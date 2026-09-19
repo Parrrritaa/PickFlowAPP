@@ -1,0 +1,145 @@
+@model IEnumerable<PickingApp.Models.Empleado>
+@{
+    ViewData["Title"] = "Gestión de empleados";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
+    var esAdmin = userRole == "Administrador";
+    var esAuxiliar = userRole == "Auxiliar";
+}
+
+<h1 class="pf-page-title">Gestión de empleados</h1>
+
+<div class="mockup-card">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h4 class="fw-bold mb-0" style="color: #1F2937;">Empleados registrados</h4>
+        <a asp-action="Crear" class="btn-pf-blue">
+            @(esAuxiliar ? "+ Generar solicitud de registro" : "+ Registrar Empleado")
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="mockup-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Estado</th>
+                    @if (!esAuxiliar)
+                    {
+                        <th>Experiencia</th>
+                    }
+                    <th>Turno</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null && Model.Any())
+                {
+                    @foreach (var emp in Model)
+                    {
+                        var estadoText = emp.EstadoDisponibilidad == "Disponible" ? "Libre" : (emp.EstadoDisponibilidad == "EnPicking" ? "Ocupado" : emp.EstadoDisponibilidad);
+                        <tr>
+                            <td class="fw-semibold">@emp.NombreCompleto</td>
+                            <td>@estadoText</td>
+                            @if (!esAuxiliar)
+                            {
+                                <td>@emp.MesesExperiencia meses</td>
+                            }
+                            <td>@(string.IsNullOrEmpty(emp.JornadaLaboral) ? "Sin turno asignado" : emp.JornadaLaboral)</td>
+                            <td class="text-center d-flex gap-2 justify-content-center">
+                                <a asp-action="Editar" asp-route-id="@emp.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
+                                    Editar
+                                </a>
+                                @if (emp.Activo)
+                                {
+                                    <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                            data-bs-toggle="modal" data-bs-target="#modalInactivar"
+                                            onclick="document.getElementById('inactivarEmpleadoId').value='@emp.Id'; document.getElementById('inactivarEmpleadoNombre').innerText='@emp.NombreCompleto';">
+                                        @(esAdmin ? "Inactivar" : "Solicitar inactivación")
+                                    </button>
+                                }
+                                else if (esAdmin)
+                                {
+                                    <form asp-action="Inactivar" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@emp.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Reactivar</button>
+                                    </form>
+                                }
+                                @if (esAdmin)
+                                {
+                                    <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                            data-bs-toggle="modal" data-bs-target="#modalReiniciarPromedio"
+                                            onclick="document.getElementById('reiniciarPromedioId').value='@emp.Id'; document.getElementById('reiniciarPromedioNombre').innerText='@emp.NombreCompleto';">
+                                        Reiniciar promedio
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="@(esAuxiliar ? 4 : 5)" class="text-center text-muted py-4">No hay empleados registrados.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="modalInactivar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content rounded-4 border-0 p-2">
+            <form asp-action="Inactivar" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="inactivarEmpleadoId" name="id" value="" />
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-danger">
+                        @(esAdmin ? "Inactivar empleado" : "Solicitar inactivación de empleado")
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Empleado: <strong id="inactivarEmpleadoNombre"></strong></p>
+                    @if (!esAdmin)
+                    {
+                        <label class="form-label fw-bold">Motivo (obligatorio):</label>
+                        <textarea name="motivo" class="form-control" rows="3" required placeholder="Especifique el motivo de la inactivación"></textarea>
+                    }
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue" style="background-color: #DC2626;">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (esAdmin)
+{
+    <div class="modal fade" id="modalReiniciarPromedio" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content rounded-4 border-0 p-2">
+                <form asp-action="ReiniciarPromedio" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="reiniciarPromedioId" name="id" value="" />
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title fw-bold text-dark">Reiniciar promedio de tiempos</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Empleado: <strong id="reiniciarPromedioNombre"></strong></p>
+                        <div class="mockup-alert-warning mb-0">
+                            Los pedidos completados hasta ahora se conservan en el historial, pero dejarán de contar para calcular su tiempo promedio. A partir de este momento, el promedio se recalculará solo con sus próximos pedidos completados.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn-pf-blue">Confirmar reinicio</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}

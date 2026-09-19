@@ -1,0 +1,155 @@
+@model IEnumerable<PickingApp.Models.Pedido>
+@{
+    ViewData["Title"] = "Dashboard";
+    var pendientes = (int)(ViewBag.TotalPendientes ?? 0);
+    var enProceso = (int)(ViewBag.TotalEnProceso ?? 0);
+    var completados = (int)(ViewBag.TotalCompletados ?? 0);
+    var cancelados = (int)(ViewBag.TotalCancelados ?? 0);
+    var reasignados = (int)(ViewBag.TotalReasignados ?? 0);
+}
+
+<h1 class="pf-page-title">Dashboard</h1>
+
+<!-- 5 Metric Cards matching Slide 5 -->
+<div class="row g-3 mb-4">
+    <div class="col">
+        <div class="pf-metric-card">
+            <span class="metric-label">Pedidos pendientes</span>
+            <span class="metric-value val-blue">@ViewBag.TotalPendientes</span>
+        </div>
+    </div>
+    <div class="col">
+        <div class="pf-metric-card">
+            <span class="metric-label">En proceso</span>
+            <span class="metric-value val-orange">@ViewBag.TotalEnProceso</span>
+        </div>
+    </div>
+    <div class="col">
+        <div class="pf-metric-card">
+            <span class="metric-label">Completados</span>
+            <span class="metric-value val-green">@ViewBag.TotalCompletados</span>
+        </div>
+    </div>
+    <div class="col">
+        <div class="pf-metric-card">
+            <span class="metric-label">Cancelados</span>
+            <span class="metric-value val-red">@ViewBag.TotalCancelados</span>
+        </div>
+    </div>
+    <div class="col">
+        <div class="pf-metric-card">
+            <span class="metric-label">Reasignados</span>
+            <span class="metric-value val-dark">@ViewBag.TotalReasignados</span>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Section: Chart and Recent Orders matching Slide 5 -->
+<div class="row g-4">
+    <!-- Chart: Detalles -->
+    <div class="col-lg-7">
+        <div class="mockup-card h-100 d-flex flex-column align-items-center justify-content-between">
+            <h4 class="fw-bold mb-3" style="color: #4B5563;">Detalles</h4>
+            @if (pendientes + enProceso + completados + cancelados + reasignados == 0)
+            {
+                <div class="text-center text-muted py-5">No hay pedidos registrados todavía.</div>
+            }
+            else
+            {
+                <div style="width: 100%; max-width: 380px; height: 260px; position: relative;" class="d-flex align-items-center justify-content-center">
+                    <canvas id="detallesChart"></canvas>
+                </div>
+                <div class="d-flex flex-wrap justify-content-center gap-3 mt-3 small text-muted">
+                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #3B71CA; display: inline-block; margin-right: 5px;"></span> pedidos pendientes</span>
+                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #EB7D26; display: inline-block; margin-right: 5px;"></span> en proceso</span>
+                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #9CA3AF; display: inline-block; margin-right: 5px;"></span> completados</span>
+                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #FBBF24; display: inline-block; margin-right: 5px;"></span> cancelados</span>
+                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #60A5FA; display: inline-block; margin-right: 5px;"></span> reasignados</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Table: Pedidos recientes -->
+    <div class="col-lg-5">
+        <div class="mockup-card h-100">
+            <h4 class="fw-bold mb-3" style="color: #111827;">Pedidos recientes</h4>
+            <div class="table-responsive">
+                <table class="mockup-table">
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Prioridad</th>
+                            <th>Estado</th>
+                            <th>Empleado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            @foreach (var pedido in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@pedido.Id" class="text-decoration-none fw-semibold" style="color: #111827;">
+                                            @pedido.CodigoPedido
+                                        </a>
+                                    </td>
+                                    <td>@pedido.Prioridad</td>
+                                    <td>@pedido.Estado</td>
+                                    <td>@(pedido.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">No hay pedidos registrados</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const ctx = document.getElementById('detallesChart');
+            if (ctx) {
+                const dataValues = [@pendientes, @enProceso, @completados, @cancelados, @reasignados];
+
+                new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['pedidos pendientes', 'en proceso', 'completados', 'cancelados', 'reasignados'],
+                        datasets: [{
+                            data: dataValues,
+                            backgroundColor: [
+                                '#3B71CA',
+                                '#EB7D26',
+                                '#9CA3AF',
+                                '#FBBF24',
+                                '#60A5FA'
+                            ],
+                            borderWidth: 1,
+                            borderColor: '#FFFFFF'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+}

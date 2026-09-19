@@ -1,0 +1,60 @@
+@model IEnumerable<PickingApp.Models.Solicitud>
+@{
+    ViewData["Title"] = "Solicitudes";
+}
+
+<h1 class="pf-page-title">Solicitudes</h1>
+
+<div class="mockup-card">
+    <div class="table-responsive">
+        <table class="mockup-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tipo</th>
+                    <th>Solicitante</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null && Model.Any())
+                {
+                    @foreach (var s in Model)
+                    {
+                        var tipoDisplay = s.TipoSolicitud switch
+                        {
+                            "RegistroEmpleado" => "Registro empleado",
+                            "EdicionEmpleado" => "Editar empleado",
+                            "InactivacionEmpleado" => "Inactivar empleado",
+                            "EdicionUbicacion" => "Editar ubicación",
+                            "EliminacionUbicacion" => "Eliminar ubicación",
+                            "CambioContrasena" => "Cambio/recuperación de contraseña",
+                            _ => s.TipoSolicitud
+                        };
+
+                        <tr>
+                            <td class="fw-semibold">SOL-@s.Id</td>
+                            <td>@tipoDisplay</td>
+                            <td>@(s.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</td>
+                            <td>@s.FechaSolicitud.ToString("dd/MM/yyyy")</td>
+                            <td>@s.Estado</td>
+                            <td class="text-center">
+                                <a asp-action="Revisar" asp-route-id="@s.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
+                                    Revisar
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No hay solicitudes registradas.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

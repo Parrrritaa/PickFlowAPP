@@ -1,0 +1,95 @@
+@model PickingApp.Models.Usuario
+@{
+    ViewData["Title"] = "Nuevo usuario";
+}
+
+<h1 class="pf-page-title">Nuevo usuario</h1>
+
+<div class="mockup-card">
+    <div class="mockup-info-banner">
+        Los usuarios tendrán acceso al sistema según el rol asignado.
+    </div>
+
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+    {
+        <div class="mockup-alert-warning mb-4">
+            @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
+            {
+                <div>@error.ErrorMessage</div>
+            }
+        </div>
+    }
+
+    <form asp-action="Crear" method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="row mb-3">
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Correo electronico <span class="text-danger">*</span></label>
+                <input asp-for="Correo" type="email" class="mockup-input" placeholder="" required />
+                <span asp-validation-for="Correo" class="text-danger small"></span>
+            </div>
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Nombre completo <span class="text-danger">*</span></label>
+                <input asp-for="NombreCompleto" class="mockup-input" placeholder="" required />
+                <span asp-validation-for="NombreCompleto" class="text-danger small"></span>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Número de identificación <span class="text-danger">*</span></label>
+                <input asp-for="Identificacion" class="mockup-input" inputmode="numeric" pattern="\d*" title="Solo números" required />
+                <span asp-validation-for="Identificacion" class="text-danger small"></span>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Rol <span class="text-danger">*</span></label>
+                <select asp-for="Rol" class="mockup-input" required>
+                    <option value="Administrador">Administrador</option>
+                    <option value="Supervisor">Supervisor</option>
+                    <option value="Auxiliar">Auxiliar</option>
+                </select>
+                <span asp-validation-for="Rol" class="text-danger small"></span>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Contraseña <span class="text-danger">*</span></label>
+                <input type="password" name="password" class="mockup-input" required />
+            </div>
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Confirmar contraseña <span class="text-danger">*</span></label>
+                <input type="password" name="confirmPassword" class="mockup-input" required />
+            </div>
+        </div>
+
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Estado <span class="text-danger">*</span></label>
+                <select asp-for="Estado" class="mockup-input">
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                    <option value="Bloqueado">Bloqueado</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <div class="mockup-alert-warning mt-2 mb-0" style="font-size: 13px; font-weight: normal;">
+                    La contraseña asignada es temporal, el usuario podrá crear una solicitud para cambiarla cuando lo desee desde el apartado 'olvidaste tu contraseña'.
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-3 pt-2">
+            <a asp-action="Index" class="btn-pf-gray">
+                Cancelar
+            </a>
+            <button type="submit" class="btn-pf-blue">
+                Crear usuario
+            </button>
+        </div>
+    </form>
+</div>

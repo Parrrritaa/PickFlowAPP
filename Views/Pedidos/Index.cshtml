@@ -1,0 +1,75 @@
+@model IEnumerable<PickingApp.Models.Pedido>
+@{
+    ViewData["Title"] = "Gestión de pedidos";
+}
+
+<h1 class="pf-page-title">Gestión de pedidos</h1>
+
+<div class="mockup-card">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <form method="get" asp-action="Index" class="d-flex gap-2 align-items-center">
+            <input type="text" name="busqueda" value="@ViewBag.Busqueda" class="mockup-search-input" placeholder="Buscar Pedido..." onchange="this.form.submit()" />
+            @if (!string.IsNullOrEmpty(ViewBag.Busqueda as string))
+            {
+                <a asp-action="Index" class="btn-pf-gray" style="padding: 6px 12px; font-size: 13px;" title="Limpiar">✕</a>
+            }
+        </form>
+
+        <div>
+            <a asp-action="CargarExcel" class="btn-pf-blue">
+                + Cargar Excel
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="mockup-table">
+            <thead>
+                <tr>
+                    <th>Pedido</th>
+                    <th>Fecha</th>
+                    <th>Prioridad</th>
+                    <th>Bodega</th>
+                    <th>Estado</th>
+                    <th>Empleado</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null && Model.Any())
+                {
+                    @foreach (var p in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@p.CodigoPedido</td>
+                            <td>@p.FechaCarga.ToString("dd/MM/yyyy")</td>
+                            <td>@p.Prioridad</td>
+                            <td>
+                                @(p.Bodega?.Nombre ?? "Principal")
+                                @if (p.Bodega != null)
+                                {
+                                    <div class="text-secondary small">@p.Bodega.Codigo</div>
+                                }
+                            </td>
+                            <td>@p.Estado</td>
+                            <td>@(p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                            <td class="text-center">
+                                <a asp-action="Detalle" asp-route-id="@p.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
+                                    Ver
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No se encontraron pedidos registrados.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

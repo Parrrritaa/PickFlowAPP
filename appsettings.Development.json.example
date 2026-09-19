@@ -1,0 +1,18 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Port=3306;Database=PickingDB;User=root;Password=TU_PASSWORD_MYSQL;"
+  },
+  "EmailSettings": {
+    "SmtpHost": "smtp.gmail.com",
+    "SmtpPort": 587,
+    "SenderEmail": "tu_correo@gmail.com",
+    "SenderPassword": "TU_APP_PASSWORD_DE_GMAIL",
+    "SenderName": "PickFlow"
+  }
+}

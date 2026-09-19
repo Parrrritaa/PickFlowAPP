@@ -1,0 +1,29 @@
+@model PickingApp.Models.ViewModels.SolicitarCodigoViewModel
+@{
+    ViewData["Title"] = "Recuperar contraseña";
+    Layout = "_LayoutLogin";
+}
+
+<div class="pf-login-card">
+    <div class="text-center mb-4">
+        <h3 class="fw-bold" style="color: #00204A;">Recuperar contraseña</h3>
+        <p class="text-muted small">Ingresa tu correo y te enviaremos un código de verificación para restablecer tu contraseña</p>
+    </div>
+
+    <form asp-action="SolicitarRecuperacion" method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="mb-3 text-start">
+            <input asp-for="Correo" class="pf-login-input" placeholder="Correo electrónico" required />
+            <span asp-validation-for="Correo" class="text-danger small"></span>
+        </div>
+
+        <button type="submit" class="btn-pf-login">
+            Enviar código de verificación
+        </button>
+
+        <div class="mt-2">
+            <a asp-action="Login" class="pf-login-link">Volver a iniciar sesión</a>
+        </div>
+    </form>
+</div>

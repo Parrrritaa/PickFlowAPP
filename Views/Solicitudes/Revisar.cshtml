@@ -1,0 +1,211 @@
+@model PickingApp.Models.Solicitud
+@{
+    ViewData["Title"] = "Revisar solicitud";
+    var tipoDisplay = Model.TipoSolicitud switch
+    {
+        "RegistroEmpleado" => "Registro de empleado",
+        "EdicionEmpleado" => "Editar empleado",
+        "InactivacionEmpleado" => "Inactivar empleado",
+        "EdicionUbicacion" => "Editar ubicación",
+        "EliminacionUbicacion" => "Eliminar ubicación",
+        "CambioContrasena" => "Cambio/recuperación de contraseña",
+        _ => Model.TipoSolicitud
+    };
+
+    // Datos concretos del empleado/ubicación asociados a la solicitud (CU-08 / CU-11 / CU-14 / CU-21).
+    var datosEmpleado = new List<(string Etiqueta, string Valor)>();
+    var cambiosEmpleado = new List<(string Campo, string Anterior, string Nuevo)>();
+    string motivo = "No especificado";
+
+    if (!string.IsNullOrEmpty(Model.DatosJson))
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(Model.DatosJson);
+            var root = doc.RootElement;
+
+            if (Model.TipoSolicitud == "RegistroEmpleado")
+            {
+                if (root.TryGetProperty("Identificacion", out var ident))
+                    datosEmpleado.Add(("Número de documento", ident.GetString() ?? "-"));
+                if (root.TryGetProperty("NombreCompleto", out var nom))
+                    datosEmpleado.Add(("Nombre completo", nom.GetString() ?? "-"));
+                if (root.TryGetProperty("Correo", out var correo) && correo.ValueKind == System.Text.Json.JsonValueKind.String)
+                    datosEmpleado.Add(("Correo electrónico", correo.GetString() ?? "-"));
+                if (root.TryGetProperty("FechaIngreso", out var fIngreso) && fIngreso.TryGetDateTime(out var fechaIngresoVal))
+                    datosEmpleado.Add(("Fecha de ingreso", fechaIngresoVal.ToString("dd/MM/yyyy")));
+                if (root.TryGetProperty("HorarioEntrada", out var hEntrada))
+                    datosEmpleado.Add(("Hora de entrada", hEntrada.ToString()));
+                if (root.TryGetProperty("HorarioSalida", out var hSalida))
+                    datosEmpleado.Add(("Hora de salida", hSalida.ToString()));
+
+                motivo = "Solicitud de registro de nuevo empleado.";
+            }
+            else if (Model.TipoSolicitud == "EdicionEmpleado" || Model.TipoSolicitud == "EdicionUbicacion")
+            {
+                if (root.TryGetProperty("Motivo", out var motEd))
+                    motivo = motEd.GetString() ?? motivo;
+
+                if (root.TryGetProperty("Cambios", out var cambiosEl) && cambiosEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var c in cambiosEl.EnumerateArray())
+                    {
+                        var campo = c.TryGetProperty("Campo", out var cp) ? cp.GetString() ?? "-" : "-";
+                        var anterior = c.TryGetProperty("Anterior", out var an) ? an.GetString() ?? "-" : "-";
+                        var nuevo = c.TryGetProperty("Nuevo", out var nv) ? nv.GetString() ?? "-" : "-";
+                        cambiosEmpleado.Add((campo, anterior, nuevo));
+                    }
+                }
+            }
+            else if (root.TryGetProperty("Identificacion", out var identOtro))
+            {
+                datosEmpleado.Add(("Número de documento", identOtro.GetString() ?? "-"));
+                if (root.TryGetProperty("NombreCompleto", out var nomOtro))
+                    datosEmpleado.Add(("Nombre completo", nomOtro.GetString() ?? "-"));
+                if (root.TryGetProperty("Motivo", out var motProp))
+                    motivo = motProp.GetString() ?? motivo;
+            }
+            else if (root.TryGetProperty("CodigoUbicacion", out var codUbi))
+            {
+                datosEmpleado.Add(("Ubicación", codUbi.GetString() ?? "-"));
+                if (root.TryGetProperty("BodegaCodigo", out var bodCod))
+                    datosEmpleado.Add(("Bodega", bodCod.GetString() ?? "-"));
+                if (root.TryGetProperty("Motivo", out var motProp2))
+                    motivo = motProp2.GetString() ?? motivo;
+            }
+            else if (root.TryGetProperty("Motivo", out var motGenerico))
+            {
+                motivo = motGenerico.GetString() ?? motivo;
+            }
+        }
+        catch { }
+    }
+}
+
+<h1 class="pf-page-title">Revisar solicitud</h1>
+
+<div class="mockup-card">
+    <div class="mb-4">
+        <h4 class="fw-bold text-dark mb-1">Solicitud SOL-@Model.Id</h4>
+        <div class="text-secondary fw-medium">@tipoDisplay</div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="bg-white rounded-3 p-3 shadow-sm">
+                <div class="text-secondary small fw-medium">Solicitante</div>
+                <div class="fs-5 text-dark fw-normal mt-1">@(Model.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="bg-white rounded-3 p-3 shadow-sm">
+                <div class="text-secondary small fw-medium">Fecha de solicitud</div>
+                <div class="fs-5 text-dark fw-normal mt-1">@Model.FechaSolicitud.ToString("dd/MM/yyyy")</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="bg-white rounded-3 p-3 shadow-sm">
+                <div class="text-secondary small fw-medium">Tipo de solicitud</div>
+                <div class="fs-5 text-dark fw-normal mt-1">@tipoDisplay</div>
+            </div>
+        </div>
+    </div>
+
+    @if (datosEmpleado.Any())
+    {
+        <div class="mb-4">
+            <h5 class="fw-bold text-dark mb-2">Datos a registrar</h5>
+            <div class="row g-3">
+                @foreach (var dato in datosEmpleado)
+                {
+                    <div class="col-md-6">
+                        <div class="bg-white rounded-3 p-3 shadow-sm">
+                            <div class="text-secondary small fw-medium">@dato.Etiqueta</div>
+                            <div class="fs-5 text-dark fw-normal mt-1">@dato.Valor</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (cambiosEmpleado.Any())
+    {
+        <div class="mb-4">
+            <h5 class="fw-bold text-dark mb-2">Cambios solicitados</h5>
+            <div class="table-responsive">
+                <table class="mockup-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Valor anterior</th>
+                            <th>Valor nuevo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in cambiosEmpleado)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@c.Campo</td>
+                                <td>@c.Anterior</td>
+                                <td>@c.Nuevo</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else if (Model.TipoSolicitud == "EdicionEmpleado" || Model.TipoSolicitud == "EdicionUbicacion")
+    {
+        <div class="mockup-info-banner mb-4">
+            No se detectaron cambios en los campos @(Model.TipoSolicitud == "EdicionEmpleado" ? "del empleado" : "de la ubicación").
+        </div>
+    }
+
+    <div class="mb-4">
+        <h5 class="fw-bold text-dark mb-2">Motivo / descripción</h5>
+        <div class="mockup-info-banner mb-0">
+            @motivo
+        </div>
+    </div>
+
+    @if (Model.Estado == "Pendiente")
+    {
+        <form id="formAccionSolicitud" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+
+            <div class="mb-4">
+                <h5 class="fw-bold text-dark mb-2">Comentario de revisión</h5>
+                <textarea name="motivoRechazo" id="txtComentario" class="mockup-input" style="height: 90px;"></textarea>
+            </div>
+
+            <div class="d-flex flex-wrap gap-3">
+                <button type="submit" formaction="@Url.Action("Aprobar")" class="btn-pf-blue" style="background-color: #84CC16;">
+                    Aprobar solicitud
+                </button>
+                <button type="submit" formaction="@Url.Action("Rechazar")" class="btn-pf-blue" style="background-color: #EF4444;">
+                    Rechazar solicitud
+                </button>
+                <a asp-action="Index" class="btn-pf-gray ms-auto">
+                    Volver
+                </a>
+            </div>
+        </form>
+    }
+    else
+    {
+        <div class="mockup-alert-warning mb-4">
+            Esta solicitud ya fue atendida con estado: <strong>@Model.Estado</strong>
+        </div>
+        <div>
+            <a asp-action="Index" class="btn-pf-gray">
+                Volver
+            </a>
+        </div>
+    }
+</div>

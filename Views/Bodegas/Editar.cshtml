@@ -1,0 +1,63 @@
+@model PickingApp.Models.Bodega
+@{
+    ViewData["Title"] = "Editar bodega";
+}
+
+<h1 class="pf-page-title">Editar bodega</h1>
+
+<div class="mockup-card">
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+    {
+        <div class="mockup-alert-warning mb-4">
+            @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
+            {
+                <div>@error.ErrorMessage</div>
+            }
+        </div>
+    }
+
+    <form asp-action="Editar" asp-route-id="@Model.Id" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Codigo" />
+        <input type="hidden" asp-for="FechaCreacion" />
+
+        <div class="mockup-info-banner mb-3" style="font-size: 13px;">
+            Código de bodega: <strong>@Model.Codigo</strong> (no editable).
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-12 mockup-form-group">
+                <label class="mockup-label">Nombre de la bodega <span class="text-danger">*</span></label>
+                <input asp-for="Nombre" class="mockup-input" required />
+                <span asp-validation-for="Nombre" class="text-danger small"></span>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label">Estado</label>
+                <select asp-for="Activa" class="mockup-input">
+                    <option value="true">Activa</option>
+                    <option value="false">Inactiva</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12 mockup-form-group">
+                <label class="mockup-label">Descripción</label>
+                <textarea asp-for="Descripcion" class="mockup-input" style="height: 110px;"></textarea>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-3 pt-2">
+            <a asp-action="Index" class="btn-pf-gray">
+                Cancelar
+            </a>
+            <button type="submit" class="btn-pf-blue">
+                Guardar cambios
+            </button>
+        </div>
+    </form>
+</div>

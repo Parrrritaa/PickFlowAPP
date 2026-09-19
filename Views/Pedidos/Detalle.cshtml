@@ -1,0 +1,332 @@
+@model PickingApp.Models.Pedido
+@{
+    ViewData["Title"] = $"Pedido {Model.CodigoPedido}";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
+    var totalUbicaciones = Model.Detalles.Select(d => d.UbicacionId).Distinct().Count();
+    if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
+}
+
+<h1 class="pf-page-title">Pedido @Model.CodigoPedido</h1>
+
+<div class="mockup-card">
+    <!-- 4 White Stat Cards matching Slide 7 -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
+                <div class="text-secondary fw-semibold small mb-1">Estado</div>
+                <div class="fw-bold fs-3" style="color: #3B71CA;">@Model.Estado</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
+                <div class="text-secondary fw-semibold small mb-1">Prioridad</div>
+                <div class="fw-bold fs-3 text-dark">@Model.Prioridad</div>
+                @if (userRole == "Administrador")
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-bs-toggle="modal" data-bs-target="#modalPrioridad">
+                        Cambiar
+                    </button>
+                }
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
+                <div class="text-secondary fw-semibold small mb-1">Ubicaciones</div>
+                <div class="fw-bold fs-3 text-dark">@totalUbicaciones</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
+                <div class="text-secondary fw-semibold small mb-1">Empleado</div>
+                <div class="fw-bold fs-3 text-dark">@(Model.Empleado?.NombreCompleto ?? "Sin asignar")</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información section -->
+    <div class="mb-4">
+        <h5 class="fw-bold mb-2 text-dark">Información</h5>
+        <div class="fs-6 mb-1"><strong>Bodega:</strong> @(Model.Bodega?.Nombre ?? "Bodega principal") <span class="text-secondary">(@(Model.Bodega?.Codigo ?? "-"))</span></div>
+        <div class="fs-6"><strong>Cliente:</strong> Cliente 001</div>
+    </div>
+
+    <!-- Productos section -->
+    <div class="mb-4">
+        <h5 class="fw-bold mb-3 text-dark">Productos</h5>
+        <div class="table-responsive">
+            <table class="mockup-table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Ubicación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Detalles != null && Model.Detalles.Any())
+                    {
+                        @foreach (var d in Model.Detalles)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@d.NombreProducto</td>
+                                <td>@d.Cantidad</td>
+                                <td>@(d.Ubicacion?.CodigoUbicacion ?? "A-01-05")</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-3">No hay productos registrados en este pedido</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Novedades registradas (CU-29 / CU-30) -->
+    @if (Model.Novedades != null && Model.Novedades.Any())
+    {
+        <div class="mb-4">
+            <h5 class="fw-bold mb-3 text-dark">Novedades registradas</h5>
+            <div class="table-responsive">
+                <table class="mockup-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Descripción</th>
+                            <th>Registrado por</th>
+                            <th>Estado</th>
+                            @if (userRole == "Administrador")
+                            {
+                                <th class="text-center">Acción</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var nov in Model.Novedades.OrderByDescending(n => n.FechaRegistro))
+                        {
+                            <tr>
+                                <td>@nov.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@nov.TipoNovedad</td>
+                                <td>@nov.Descripcion</td>
+                                <td>@nov.RegistradoPor</td>
+                                <td>
+                                    @if (nov.Atendida)
+                                    {
+                                        <span class="badge bg-success">Atendida</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">Pendiente</span>
+                                    }
+                                </td>
+                                @if (userRole == "Administrador")
+                                {
+                                    <td class="text-center">
+                                        @if (!nov.Atendida)
+                                        {
+                                            <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                                    data-bs-toggle="modal" data-bs-target="#modalAtenderNovedad"
+                                                    onclick="document.getElementById('atenderNovedadId').value='@nov.Id';">
+                                                Atender
+                                            </button>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Action Buttons matching Slide 7 -->
+    <div class="d-flex flex-wrap gap-3 mt-4 pt-2 align-items-center">
+        @if (userRole == "Administrador" || userRole == "Supervisor")
+        {
+            @if (Model.Estado == "Pendiente")
+            {
+                <a asp-action="Asignar" asp-route-id="@Model.Id" class="btn-pf-blue">
+                    Asignar Empleado
+                </a>
+            }
+            else if (Model.Estado == "Asignado" || Model.Estado == "EnProceso" || Model.Estado == "Reasignado")
+            {
+                <button type="button" class="btn-pf-blue" style="background-color: #52A447;" data-bs-toggle="modal" data-bs-target="#modalCompletar">
+                    Marcar Completado
+                </button>
+                <a asp-action="Asignar" asp-route-id="@Model.Id" class="btn-pf-blue" style="background-color: #F59E0B;">
+                    Reasignar
+                </a>
+            }
+
+            @if (Model.Estado != "Completado" && Model.Estado != "Cancelado")
+            {
+                <button type="button" class="btn-pf-blue" data-bs-toggle="modal" data-bs-target="#modalCancelar">
+                    Cancelar pedido
+                </button>
+            }
+
+            <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
+                Novedad
+            </button>
+        }
+
+        <a asp-action="Index" class="btn-pf-gray">
+            Volver a pedidos
+        </a>
+    </div>
+</div>
+
+@if (userRole == "Administrador")
+{
+    <!-- Modal Cambiar Prioridad (CU-25) -->
+    <div class="modal fade" id="modalPrioridad" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content rounded-4 border-0 p-2">
+                <form asp-action="CambiarPrioridad" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="pedidoId" value="@Model.Id" />
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title fw-bold text-dark">Cambiar prioridad</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label fw-bold">Nueva prioridad:</label>
+                        <select name="nuevaPrioridad" class="form-select">
+                            <option value="Alta" selected="@(Model.Prioridad == "Alta")">Alta</option>
+                            <option value="Media" selected="@(Model.Prioridad == "Media")">Media</option>
+                            <option value="Baja" selected="@(Model.Prioridad == "Baja")">Baja</option>
+                        </select>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn-pf-blue">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Atender Novedad (CU-30) -->
+    <div class="modal fade" id="modalAtenderNovedad" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content rounded-4 border-0 p-2">
+                <form asp-action="AtenderNovedad" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="atenderNovedadId" name="novedadId" value="" />
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title fw-bold text-dark">Atender novedad</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label fw-bold">Observaciones de atención:</label>
+                        <textarea name="observacionesAtencion" class="form-control" rows="3" placeholder="Describa cómo fue atendida la novedad"></textarea>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn-pf-blue">Marcar como atendida</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Cancelar (CU-31) -->
+<div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content rounded-4 border-0 p-2">
+            <form asp-action="Cancelar" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="pedidoId" value="@Model.Id" />
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-danger">Cancelar Pedido</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mockup-alert-warning mt-0 mb-3">
+                        <strong>Atención:</strong> Un pedido cancelado no podrá reactivarse.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Motivo de Cancelación (Obligatorio):</label>
+                        <textarea name="motivoCancelacion" class="form-control" rows="3" required placeholder="Especifique el motivo de cancelación"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="submit" class="btn-pf-blue" style="background-color: #DC2626;">Confirmar Cancelación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Completar (CU-28) -->
+<div class="modal fade" id="modalCompletar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content rounded-4 border-0 p-2">
+            <form asp-action="MarcarCompletado" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="pedidoId" value="@Model.Id" />
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-success">Finalizar Pedido de Picking</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Desea marcar como completado el pedido <strong>@Model.CodigoPedido</strong>?</p>
+                    <div class="form-check p-3 bg-light rounded-3 mb-2">
+                        <input class="form-check-input" type="checkbox" name="confirmacionFisica" id="chkFisica" value="true" required />
+                        <label class="form-check-label fw-semibold text-dark" for="chkFisica">
+                            Confirmo que el empleado ha entregado físicamente la mercancía completa.
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue" style="background-color: #52A447;">Marcar como Completado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registrar Novedad (CU-29) -->
+<div class="modal fade" id="modalNovedad" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content rounded-4 border-0 p-2">
+            <form asp-action="RegistrarNovedad" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="pedidoId" value="@Model.Id" />
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-warning">Registrar Novedad</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tipo de Novedad:</label>
+                        <select name="tipoNovedad" class="form-select">
+                            <option value="Faltante">Faltante de Producto</option>
+                            <option value="Avería">Avería / Producto Dañado</option>
+                            <option value="Ubicación Incorrecta">Ubicación Física Incorrecta</option>
+                            <option value="Diferencia Cantidad">Diferencia de Cantidades</option>
+                            <option value="Otro">Otro Motivo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Descripción de la Novedad:</label>
+                        <textarea name="descripcion" class="form-control" rows="3" required placeholder="Detalle la situación encontrada"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue">Registrar Novedad</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,115 @@
+@model IEnumerable<PickingApp.Models.Bodega>
+@{
+    ViewData["Title"] = "Bodegas y ubicaciones";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
+}
+
+<h1 class="pf-page-title">Bodegas y ubicaciones</h1>
+
+<div class="mockup-card">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h4 class="fw-bold mb-0" style="color: #1F2937;">Bodegas registradas</h4>
+        @if (userRole == "Administrador")
+        {
+            <a asp-action="Crear" class="btn-pf-blue">
+                + Crear bodega
+            </a>
+        }
+    </div>
+
+    <div class="table-responsive">
+        <table class="mockup-table">
+            <thead>
+                <tr>
+                    <th>Bodega</th>
+                    <th>Direccion</th>
+                    <th>Ubicaciones</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null && Model.Any())
+                {
+                    @foreach (var b in Model)
+                    {
+                        var ubicacionesCount = b.Ubicaciones?.Count ?? 0;
+                        var estadoText = b.Activa ? "Activa" : "Inactiva";
+                        var direccion = b.Nombre.Contains("Norte") ? "Zona Norte" : (b.Nombre.Contains("Sur") ? "Zona sur" : "Zona industrial");
+
+                        <tr>
+                            <td class="fw-semibold">
+                                @b.Nombre
+                                <div class="text-secondary small">@b.Codigo</div>
+                            </td>
+                            <td>@direccion</td>
+                            <td>@ubicacionesCount</td>
+                            <td>@estadoText</td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                    <a asp-action="Detalle" asp-route-id="@b.Id" class="btn-pf-blue" style="padding: 4px 18px; font-size: 14px;">
+                                        Ver ubicaciones
+                                    </a>
+                                    @if (userRole == "Administrador")
+                                    {
+                                        <a asp-action="Editar" asp-route-id="@b.Id" class="btn-pf-gray" style="padding: 4px 18px; font-size: 14px;">
+                                            Editar
+                                        </a>
+                                        <button type="button" class="btn-pf-gray btn-eliminar-bodega" style="padding: 4px 18px; font-size: 14px;"
+                                                data-bs-toggle="modal" data-bs-target="#modalEliminarBodega"
+                                                data-bodega-id="@b.Id" data-bodega-etiqueta="@($"{b.Nombre} ({b.Codigo})")">
+                                            Eliminar
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No hay bodegas registradas.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (userRole == "Administrador")
+{
+    <div class="modal fade" id="modalEliminarBodega" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content rounded-4 border-0 p-2">
+                <form asp-action="EliminarBodega" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="eliminarBodegaId" name="id" value="" />
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title fw-bold text-danger">Eliminar bodega</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Bodega: <strong id="eliminarBodegaNombre"></strong></p>
+                        <div class="mockup-alert-warning mt-0 mb-0">
+                            Solo se puede eliminar si no tiene ubicaciones ni pedidos asociados.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn-pf-blue" style="background-color: #DC2626;">Confirmar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.querySelectorAll('.btn-eliminar-bodega').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.getElementById('eliminarBodegaId').value = btn.dataset.bodegaId;
+                document.getElementById('eliminarBodegaNombre').textContent = btn.dataset.bodegaEtiqueta;
+            });
+        });
+    </script>
+}

@@ -1,0 +1,67 @@
+@{
+    ViewData["Title"] = "Reportes";
+}
+
+<h1 class="pf-page-title">Reportes</h1>
+
+<div class="row g-4">
+    <!-- Card 1: Tiempos por empleado -->
+    <div class="col-lg-4 col-md-6">
+        <div class="mockup-report-card">
+            <div>
+                <h3>Tiempos por empleado</h3>
+                <p>Consulta los tiempos de procesamiento de empleados.</p>
+            </div>
+            <div>
+                <a asp-action="TiemposPorEmpleado" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                    Generar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Tiempos generales de entrega -->
+    <div class="col-lg-4 col-md-6">
+        <div class="mockup-report-card">
+            <div>
+                <h3>Tiempos generales de entrega</h3>
+                <p>Consulta los tiempos de entrega agrupados por bodega.</p>
+            </div>
+            <div>
+                <a asp-action="TiemposGenerales" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                    Generar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Pedidos por periodo -->
+    <div class="col-lg-4 col-md-6">
+        <div class="mockup-report-card">
+            <div>
+                <h3>Pedidos por periodo</h3>
+                <p>Consultar pedidos realizados durante un periodo.</p>
+            </div>
+            <div>
+                <a asp-action="PedidosPorPeriodo" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                    Generar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Estado de pedidos -->
+    <div class="col-lg-4 col-md-6">
+        <div class="mockup-report-card">
+            <div>
+                <h3>Estado de pedidos</h3>
+                <p>Completados , cancelados y reasignados.</p>
+            </div>
+            <div>
+                <a asp-action="CompletadosCanceladosReasignados" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                    Generar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

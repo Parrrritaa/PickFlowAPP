@@ -1,0 +1,59 @@
+@model PickingApp.Models.ViewModels.LoginViewModel
+@inject IWebHostEnvironment Environment
+@{
+    ViewData["Title"] = "Iniciar sesión";
+    Layout = "_LayoutLogin";
+}
+
+<div class="pf-login-card">
+    <div class="text-center mb-4">
+        <!-- PickFlow Logo -->
+        <img src="~/images/pickflow-logo.jpg" alt="PickFlow" style="height: 110px; object-fit: contain;" class="mb-1" />
+    </div>
+
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+    {
+        <div class="alert alert-danger py-2 text-start small mb-3" role="alert">
+            @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
+            {
+                <div>@error.ErrorMessage</div>
+            }
+        </div>
+    }
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success py-2 text-start small mb-3" role="alert">
+            @TempData["SuccessMessage"]
+        </div>
+    }
+
+    <form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="mb-2">
+            <input asp-for="Correo" class="pf-login-input" placeholder="Usuario" autocomplete="username" />
+            <span asp-validation-for="Correo" class="text-danger small d-block text-start mb-2"></span>
+        </div>
+
+        <div class="mb-2">
+            <input asp-for="Password" class="pf-login-input" placeholder="Contraseña" type="password" autocomplete="current-password" />
+            <span asp-validation-for="Password" class="text-danger small d-block text-start mb-2"></span>
+        </div>
+
+        <button type="submit" class="btn-pf-login">
+            Iniciar sesión
+        </button>
+
+        <div>
+            <a asp-action="SolicitarRecuperacion" class="pf-login-link">¿Olvidaste tu contraseña?</a>
+        </div>
+    </form>
+
+    @if (Environment.IsDevelopment())
+    {
+        <div class="mt-4 pt-3 border-top text-center text-muted" style="font-size: 12px;">
+            <span class="text-secondary">Pruebas: <code>admin@pickingapp.com</code> / <code>Admin123*</code></span>
+        </div>
+    }
+</div>
