@@ -13,7 +13,7 @@ namespace PickingApp.Services
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
-        public byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, DateTime fechaInicio, DateTime fechaFin)
+        public byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo)
         {
             var document = Document.Create(container =>
             {
@@ -24,7 +24,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte de Tiempos de Picking por Empleado (CU-32)", fechaInicio, fechaFin));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte de Tiempos de Picking por Empleado (CU-32)", periodo.Descripcion, "Todos los empleados"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -59,6 +59,11 @@ namespace PickingApp.Services
                                 table.Cell().Element(CellStyleRow).AlignRight().Text(item.TiempoMinimo.ToString("0.0"));
                                 table.Cell().Element(CellStyleRow).AlignRight().Text(item.TiempoMaximo.ToString("0.0"));
                             }
+
+                            if (!datos.Any())
+                            {
+                                table.Cell().ColumnSpan(6).Element(celda => FilaSinDatos(celda, "No hay pedidos completados por empleados en este periodo."));
+                            }
                         });
                     });
 
@@ -69,7 +74,7 @@ namespace PickingApp.Services
             return document.GeneratePdf();
         }
 
-        public byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, DateTime fechaInicio, DateTime fechaFin)
+        public byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, PeriodoReporte periodo)
         {
             var document = Document.Create(container =>
             {
@@ -80,7 +85,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte General de Tiempos de Entrega (CU-33)", fechaInicio, fechaFin));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte General de Tiempos de Entrega (CU-33)", periodo.Descripcion, "Todas las bodegas"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -109,6 +114,11 @@ namespace PickingApp.Services
                                 table.Cell().Element(CellStyleRow).AlignRight().Text(item.PromedioMinutos.ToString("0.0"));
                                 table.Cell().Element(CellStyleRow).AlignRight().Text(item.TiempoTotalMinutos.ToString("0.0"));
                             }
+
+                            if (!datos.Any())
+                            {
+                                table.Cell().ColumnSpan(4).Element(celda => FilaSinDatos(celda, "No hay pedidos completados en este periodo."));
+                            }
                         });
                     });
 
@@ -119,7 +129,7 @@ namespace PickingApp.Services
             return document.GeneratePdf();
         }
 
-        public byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, DateTime fechaInicio, DateTime fechaFin)
+        public byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro)
         {
             var document = Document.Create(container =>
             {
@@ -130,7 +140,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte Consolidado de Pedidos por Periodo (CU-34)", fechaInicio, fechaFin));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte Consolidado de Pedidos por Periodo (CU-34)", periodo.Descripcion, filtro ?? "Todas las bodegas"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -168,6 +178,11 @@ namespace PickingApp.Services
                                 table.Cell().Element(CellStyleRow).Text(p.FechaCarga.ToString("dd/MM/yyyy HH:mm"));
                                 table.Cell().Element(CellStyleRow).AlignRight().Text(p.TiempoProcesamientoMinutos?.ToString("0.0") ?? "-");
                             }
+
+                            if (!pedidos.Any())
+                            {
+                                table.Cell().ColumnSpan(7).Element(celda => FilaSinDatos(celda, "No hay pedidos en este periodo."));
+                            }
                         });
                     });
 
@@ -178,7 +193,7 @@ namespace PickingApp.Services
             return document.GeneratePdf();
         }
 
-        public byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, DateTime fechaInicio, DateTime fechaFin)
+        public byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro)
         {
             var document = Document.Create(container =>
             {
@@ -189,7 +204,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte de Pedidos Completados, Cancelados y Reasignados (CU-35)", fechaInicio, fechaFin));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte de Pedidos Completados, Cancelados y Reasignados (CU-35)", periodo.Descripcion, filtro ?? "Completados, cancelados y reasignados"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -225,8 +240,102 @@ namespace PickingApp.Services
                                 table.Cell().Element(CellStyleRow).Text(p.Estado);
                                 table.Cell().Element(CellStyleRow).Text(p.Empleado?.NombreCompleto ?? "-");
                                 table.Cell().Element(CellStyleRow).Text(p.FechaFinalizacion?.ToString("dd/MM/yyyy HH:mm") ?? "-");
-                                table.Cell().Element(CellStyleRow).AlignRight().Text(p.TiempoProcesamientoMinutos?.ToString("0.0") + " min");
+                                table.Cell().Element(CellStyleRow).AlignRight().Text(p.TiempoProcesamientoMinutos.HasValue ? $"{p.TiempoProcesamientoMinutos.Value:0.0} min" : "-");
                                 table.Cell().Element(CellStyleRow).Text(motivo);
+                            }
+
+                            if (!pedidos.Any())
+                            {
+                                table.Cell().ColumnSpan(6).Element(celda => FilaSinDatos(celda, "No hay pedidos con estos estados en este periodo."));
+                            }
+                        });
+                    });
+
+                    page.Footer().Element(ComposeFooter);
+                });
+            });
+
+            return document.GeneratePdf();
+        }
+
+        public byte[] GenerarReporteDetalleTiemposPdf(string titulo, string sujeto, List<Pedido> pedidos, PeriodoReporte periodo, bool porEmpleado)
+        {
+            var tiempos = pedidos.Where(p => p.TiempoProcesamientoMinutos.HasValue)
+                                 .Select(p => p.TiempoProcesamientoMinutos!.Value)
+                                 .ToList();
+            var unidades = pedidos.Sum(p => p.Detalles.Sum(d => d.Cantidad));
+
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(1.5f, Unit.Centimetre);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Lato"));
+
+                    page.Header().Element(c => ComposeHeader(c, titulo, periodo.Descripcion, sujeto));
+
+                    page.Content().PaddingVertical(10).Column(col =>
+                    {
+                        // Resumen en tarjetas
+                        col.Item().PaddingBottom(12).Row(row =>
+                        {
+                            row.Spacing(8);
+
+                            void Dato(string etiqueta, string valor) =>
+                                row.RelativeItem().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(8).Column(d =>
+                                {
+                                    d.Item().Text(etiqueta).FontSize(8).FontColor(Colors.Grey.Darken1);
+                                    d.Item().Text(valor).FontSize(13).Bold().FontColor("#1C3A6B");
+                                });
+
+                            Dato("Pedidos completados", pedidos.Count.ToString());
+                            Dato("Unidades", unidades.ToString());
+                            Dato("Promedio", tiempos.Any() ? $"{tiempos.Average():0.0} min" : "-");
+                            Dato("Mínimo", tiempos.Any() ? $"{tiempos.Min():0.0} min" : "-");
+                            Dato("Máximo", tiempos.Any() ? $"{tiempos.Max():0.0} min" : "-");
+                        });
+
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.ConstantColumn(90);
+                                columns.RelativeColumn(3);
+                                columns.ConstantColumn(95);
+                                columns.ConstantColumn(55);
+                                columns.ConstantColumn(65);
+                                columns.ConstantColumn(60);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellStyleHeader).Text("Pedido");
+                                header.Cell().Element(CellStyleHeader).Text(porEmpleado ? "Bodega" : "Empleado");
+                                header.Cell().Element(CellStyleHeader).Text("Finalizado");
+                                header.Cell().Element(CellStyleHeader).AlignRight().Text("Unidades");
+                                header.Cell().Element(CellStyleHeader).AlignRight().Text("Ubicaciones");
+                                header.Cell().Element(CellStyleHeader).AlignRight().Text("Tiempo");
+                            });
+
+                            foreach (var p in pedidos)
+                            {
+                                var columna = porEmpleado
+                                    ? (p.Bodega != null ? $"{p.Bodega.Nombre} ({p.Bodega.Codigo})" : "Sin bodega")
+                                    : (p.Empleado?.NombreCompleto ?? "Sin asignar");
+
+                                table.Cell().Element(CellStyleRow).Text(p.CodigoPedido);
+                                table.Cell().Element(CellStyleRow).Text(columna);
+                                table.Cell().Element(CellStyleRow).Text(p.FechaFinalizacion?.ToString("dd/MM/yyyy HH:mm") ?? "-");
+                                table.Cell().Element(CellStyleRow).AlignRight().Text(p.Detalles.Sum(d => d.Cantidad).ToString());
+                                table.Cell().Element(CellStyleRow).AlignRight().Text(p.Detalles.Select(d => d.UbicacionId).Distinct().Count().ToString());
+                                table.Cell().Element(CellStyleRow).AlignRight().Text(p.TiempoProcesamientoMinutos.HasValue ? $"{p.TiempoProcesamientoMinutos.Value:0.0} min" : "-");
+                            }
+
+                            if (!pedidos.Any())
+                            {
+                                table.Cell().ColumnSpan(6).Element(celda => FilaSinDatos(celda, "No hay pedidos completados en este periodo."));
                             }
                         });
                     });
@@ -255,7 +364,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "LOG del Sistema (CU-38)", fechaDesde, fechaHasta));
+                    page.Header().Element(c => ComposeHeader(c, "LOG del Sistema (CU-38)", new PeriodoReporte(fechaDesde, fechaHasta).Descripcion, null));
 
                     page.Content().PaddingVertical(10).Column(col =>
                     {
@@ -296,7 +405,7 @@ namespace PickingApp.Services
             return document.GeneratePdf();
         }
 
-        private static void ComposeHeader(IContainer container, string titulo, DateTime fechaInicio, DateTime fechaFin)
+        private static void ComposeHeader(IContainer container, string titulo, string periodo, string? filtro)
         {
             // Ruta absoluta al logo en wwwroot
             var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "images", "pickflow-logo.jpg");
@@ -328,8 +437,12 @@ namespace PickingApp.Services
                     row.RelativeItem().PaddingLeft(12).Column(col =>
                     {
                         col.Item().Text(titulo).FontSize(11).SemiBold().FontColor("#1C3A6B");
-                        col.Item().Text($"Periodo: {fechaInicio:dd/MM/yyyy} – {fechaFin:dd/MM/yyyy}")
+                        col.Item().Text($"Periodo: {periodo}")
                            .FontSize(9).FontColor(Colors.Grey.Medium);
+                        if (!string.IsNullOrWhiteSpace(filtro))
+                        {
+                            col.Item().Text(filtro).FontSize(9).SemiBold().FontColor(Colors.Grey.Darken2);
+                        }
                     });
 
                     // Fecha de generación
@@ -367,6 +480,11 @@ namespace PickingApp.Services
                             .PaddingVertical(6)
                             .PaddingHorizontal(4)
                             .Background("#0D6EFD");
+        }
+
+        private static void FilaSinDatos(IContainer container, string mensaje)
+        {
+            container.PaddingVertical(14).AlignCenter().Text(mensaje).FontSize(9).Italic().FontColor(Colors.Grey.Darken1);
         }
 
         private static IContainer CellStyleRow(IContainer container)

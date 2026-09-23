@@ -1,5 +1,38 @@
 @{
     ViewData["Title"] = "Reportes";
+    var empleados = ViewBag.Empleados as IEnumerable<PickingApp.Models.Empleado> ?? Enumerable.Empty<PickingApp.Models.Empleado>();
+    var bodegas = ViewBag.Bodegas as IEnumerable<PickingApp.Models.Bodega> ?? Enumerable.Empty<PickingApp.Models.Bodega>();
+    var hoy = DateTime.Today.ToString("yyyy-MM-dd");
+
+    // Control segmentado de dos opciones: la segunda revela un campo adicional
+    void Segmentado(string nombre, string prefijo, string textoGeneral, string textoIndividual)
+    {
+        <div class="pf-segmented" role="radiogroup">
+            <input type="radio" class="pf-seg-input" name="@nombre" id="@(prefijo)General" value="general" checked />
+            <label for="@(prefijo)General">@textoGeneral</label>
+            <input type="radio" class="pf-seg-input" name="@nombre" id="@(prefijo)Individual" value="individual" />
+            <label for="@(prefijo)Individual">@textoIndividual</label>
+        </div>
+    }
+
+    // Periodo común a todos los reportes: todo el historial o un rango (Desde obligatorio, Hasta opcional)
+    void Periodo(string prefijo)
+    {
+        <fieldset class="pf-campo">
+            <legend class="pf-campo-titulo">Periodo</legend>
+            @{ Segmentado("_periodo", prefijo + "Periodo", "Todo el historial", "Rango de fechas"); }
+            <div class="pf-dependiente row g-2" data-si="_periodo=individual" hidden>
+                <div class="col-6">
+                    <label class="form-label small fw-semibold mb-1" for="@(prefijo)Desde">Desde</label>
+                    <input type="date" class="form-control" id="@(prefijo)Desde" name="fechaInicio" max="@hoy" required disabled data-fecha-desde />
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-semibold mb-1" for="@(prefijo)Hasta">Hasta <span class="fw-normal text-secondary">(opcional)</span></label>
+                    <input type="date" class="form-control" id="@(prefijo)Hasta" name="fechaFin" max="@hoy" disabled data-fecha-hasta />
+                </div>
+            </div>
+        </fieldset>
+    }
 }
 
 <h1 class="pf-page-title">Reportes</h1>
@@ -10,27 +43,27 @@
         <div class="mockup-report-card">
             <div>
                 <h3>Tiempos por empleado</h3>
-                <p>Consulta los tiempos de procesamiento de empleados.</p>
+                <p>De todos los empleados o de uno solo, con el detalle de sus pedidos.</p>
             </div>
             <div>
-                <a asp-action="TiemposPorEmpleado" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalReporteEmpleados">
                     Generar PDF
-                </a>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Card 2: Tiempos generales de entrega -->
+    <!-- Card 2: Tiempos de entrega -->
     <div class="col-lg-4 col-md-6">
         <div class="mockup-report-card">
             <div>
                 <h3>Tiempos generales de entrega</h3>
-                <p>Consulta los tiempos de entrega agrupados por bodega.</p>
+                <p>Agrupados por bodega: todas o una en particular.</p>
             </div>
             <div>
-                <a asp-action="TiemposGenerales" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalReporteEntrega">
                     Generar PDF
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -40,12 +73,12 @@
         <div class="mockup-report-card">
             <div>
                 <h3>Pedidos por periodo</h3>
-                <p>Consultar pedidos realizados durante un periodo.</p>
+                <p>Pedidos cargados en todo el historial o entre fechas, por bodega.</p>
             </div>
             <div>
-                <a asp-action="PedidosPorPeriodo" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalReportePedidos">
                     Generar PDF
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -55,13 +88,236 @@
         <div class="mockup-report-card">
             <div>
                 <h3>Estado de pedidos</h3>
-                <p>Completados , cancelados y reasignados.</p>
+                <p>Completados, cancelados y reasignados, juntos o por separado.</p>
             </div>
             <div>
-                <a asp-action="CompletadosCanceladosReasignados" asp-route-exportarPdf="true" class="btn-pf-blue w-100 py-2">
+                <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalReporteEstados">
                     Generar PDF
-                </a>
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ===== Diálogos de configuración de cada reporte ===== -->
+
+<div class="modal fade" id="modalReporteEmpleados" tabindex="-1" aria-labelledby="tituloReporteEmpleados" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="TiemposPorEmpleado" method="get" data-reporte-form>
+                <input type="hidden" name="exportarPdf" value="true" />
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="tituloReporteEmpleados">Tiempos por empleado</h5>
+                        <p class="pf-reporte-desc">Elige si el reporte incluye a todos los empleados o solo a uno.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <fieldset class="pf-campo">
+                        <legend class="pf-campo-titulo">Empleados</legend>
+                        @{ Segmentado("_alcance", "emp", "Todos", "Un empleado"); }
+                        <div class="pf-dependiente" data-si="_alcance=individual" hidden>
+                            <label class="visually-hidden" for="empSelect">Empleado</label>
+                            <select class="form-select" id="empSelect" name="empleadoId" required disabled>
+                                <option value="">Selecciona un empleado…</option>
+                                @foreach (var e in empleados)
+                                {
+                                    <option value="@e.Id">@e.NombreCompleto@(e.Activo ? "" : " (inactivo)")</option>
+                                }
+                            </select>
+                            <div class="form-text">Incluye su resumen y el detalle de cada pedido completado.</div>
+                        </div>
+                    </fieldset>
+                    @{ Periodo("emp"); }
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Generar PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalReporteEntrega" tabindex="-1" aria-labelledby="tituloReporteEntrega" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="TiemposGenerales" method="get" data-reporte-form>
+                <input type="hidden" name="exportarPdf" value="true" />
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="tituloReporteEntrega">Tiempos generales de entrega</h5>
+                        <p class="pf-reporte-desc">Elige si el reporte incluye todas las bodegas o solo una.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <fieldset class="pf-campo">
+                        <legend class="pf-campo-titulo">Bodegas</legend>
+                        @{ Segmentado("_alcance", "ent", "Todas", "Una bodega"); }
+                        <div class="pf-dependiente" data-si="_alcance=individual" hidden>
+                            <label class="visually-hidden" for="entSelect">Bodega</label>
+                            <select class="form-select" id="entSelect" name="bodegaId" required disabled>
+                                <option value="">Selecciona una bodega…</option>
+                                @foreach (var b in bodegas)
+                                {
+                                    <option value="@b.Id">@b.Codigo – @b.Nombre@(b.Activa ? "" : " (inactiva)")</option>
+                                }
+                            </select>
+                            <div class="form-text">Incluye su resumen y el detalle de cada pedido completado.</div>
+                        </div>
+                    </fieldset>
+                    @{ Periodo("ent"); }
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Generar PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalReportePedidos" tabindex="-1" aria-labelledby="tituloReportePedidos" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="PedidosPorPeriodo" method="get" data-reporte-form>
+                <input type="hidden" name="exportarPdf" value="true" />
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="tituloReportePedidos">Pedidos por periodo</h5>
+                        <p class="pf-reporte-desc">Todos los pedidos cargados, de todas las bodegas o de una.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <fieldset class="pf-campo">
+                        <legend class="pf-campo-titulo">Bodegas</legend>
+                        @{ Segmentado("_alcance", "ped", "Todas", "Una bodega"); }
+                        <div class="pf-dependiente" data-si="_alcance=individual" hidden>
+                            <label class="visually-hidden" for="pedSelect">Bodega</label>
+                            <select class="form-select" id="pedSelect" name="bodegaId" required disabled>
+                                <option value="">Selecciona una bodega…</option>
+                                @foreach (var b in bodegas)
+                                {
+                                    <option value="@b.Id">@b.Codigo – @b.Nombre@(b.Activa ? "" : " (inactiva)")</option>
+                                }
+                            </select>
+                        </div>
+                    </fieldset>
+                    @{ Periodo("ped"); }
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Generar PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalReporteEstados" tabindex="-1" aria-labelledby="tituloReporteEstados" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="CompletadosCanceladosReasignados" method="get" data-reporte-form>
+                <input type="hidden" name="exportarPdf" value="true" />
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="tituloReporteEstados">Estado de pedidos</h5>
+                        <p class="pf-reporte-desc">Completados, cancelados y reasignados juntos, o un solo estado.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <fieldset class="pf-campo">
+                        <legend class="pf-campo-titulo">Estados</legend>
+                        @{ Segmentado("_alcance", "est", "Todos", "Un estado"); }
+                        <div class="pf-dependiente" data-si="_alcance=individual" hidden>
+                            <label class="visually-hidden" for="estSelect">Estado</label>
+                            <select class="form-select" id="estSelect" name="estado" required disabled>
+                                <option value="">Selecciona un estado…</option>
+                                <option value="Completado">Completados</option>
+                                <option value="Cancelado">Cancelados</option>
+                                <option value="Reasignado">Reasignados</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    @{ Periodo("est"); }
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Generar PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Diálogos de reportes: el segmento "individual" revela su campo; los campos ocultos van deshabilitados
+        // (no se envían ni se validan). La descarga no cambia de página, así que el diálogo se cierra solo.
+        document.querySelectorAll('[data-reporte-form]').forEach(function (form) {
+            var modalEl = form.closest('.modal');
+            var btnGenerar = form.querySelector('[type="submit"]');
+            var textoGenerar = btnGenerar.innerHTML;
+
+            function actualizar(animar) {
+                form.querySelectorAll('[data-si]').forEach(function (bloque) {
+                    var partes = bloque.dataset.si.split('=');
+                    var marcado = form.querySelector('input[name="' + partes[0] + '"]:checked');
+                    var visible = !!marcado && marcado.value === partes[1];
+                    if (visible === !bloque.hidden) return;
+
+                    bloque.hidden = !visible;
+                    bloque.querySelectorAll('input, select').forEach(function (c) { c.disabled = !visible; });
+                    if (visible && animar) {
+                        bloque.classList.remove('pf-appear');
+                        void bloque.offsetWidth;
+                        bloque.classList.add('pf-appear');
+                        var primero = bloque.querySelector('select, input');
+                        if (primero) primero.focus({ preventScroll: true });
+                    }
+                });
+            }
+
+            function validarFechas() {
+                var desde = form.querySelector('[data-fecha-desde]');
+                var hasta = form.querySelector('[data-fecha-hasta]');
+                if (!desde || !hasta) return;
+                var invalido = !desde.disabled && desde.value && hasta.value && hasta.value < desde.value;
+                hasta.setCustomValidity(invalido ? 'La fecha final debe ser igual o posterior a la inicial.' : '');
+            }
+
+            form.addEventListener('change', function (e) {
+                if (e.target.classList.contains('pf-seg-input')) actualizar(true);
+                validarFechas();
+            });
+
+            form.addEventListener('submit', function (e) {
+                validarFechas();
+                if (!form.checkValidity()) {
+                    e.preventDefault();
+                    form.reportValidity();
+                    return;
+                }
+                // Los segmentos solo controlan la interfaz: no viajan en la URL
+                var segmentos = form.querySelectorAll('.pf-seg-input');
+                segmentos.forEach(function (r) { r.disabled = true; });
+                setTimeout(function () { segmentos.forEach(function (r) { r.disabled = false; }); }, 0);
+
+                btnGenerar.classList.add('is-loading');
+                btnGenerar.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>Generando…';
+                setTimeout(function () { bootstrap.Modal.getOrCreateInstance(modalEl).hide(); }, 900);
+            });
+
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                btnGenerar.classList.remove('is-loading');
+                btnGenerar.innerHTML = textoGenerar;
+            });
+
+            actualizar(false);
+        });
+    </script>
+}

@@ -1,8 +1,9 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
+using PickingApp.Models;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -10,13 +11,15 @@ namespace PickingApp.Controllers
     [Authorize]
     public class ReportesController : Controller
     {
+        private static readonly string[] EstadosReporte = { "Completado", "Cancelado", "Reasignado" };
+
         private readonly ApplicationDbContext _context;
         private readonly IReportService _reportService;
         private readonly IAuditService _auditService;
 
         public ReportesController(
-            ApplicationDbContext context, 
-            IReportService reportService, 
+            ApplicationDbContext context,
+            IReportService reportService,
             IAuditService auditService)
         {
             _context = context;
@@ -25,167 +28,252 @@ namespace PickingApp.Controllers
         }
 
         // CU-37: Consultar reportes generados
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
+            // Listas para los reportes individuales (incluye inactivos para consultar su historial)
+            ViewBag.Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync();
+            ViewBag.Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync();
             return View();
         }
 
-        // CU-32: Generar reporte de tiempos por empleado
-        public async Task<IActionResult> TiemposPorEmpleado(DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
+        // CU-32: Generar reporte de tiempos por empleado (general o de un empleado)
+        public async Task<IActionResult> TiemposPorEmpleado(int? empleadoId, DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
         {
-            var inicio = fechaInicio ?? DateTime.Today.AddMonths(-1);
-            var fin = (fechaFin ?? DateTime.Today).AddDays(1).AddTicks(-1);
+            var periodo = new PeriodoReporte(fechaInicio, fechaFin);
+            if (!periodo.EsValido) return FiltroInvalido("La fecha inicial no puede ser posterior a la fecha final.");
 
-            var empleados = await _context.Empleados
-                .Include(e => e.PedidosAsignados)
-                .ToListAsync();
+            var query = PedidosCompletadosEnPeriodo(periodo).Where(p => p.EmpleadoId != null);
 
-            var datos = new List<ReporteTiemposEmpleadoItem>();
-
-            foreach (var emp in empleados)
+            if (empleadoId.HasValue)
             {
-                var pedidosPeriodo = emp.PedidosAsignados
-                    .Where(p => p.Estado == "Completado" && 
-                                p.FechaFinalizacion >= inicio && 
-                                p.FechaFinalizacion <= fin && 
-                                p.TiempoProcesamientoMinutos.HasValue)
-                    .ToList();
+                var empleado = await _context.Empleados.FindAsync(empleadoId.Value);
+                if (empleado == null) return FiltroInvalido("El empleado seleccionado no existe.");
 
-                if (pedidosPeriodo.Any())
+                var pedidosEmpleado = await query
+                    .Where(p => p.EmpleadoId == empleado.Id)
+                    .Include(p => p.Bodega)
+                    .Include(p => p.Detalles)
+                    .OrderByDescending(p => p.FechaFinalizacion)
+                    .ToListAsync();
+
+                if (exportarPdf)
                 {
-                    datos.Add(new ReporteTiemposEmpleadoItem
-                    {
-                        Identificacion = emp.Identificacion,
-                        Empleado = emp.NombreCompleto,
-                        TotalPedidos = pedidosPeriodo.Count,
-                        PromedioMinutos = Math.Round(pedidosPeriodo.Average(p => p.TiempoProcesamientoMinutos!.Value), 1),
-                        TiempoMinimo = Math.Round(pedidosPeriodo.Min(p => p.TiempoProcesamientoMinutos!.Value), 1),
-                        TiempoMaximo = Math.Round(pedidosPeriodo.Max(p => p.TiempoProcesamientoMinutos!.Value), 1)
-                    });
+                    await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos Empleado",
+                        $"Reporte individual de {empleado.NombreCompleto} ({empleado.Identificacion}), periodo: {periodo.Descripcion}. {pedidosEmpleado.Count} pedidos.");
+
+                    var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
+                        "Reporte Individual de Tiempos de Picking (CU-32)",
+                        $"Empleado: {empleado.NombreCompleto} · Doc. {empleado.Identificacion}",
+                        pedidosEmpleado, periodo, porEmpleado: true);
+                    return File(pdf, "application/pdf", $"Reporte_Tiempos_Empleado_{empleado.Identificacion}_{periodo.ParaArchivo}.pdf");
                 }
             }
 
+            var pedidos = await query.Include(p => p.Empleado).ToListAsync();
+            var datos = pedidos
+                .Where(p => !empleadoId.HasValue || p.EmpleadoId == empleadoId)
+                .GroupBy(p => p.EmpleadoId)
+                .Select(g => new ReporteTiemposEmpleadoItem
+                {
+                    Identificacion = g.First().Empleado!.Identificacion,
+                    Empleado = g.First().Empleado!.NombreCompleto,
+                    TotalPedidos = g.Count(),
+                    PromedioMinutos = Math.Round(g.Average(p => p.TiempoProcesamientoMinutos!.Value), 1),
+                    TiempoMinimo = Math.Round(g.Min(p => p.TiempoProcesamientoMinutos!.Value), 1),
+                    TiempoMaximo = Math.Round(g.Max(p => p.TiempoProcesamientoMinutos!.Value), 1)
+                })
+                .OrderBy(i => i.Empleado)
+                .ToList();
+
             if (exportarPdf)
             {
-                var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-                var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-                await _auditService.LogAsync(userEmail, userRole, "Exportar PDF Reporte Tiempos Empleado", "Reportes", 
-                    $"Exportación PDF periodo {inicio:dd/MM/yyyy} a {fin:dd/MM/yyyy}");
+                await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos Empleado",
+                    $"Reporte general de todos los empleados, periodo: {periodo.Descripcion}.");
 
-                var pdfBytes = _reportService.GenerarReporteTiemposPorEmpleadoPdf(datos, inicio, fin);
-                return File(pdfBytes, "application/pdf", $"Reporte_Tiempos_Empleado_{DateTime.Now:yyyyMMdd}.pdf");
+                var pdfBytes = _reportService.GenerarReporteTiemposPorEmpleadoPdf(datos, periodo);
+                return File(pdfBytes, "application/pdf", $"Reporte_Tiempos_Empleados_{periodo.ParaArchivo}.pdf");
             }
 
-            ViewBag.FechaInicio = inicio;
-            ViewBag.FechaFin = fin;
+            PrepararVista(periodo);
+            ViewBag.EmpleadoId = empleadoId;
             return View(datos);
         }
 
-        // CU-33: Generar reporte general de tiempos de entrega
-        public async Task<IActionResult> TiemposGenerales(DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
+        // CU-33: Generar reporte de tiempos de entrega (general o de una bodega)
+        public async Task<IActionResult> TiemposGenerales(int? bodegaId, DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
         {
-            var inicio = fechaInicio ?? DateTime.Today.AddMonths(-1);
-            var fin = (fechaFin ?? DateTime.Today).AddDays(1).AddTicks(-1);
+            var periodo = new PeriodoReporte(fechaInicio, fechaFin);
+            if (!periodo.EsValido) return FiltroInvalido("La fecha inicial no puede ser posterior a la fecha final.");
 
-            var bodegas = await _context.Bodegas
-                .Include(b => b.Pedidos)
-                .ToListAsync();
+            var query = PedidosCompletadosEnPeriodo(periodo);
 
-            var datos = new List<ReporteGeneralTiemposItem>();
-
-            foreach (var b in bodegas)
+            if (bodegaId.HasValue)
             {
-                var pedidos = b.Pedidos
-                    .Where(p => p.Estado == "Completado" && 
-                                p.FechaFinalizacion >= inicio && 
-                                p.FechaFinalizacion <= fin && 
-                                p.TiempoProcesamientoMinutos.HasValue)
-                    .ToList();
+                var bodega = await _context.Bodegas.FindAsync(bodegaId.Value);
+                if (bodega == null) return FiltroInvalido("La bodega seleccionada no existe.");
 
-                if (pedidos.Any())
+                var pedidosBodega = await query
+                    .Where(p => p.BodegaId == bodega.Id)
+                    .Include(p => p.Empleado)
+                    .Include(p => p.Detalles)
+                    .OrderByDescending(p => p.FechaFinalizacion)
+                    .ToListAsync();
+
+                if (exportarPdf)
                 {
-                    datos.Add(new ReporteGeneralTiemposItem
-                    {
-                        Bodega = $"{b.Nombre} ({b.Codigo})",
-                        TotalCompletados = pedidos.Count,
-                        PromedioMinutos = Math.Round(pedidos.Average(p => p.TiempoProcesamientoMinutos!.Value), 1),
-                        TiempoTotalMinutos = Math.Round(pedidos.Sum(p => p.TiempoProcesamientoMinutos!.Value), 1)
-                    });
+                    await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos General",
+                        $"Reporte individual de la bodega {bodega.Codigo}, periodo: {periodo.Descripcion}. {pedidosBodega.Count} pedidos.");
+
+                    var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
+                        "Reporte de Tiempos de Entrega por Bodega (CU-33)",
+                        $"Bodega: {bodega.Nombre} ({bodega.Codigo})",
+                        pedidosBodega, periodo, porEmpleado: false);
+                    return File(pdf, "application/pdf", $"Reporte_Tiempos_Bodega_{bodega.Codigo}_{periodo.ParaArchivo}.pdf");
                 }
             }
 
+            var pedidos = await query.Include(p => p.Bodega).ToListAsync();
+            var datos = pedidos
+                .Where(p => !bodegaId.HasValue || p.BodegaId == bodegaId)
+                .GroupBy(p => p.BodegaId)
+                .Select(g => new ReporteGeneralTiemposItem
+                {
+                    Bodega = $"{g.First().Bodega!.Nombre} ({g.First().Bodega!.Codigo})",
+                    TotalCompletados = g.Count(),
+                    PromedioMinutos = Math.Round(g.Average(p => p.TiempoProcesamientoMinutos!.Value), 1),
+                    TiempoTotalMinutos = Math.Round(g.Sum(p => p.TiempoProcesamientoMinutos!.Value), 1)
+                })
+                .OrderBy(i => i.Bodega)
+                .ToList();
+
             if (exportarPdf)
             {
-                var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-                var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-                await _auditService.LogAsync(userEmail, userRole, "Exportar PDF Reporte Tiempos General", "Reportes", 
-                    $"Exportación PDF periodo {inicio:dd/MM/yyyy} a {fin:dd/MM/yyyy}");
+                await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos General",
+                    $"Reporte general de todas las bodegas, periodo: {periodo.Descripcion}.");
 
-                var pdfBytes = _reportService.GenerarReporteGeneralTiemposPdf(datos, inicio, fin);
-                return File(pdfBytes, "application/pdf", $"Reporte_General_Tiempos_{DateTime.Now:yyyyMMdd}.pdf");
+                var pdfBytes = _reportService.GenerarReporteGeneralTiemposPdf(datos, periodo);
+                return File(pdfBytes, "application/pdf", $"Reporte_Tiempos_Entrega_{periodo.ParaArchivo}.pdf");
             }
 
-            ViewBag.FechaInicio = inicio;
-            ViewBag.FechaFin = fin;
+            PrepararVista(periodo);
+            ViewBag.BodegaId = bodegaId;
             return View(datos);
         }
 
-        // CU-34: Generar reporte de pedidos por periodo
-        public async Task<IActionResult> PedidosPorPeriodo(DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
+        // CU-34: Generar reporte de pedidos por periodo (todas las bodegas o una)
+        public async Task<IActionResult> PedidosPorPeriodo(int? bodegaId, DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
         {
-            var inicio = fechaInicio ?? DateTime.Today.AddMonths(-1);
-            var fin = (fechaFin ?? DateTime.Today).AddDays(1).AddTicks(-1);
+            var periodo = new PeriodoReporte(fechaInicio, fechaFin);
+            if (!periodo.EsValido) return FiltroInvalido("La fecha inicial no puede ser posterior a la fecha final.");
 
-            var pedidos = await _context.Pedidos
+            var query = _context.Pedidos
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
-                .Where(p => p.FechaCarga >= inicio && p.FechaCarga <= fin)
-                .OrderByDescending(p => p.FechaCarga)
-                .ToListAsync();
+                .AsQueryable();
+
+            if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
+            if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaCarga < hasta);
+
+            string? filtro = null;
+            if (bodegaId.HasValue)
+            {
+                var bodega = await _context.Bodegas.FindAsync(bodegaId.Value);
+                if (bodega == null) return FiltroInvalido("La bodega seleccionada no existe.");
+                query = query.Where(p => p.BodegaId == bodega.Id);
+                filtro = $"Bodega: {bodega.Nombre} ({bodega.Codigo})";
+            }
+
+            var pedidos = await query.OrderByDescending(p => p.FechaCarga).ToListAsync();
 
             if (exportarPdf)
             {
-                var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-                var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-                await _auditService.LogAsync(userEmail, userRole, "Exportar PDF Pedidos por Periodo", "Reportes", 
-                    $"Exportación PDF {pedidos.Count} pedidos entre {inicio:dd/MM/yyyy} y {fin:dd/MM/yyyy}");
+                await RegistrarExportacionAsync("Exportar PDF Pedidos por Periodo",
+                    $"{pedidos.Count} pedidos, periodo: {periodo.Descripcion}. {filtro ?? "Todas las bodegas"}.");
 
-                var pdfBytes = _reportService.GenerarReportePedidosPorPeriodoPdf(pedidos, inicio, fin);
-                return File(pdfBytes, "application/pdf", $"Reporte_Pedidos_Periodo_{DateTime.Now:yyyyMMdd}.pdf");
+                var pdfBytes = _reportService.GenerarReportePedidosPorPeriodoPdf(pedidos, periodo, filtro);
+                var sufijo = bodegaId.HasValue ? $"_{pedidos.FirstOrDefault()?.Bodega?.Codigo ?? $"Bodega{bodegaId}"}" : "";
+                return File(pdfBytes, "application/pdf", $"Reporte_Pedidos{sufijo}_{periodo.ParaArchivo}.pdf");
             }
 
-            ViewBag.FechaInicio = inicio;
-            ViewBag.FechaFin = fin;
+            PrepararVista(periodo);
+            ViewBag.BodegaId = bodegaId;
             return View(pedidos);
         }
 
-        // CU-35: Generar reporte de pedidos completados, cancelados y reasignados
-        public async Task<IActionResult> CompletadosCanceladosReasignados(DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
+        // CU-35: Generar reporte de pedidos completados, cancelados y reasignados (todos o un estado)
+        public async Task<IActionResult> CompletadosCanceladosReasignados(string? estado, DateTime? fechaInicio, DateTime? fechaFin, bool exportarPdf = false)
         {
-            var inicio = fechaInicio ?? DateTime.Today.AddMonths(-1);
-            var fin = (fechaFin ?? DateTime.Today).AddDays(1).AddTicks(-1);
+            var periodo = new PeriodoReporte(fechaInicio, fechaFin);
+            if (!periodo.EsValido) return FiltroInvalido("La fecha inicial no puede ser posterior a la fecha final.");
 
-            var pedidos = await _context.Pedidos
+            if (!string.IsNullOrEmpty(estado) && !EstadosReporte.Contains(estado))
+            {
+                return FiltroInvalido("El estado seleccionado no es válido.");
+            }
+
+            var estados = string.IsNullOrEmpty(estado) ? EstadosReporte : new[] { estado };
+            var query = _context.Pedidos
                 .Include(p => p.Empleado)
-                .Where(p => (p.Estado == "Completado" || p.Estado == "Cancelado" || p.Estado == "Reasignado") &&
-                            p.FechaCarga >= inicio && p.FechaCarga <= fin)
-                .OrderByDescending(p => p.FechaCarga)
-                .ToListAsync();
+                .Where(p => estados.Contains(p.Estado));
+
+            if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
+            if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaCarga < hasta);
+
+            var pedidos = await query.OrderByDescending(p => p.FechaCarga).ToListAsync();
+            var filtro = string.IsNullOrEmpty(estado) ? null : $"Solo pedidos {NombreEstadoPlural(estado).ToLowerInvariant()}";
 
             if (exportarPdf)
             {
-                var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-                var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-                await _auditService.LogAsync(userEmail, userRole, "Exportar PDF Completados Cancelados Reasignados", "Reportes", 
-                    $"Exportación PDF {pedidos.Count} registros");
+                await RegistrarExportacionAsync("Exportar PDF Completados Cancelados Reasignados",
+                    $"{pedidos.Count} registros, periodo: {periodo.Descripcion}. {filtro ?? "Todos los estados"}.");
 
-                var pdfBytes = _reportService.GenerarReporteCompletadosCanceladosReasignadosPdf(pedidos, inicio, fin);
-                return File(pdfBytes, "application/pdf", $"Reporte_Completados_Cancelados_Reasignados_{DateTime.Now:yyyyMMdd}.pdf");
+                var pdfBytes = _reportService.GenerarReporteCompletadosCanceladosReasignadosPdf(pedidos, periodo, filtro);
+                var nombre = string.IsNullOrEmpty(estado) ? "Completados_Cancelados_Reasignados" : NombreEstadoPlural(estado);
+                return File(pdfBytes, "application/pdf", $"Reporte_{nombre}_{periodo.ParaArchivo}.pdf");
             }
 
-            ViewBag.FechaInicio = inicio;
-            ViewBag.FechaFin = fin;
+            PrepararVista(periodo);
+            ViewBag.Estado = estado;
             return View(pedidos);
+        }
+
+        private IQueryable<Pedido> PedidosCompletadosEnPeriodo(PeriodoReporte periodo)
+        {
+            var query = _context.Pedidos
+                .Where(p => p.Estado == "Completado" && p.TiempoProcesamientoMinutos != null);
+
+            if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaFinalizacion >= desde);
+            if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaFinalizacion < hasta);
+
+            return query;
+        }
+
+        private static string NombreEstadoPlural(string estado) => estado switch
+        {
+            "Completado" => "Completados",
+            "Cancelado" => "Cancelados",
+            "Reasignado" => "Reasignados",
+            _ => estado
+        };
+
+        private IActionResult FiltroInvalido(string mensaje)
+        {
+            TempData["ErrorMessage"] = mensaje;
+            return RedirectToAction(nameof(Index));
+        }
+
+        private void PrepararVista(PeriodoReporte periodo)
+        {
+            ViewBag.FechaInicio = periodo.Desde;
+            ViewBag.FechaFin = periodo.Hasta;
+            ViewBag.DescripcionPeriodo = periodo.Descripcion;
+        }
+
+        private async Task RegistrarExportacionAsync(string accion, string detalle)
+        {
+            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
+            await _auditService.LogAsync(userEmail, userRole, accion, "Reportes", detalle);
         }
     }
 }

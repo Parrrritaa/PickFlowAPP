@@ -27,12 +27,52 @@ namespace PickingApp.Services
         public double Porcentaje { get; set; }
     }
 
+    // Periodo de un reporte. Sin fechas = todo el historial; con solo "Desde" o solo "Hasta" queda abierto por un lado.
+    public class PeriodoReporte
+    {
+        public PeriodoReporte(DateTime? desde, DateTime? hasta)
+        {
+            Desde = desde?.Date;
+            Hasta = hasta?.Date;
+        }
+
+        public DateTime? Desde { get; }
+        public DateTime? Hasta { get; }
+
+        // Límite superior exclusivo para incluir el día "Hasta" completo
+        public DateTime? HastaExclusivo => Hasta?.AddDays(1);
+
+        public bool EsValido => Desde == null || Hasta == null || Desde <= Hasta;
+
+        public string Descripcion => (Desde, Hasta) switch
+        {
+            (null, null) => "Todo el historial",
+            (DateTime d, null) => $"Desde el {d:dd/MM/yyyy}",
+            (null, DateTime h) => $"Hasta el {h:dd/MM/yyyy}",
+            (DateTime d, DateTime h) when d == h => $"{d:dd/MM/yyyy}",
+            (DateTime d, DateTime h) => $"{d:dd/MM/yyyy} – {h:dd/MM/yyyy}"
+        };
+
+        public string ParaArchivo => (Desde, Hasta) switch
+        {
+            (null, null) => "Historial",
+            (DateTime d, null) => $"desde_{d:yyyyMMdd}",
+            (null, DateTime h) => $"hasta_{h:yyyyMMdd}",
+            (DateTime d, DateTime h) => $"{d:yyyyMMdd}_{h:yyyyMMdd}"
+        };
+    }
+
     public interface IReportService
     {
-        byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, DateTime fechaInicio, DateTime fechaFin);
-        byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, DateTime fechaInicio, DateTime fechaFin);
-        byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, DateTime fechaInicio, DateTime fechaFin);
-        byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, DateTime fechaInicio, DateTime fechaFin);
+        byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo);
+        byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, PeriodoReporte periodo);
+
+        // Reporte individual (un empleado o una bodega): resumen + detalle de cada pedido completado.
+        // porEmpleado = true muestra la columna Bodega; false muestra la columna Empleado.
+        byte[] GenerarReporteDetalleTiemposPdf(string titulo, string sujeto, List<Pedido> pedidos, PeriodoReporte periodo, bool porEmpleado);
+
+        byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
+        byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
         byte[] GenerarReporteLogSistemaPdf(List<LogSistema> logs, string? modulo, string? usuario, DateTime fechaDesde, DateTime fechaHasta);
     }
 }
