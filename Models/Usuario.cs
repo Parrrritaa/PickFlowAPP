@@ -40,9 +40,6 @@ namespace PickingApp.Models
 
         public DateTime? UltimoAcceso { get; set; }
 
-        // RN-06-CU041: tras una recuperación aprobada, se obliga a establecer una nueva contraseña propia en el próximo inicio de sesión.
-        public bool DebeCambiarContrasena { get; set; } = false;
-
         // Código de verificación (6 dígitos) enviado por correo para recuperar u confirmar el cambio de contraseña.
         [StringLength(6)]
         public string? CodigoVerificacion { get; set; }
