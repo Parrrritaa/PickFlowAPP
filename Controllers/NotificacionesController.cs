@@ -22,7 +22,9 @@ namespace PickingApp.Controllers
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
 
+            // Solo las pendientes: al marcarse como leída, la notificación se descarta de la lista
             var notificaciones = await _context.Notificaciones
+                .Where(n => !n.Leida)
                 .Where(n => n.UsuarioDestinoId == userId || n.RolDestino == userRole || (n.UsuarioDestinoId == null && n.RolDestino == null))
                 .OrderByDescending(n => n.FechaCreacion)
                 .Take(50)
@@ -50,6 +52,12 @@ namespace PickingApp.Controllers
             {
                 notificacion.Leida = true;
                 await _context.SaveChangesAsync();
+            }
+
+            // Petición desde la página (sin recarga): responde con el resultado para animar el descarte
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return esDelUsuario ? NoContent() : NotFound();
             }
 
             return RedirectToAction(nameof(Index));

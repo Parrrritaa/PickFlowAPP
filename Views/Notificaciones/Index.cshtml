@@ -1,32 +1,70 @@
 @model IEnumerable<PickingApp.Models.Notificacion>
 @{
     ViewData["Title"] = "Notificaciones";
+    var total = Model?.Count() ?? 0;
+
+    static string Icono(string tipo) => tipo switch
+    {
+        "Success" => "bi-check-circle-fill",
+        "Warning" => "bi-exclamation-triangle-fill",
+        "Danger" => "bi-x-octagon-fill",
+        _ => "bi-info-circle-fill"
+    };
+
+    static string Hace(DateTime fecha)
+    {
+        var d = DateTime.Now - fecha;
+        if (d.TotalMinutes < 1) return "Hace un momento";
+        if (d.TotalMinutes < 60) return $"Hace {(int)d.TotalMinutes} min";
+        if (d.TotalHours < 24) return $"Hace {(int)d.TotalHours} h";
+        if (d.TotalDays < 2) return $"Ayer, {fecha:HH:mm}";
+        return fecha.ToString("dd/MM/yyyy HH:mm");
+    }
 }
 
 <h1 class="pf-page-title">Notificaciones</h1>
 
 <div class="mockup-card">
-    @if (Model != null && Model.Any())
-    {
-        @foreach (var n in Model)
+    <div class="pf-notif-toolbar">
+        <span id="pfNotifContador" aria-live="polite">
+            @(total == 1 ? "1 notificación sin leer" : total > 1 ? $"{total} notificaciones sin leer" : "")
+        </span>
+    </div>
+
+    <ul class="pf-notif-list" id="pfNotifLista">
+        @if (Model != null)
         {
-            <div class="mockup-notification-item">
-                <span>@n.Mensaje</span>
-                @if (!n.Leida)
-                {
-                    <form asp-action="MarcarLeida" method="post" class="d-inline ms-2">
+            @foreach (var n in Model)
+            {
+                var tipo = n.Tipo is "Success" or "Warning" or "Danger" ? n.Tipo : "Info";
+                <li class="pf-notif pf-notif--@tipo">
+                    <span class="pf-notif-icon" aria-hidden="true"><i class="bi @Icono(tipo)"></i></span>
+                    <div class="pf-notif-body">
+                        <div class="pf-notif-title">@n.Titulo</div>
+                        <div class="pf-notif-msg">@n.Mensaje</div>
+                        <div class="pf-notif-meta">
+                            <time datetime="@n.FechaCreacion.ToString("s")" title="@n.FechaCreacion.ToString("dd/MM/yyyy HH:mm")">@Hace(n.FechaCreacion)</time>
+                            @if (!string.IsNullOrEmpty(n.Enlace) && n.Enlace.StartsWith("/"))
+                            {
+                                <span aria-hidden="true"> · </span><a href="@n.Enlace">Ver detalle</a>
+                            }
+                        </div>
+                    </div>
+                    <form asp-action="MarcarLeida" method="post" data-marcar-leida>
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@n.Id" />
-                        <button type="submit" class="btn btn-sm btn-outline-dark border-0 py-0 px-2" title="Marcar como leída">
-                            ✓
+                        <button type="submit" class="pf-notif-read" aria-label="Marcar como leída: @n.Titulo">
+                            <i class="bi bi-check2" aria-hidden="true"></i><span>Marcar como leída</span>
                         </button>
                     </form>
-                }
-            </div>
+                </li>
+            }
         }
-    }
-    else
-    {
-        <div class="text-center text-muted py-4">No tienes notificaciones.</div>
-    }
+    </ul>
+
+    <div class="pf-notif-empty" id="pfNotifVacio" tabindex="-1" hidden="@(total > 0)">
+        <div class="pf-notif-empty-icon" aria-hidden="true"><i class="bi bi-check2-all"></i></div>
+        <div class="pf-notif-empty-title">Estás al día</div>
+        <div class="pf-notif-empty-text">No tienes notificaciones sin leer.</div>
+    </div>
 </div>

@@ -1,9 +1,11 @@
-@model IEnumerable<PickingApp.Models.Empleado>
+﻿@model IEnumerable<PickingApp.Models.Empleado>
 @{
     ViewData["Title"] = "Gestión de empleados";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
     var esAdmin = userRole == "Administrador";
     var esAuxiliar = userRole == "Auxiliar";
+    // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
+    var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
 }
 
 <h1 class="pf-page-title">Gestión de empleados</h1>
@@ -36,7 +38,7 @@
                     @foreach (var emp in Model)
                     {
                         var estadoText = emp.EstadoDisponibilidad == "Disponible" ? "Libre" : (emp.EstadoDisponibilidad == "EnPicking" ? "Ocupado" : emp.EstadoDisponibilidad);
-                        <tr>
+                        <tr class="@(emp.Id == destacadoId ? "pf-row-flash" : "")">
                             <td class="fw-semibold">@emp.NombreCompleto</td>
                             <td>@estadoText</td>
                             @if (!esAuxiliar)

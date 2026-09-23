@@ -31,12 +31,13 @@
                             <label class="form-label fw-semibold text-danger">
                                 Para confirmar, escriba exactamente <span class="badge bg-danger">LIMPIAR_SISTEMA</span>:
                             </label>
-                            <input type="text" name="confirmacion" class="form-control" placeholder="LIMPIAR_SISTEMA" required autocomplete="off" />
+                            <input type="text" name="confirmacion" id="confirmacionLimpieza" class="form-control" placeholder="LIMPIAR_SISTEMA" required autocomplete="off" spellcheck="false" aria-describedby="ayudaLimpieza" />
+                            <div id="ayudaLimpieza" class="form-text">El botón se habilita cuando el texto coincide exactamente.</div>
                         </div>
 
                         <div class="d-flex justify-content-end gap-2">
                             <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
-                            <button type="submit" class="btn btn-danger">
+                            <button type="submit" class="btn btn-danger pf-btn-habilitable" id="btnLimpiarBd">
                                 <i class="bi bi-trash3-fill me-1"></i> Ejecutar Limpieza de BD
                             </button>
                         </div>
@@ -46,3 +47,23 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        // Validación en vivo: el botón destructivo solo se habilita con la frase exacta (el servidor también la valida)
+        (function () {
+            var input = document.getElementById('confirmacionLimpieza');
+            var btn = document.getElementById('btnLimpiarBd');
+            var frase = 'LIMPIAR_SISTEMA';
+
+            function actualizar() {
+                var coincide = input.value === frase;
+                btn.disabled = !coincide;
+                input.classList.toggle('is-valid', coincide);
+            }
+
+            input.addEventListener('input', actualizar);
+            actualizar();
+        })();
+    </script>
+}

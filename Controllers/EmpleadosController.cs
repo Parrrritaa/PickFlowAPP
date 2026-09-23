@@ -81,6 +81,7 @@ namespace PickingApp.Controllers
             {
                 _context.Empleados.Add(model);
                 await _context.SaveChangesAsync();
+                TempData["EmpleadoDestacadoId"] = model.Id;
 
                 await _auditService.LogAsync(userEmail, userRole, "Registrar Empleado", "Empleados", 
                     $"Empleado registrado: {model.Identificacion} - {model.NombreCompleto}");
@@ -183,6 +184,7 @@ namespace PickingApp.Controllers
                 empleadoExistente.EstadoDisponibilidad = model.EstadoDisponibilidad;
 
                 await _context.SaveChangesAsync();
+                TempData["EmpleadoDestacadoId"] = empleadoExistente.Id;
 
                 await _auditService.LogAsync(userEmail, userRole, "Editar Empleado", "Empleados", 
                     $"Datos actualizados de empleado: {empleadoExistente.Identificacion}");
@@ -282,6 +284,7 @@ namespace PickingApp.Controllers
                 empleado.Activo = !empleado.Activo;
                 empleado.EstadoDisponibilidad = empleado.Activo ? "Disponible" : "Inactivo";
                 await _context.SaveChangesAsync();
+                TempData["EmpleadoDestacadoId"] = empleado.Id;
 
                 var accion = empleado.Activo ? "Reactivar Empleado" : "Inactivar Empleado";
                 await _auditService.LogAsync(userEmail, userRole, accion, "Empleados", 
@@ -341,6 +344,7 @@ namespace PickingApp.Controllers
 
             empleado.FechaReinicioPromedio = DateTime.Now;
             await _context.SaveChangesAsync();
+            TempData["EmpleadoDestacadoId"] = empleado.Id;
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
             await _auditService.LogAsync(userEmail, "Administrador", "Reiniciar Promedio de Tiempos", "Empleados",

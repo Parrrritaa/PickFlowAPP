@@ -11,7 +11,15 @@ document.addEventListener('click', function (e) {
     var tabla = document.getElementById(btn.dataset.verMas);
     if (!tabla) return;
     var expandir = btn.dataset.expandido !== 'true';
-    tabla.querySelectorAll('.fila-extra').forEach(function (f) { f.classList.toggle('d-none', !expandir); });
+    tabla.querySelectorAll('.fila-extra').forEach(function (f) {
+        f.classList.toggle('d-none', !expandir);
+        // Reinicia la animación de aparición en cada despliegue
+        f.classList.remove('pf-reveal');
+        if (expandir) {
+            void f.offsetWidth;
+            f.classList.add('pf-reveal');
+        }
+    });
     btn.dataset.expandido = expandir ? 'true' : 'false';
     btn.textContent = expandir ? btn.dataset.textoMenos : btn.dataset.textoMas;
 });
@@ -87,4 +95,193 @@ document.addEventListener('click', function (e) {
     });
 
     sincronizarBoton();
+})();
+
+function pfReducirMovimiento() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Confirmación de cierre de sesión con un diálogo propio (reemplaza el confirm() del navegador).
+// Sin JavaScript el formulario sigue funcionando y cierra la sesión directamente.
+(function () {
+    var form = document.getElementById('pf-logout-form');
+    var modalEl = document.getElementById('pfModalCerrarSesion');
+    var btnConfirmar = document.getElementById('pfConfirmarCerrarSesion');
+    if (!form || !modalEl || !btnConfirmar || !window.bootstrap) return;
+
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    var confirmado = false;
+
+    form.addEventListener('submit', function (e) {
+        if (confirmado) return;
+        e.preventDefault();
+        modal.show();
+    });
+
+    // Cerrar sesión fue una elección deliberada: el botón de la acción queda como predeterminado (Enter)
+    modalEl.addEventListener('shown.bs.modal', function () { btnConfirmar.focus(); });
+
+    // Al cancelar, el foco vuelve al botón que abrió el diálogo (Bootstrap no lo hace al abrirlo por código)
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        if (!confirmado) {
+            var btnAbrir = form.querySelector('[type="submit"]');
+            if (btnAbrir) btnAbrir.focus({ preventScroll: true });
+        }
+    });
+
+    btnConfirmar.addEventListener('click', function () {
+        if (confirmado) return;
+        confirmado = true;
+        btnConfirmar.classList.add('is-loading');
+        btnConfirmar.insertAdjacentHTML('afterbegin', '<span class="pf-spinner" aria-hidden="true"></span>');
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            if (pfReducirMovimiento()) {
+                form.submit();
+                return;
+            }
+            // Fundido de salida del panel antes de ir al login
+            document.body.classList.add('pf-logging-out');
+            window.setTimeout(function () { form.submit(); }, 220);
+        }, { once: true });
+
+        modal.hide();
+    });
+})();
+
+// Estado "procesando" en los formularios POST: indicador en el botón y bloqueo del doble envío.
+// Los formularios que manejan su propio envío (preventDefault) o llevan data-sin-carga se omiten.
+document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (e.defaultPrevented || !(form instanceof HTMLFormElement)) return;
+    if ((form.getAttribute('method') || '').toLowerCase() !== 'post' || form.hasAttribute('data-sin-carga')) return;
+
+    if (form.dataset.enviando === 'true') {
+        e.preventDefault();
+        return;
+    }
+    form.dataset.enviando = 'true';
+    form.setAttribute('aria-busy', 'true');
+
+    // No se usa "disabled": un botón deshabilitado no envía su name/value
+    var btn = e.submitter || form.querySelector('[type="submit"]');
+    if (btn && !btn.querySelector('.pf-spinner')) {
+        btn.classList.add('is-loading');
+        btn.setAttribute('aria-disabled', 'true');
+        btn.insertAdjacentHTML('afterbegin', '<span class="pf-spinner" aria-hidden="true"></span>');
+    }
+});
+
+// Al volver con el botón "atrás" el navegador puede restaurar la página tal como quedó: se limpia el estado
+window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    document.querySelectorAll('form[data-enviando]').forEach(function (form) {
+        delete form.dataset.enviando;
+        form.removeAttribute('aria-busy');
+    });
+    document.querySelectorAll('.is-loading').forEach(function (btn) {
+        btn.classList.remove('is-loading');
+        btn.removeAttribute('aria-disabled');
+        var spinner = btn.querySelector('.pf-spinner');
+        if (spinner) spinner.remove();
+    });
+    document.body.classList.remove('pf-logging-out');
+});
+
+// Notificaciones: marcar como leída sin recargar y descartarla con una animación.
+// Sin JavaScript, el formulario hace el POST normal y la página se recarga.
+(function () {
+    var lista = document.getElementById('pfNotifLista');
+    if (!lista) return;
+    var contador = document.getElementById('pfNotifContador');
+    var vacio = document.getElementById('pfNotifVacio');
+
+    function textoContador(n) {
+        return n === 1 ? '1 notificación sin leer' : n + ' notificaciones sin leer';
+    }
+
+    function actualizarContador() {
+        var restantes = lista.querySelectorAll('.pf-notif').length;
+        if (contador) contador.textContent = restantes > 0 ? textoContador(restantes) : '';
+        if (restantes === 0 && vacio) {
+            vacio.hidden = false;
+            vacio.classList.add('pf-appear');
+            vacio.focus({ preventScroll: true });
+        }
+    }
+
+    // Sale hacia la derecha con un fundido y luego cierra su espacio para que el resto suba suavemente
+    function descartar(item) {
+        if (pfReducirMovimiento() || !item.animate) {
+            item.remove();
+            return Promise.resolve();
+        }
+        var estilo = getComputedStyle(item);
+        var desde = {
+            height: item.offsetHeight + 'px',
+            marginBottom: estilo.marginBottom,
+            paddingTop: estilo.paddingTop,
+            paddingBottom: estilo.paddingBottom
+        };
+        var salida = item.animate(
+            [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(28px)' }],
+            { duration: 240, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' });
+
+        return salida.finished.then(function () {
+            item.style.overflow = 'hidden';
+            return item.animate(
+                [desde, { height: '0px', marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' }],
+                { duration: 220, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' }).finished;
+        }).then(function () { item.remove(); });
+    }
+
+    lista.addEventListener('submit', function (e) {
+        var form = e.target.closest('form[data-marcar-leida]');
+        if (!form) return;
+        e.preventDefault();
+
+        var item = form.closest('.pf-notif');
+        var btn = form.querySelector('.pf-notif-read');
+        if (item.dataset.estado === 'enviando') return;
+        item.dataset.estado = 'enviando';
+
+        var contenidoOriginal = btn.innerHTML;
+        var error = item.querySelector('.pf-notif-error');
+        if (error) error.remove();
+
+        // Confirmación inmediata en el botón mientras responde el servidor
+        btn.classList.add('is-done');
+        btn.setAttribute('aria-disabled', 'true');
+        btn.innerHTML = '<i class="bi bi-check2" aria-hidden="true"></i><span>Leída</span>';
+
+        var pausa = new Promise(function (resolve) { setTimeout(resolve, pfReducirMovimiento() ? 0 : 220); });
+        var peticion = fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        }).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+        });
+
+        Promise.all([peticion, pausa]).then(function () {
+            // Conserva el foco del teclado en la siguiente notificación (o la anterior)
+            var vecino = item.nextElementSibling || item.previousElementSibling;
+            var teniaFoco = item.contains(document.activeElement);
+            return descartar(item).then(function () {
+                if (teniaFoco && vecino) {
+                    var siguienteBtn = vecino.querySelector('.pf-notif-read');
+                    if (siguienteBtn) siguienteBtn.focus({ preventScroll: true });
+                }
+                actualizarContador();
+            });
+        }).catch(function () {
+            item.dataset.estado = '';
+            btn.classList.remove('is-done');
+            btn.removeAttribute('aria-disabled');
+            btn.innerHTML = contenidoOriginal;
+            item.querySelector('.pf-notif-body').insertAdjacentHTML('beforeend',
+                '<div class="pf-notif-error" role="alert">No se pudo marcar como leída. Inténtalo de nuevo.</div>');
+        });
+    });
 })();

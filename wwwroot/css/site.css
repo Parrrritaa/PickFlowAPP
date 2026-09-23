@@ -58,12 +58,14 @@
     animation: pf-fade-up-in 0.5s var(--pf-ease-out) both;
 }
 
+/* fill-mode "backwards": al terminar no queda un transform residual, que convertiría al contenedor
+   en referencia de los elementos position:fixed (modales) y los dejaría detrás del fondo oscuro. */
 body.pf-just-logged-in .pf-sidebar {
-    animation: pf-shell-in 0.45s var(--pf-ease-out) both;
+    animation: pf-shell-in 0.45s var(--pf-ease-out) backwards;
 }
 
 body.pf-just-logged-in .pf-main-wrapper {
-    animation: pf-shell-in 0.5s var(--pf-ease-out) 0.06s both;
+    animation: pf-shell-in 0.5s var(--pf-ease-out) 0.06s backwards;
 }
 
 body.pf-logging-out .pf-sidebar,
@@ -767,4 +769,411 @@ html.pf-sin-transicion .pf-menu-toggle--header {
     .pf-content {
         padding: 20px 16px 48px 16px;
     }
+}
+
+/* =====================================================================
+   Movimiento y diálogos
+   Todas las animaciones son breves y no bloquean la interacción. Con "reducir movimiento"
+   la regla global del inicio las deja en ~0 ms; las de JavaScript lo consultan aparte.
+   ===================================================================== */
+
+/* --- Entrada de cada apartado: sutil porque la navegación es frecuente --- */
+@keyframes pf-page-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script) {
+    animation: pf-page-in 0.28s var(--pf-ease-out) backwards;
+}
+
+body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(2) { animation-delay: 0.03s; }
+body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(3) { animation-delay: 0.06s; }
+body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(4) { animation-delay: 0.09s; }
+body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+5) { animation-delay: 0.12s; }
+
+/* --- Modales (todos los de la app): fondo azul marino desenfocado y entrada con escala suave --- */
+.modal.fade {
+    transition: opacity 0.2s var(--pf-ease);
+}
+
+.modal-backdrop {
+    background-color: var(--pf-navy-dark);
+}
+
+.modal-backdrop.fade {
+    transition: opacity 0.15s var(--pf-ease);
+}
+
+.modal-backdrop.show {
+    opacity: 0.45;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+.modal-dialog {
+    display: flex;
+    align-items: center;
+    min-height: calc(100% - 1rem);
+}
+
+@media (min-width: 576px) {
+    .modal-dialog {
+        min-height: calc(100% - 3.5rem);
+    }
+}
+
+/* La opacidad va primero: Bootstrap mide la duración con el primer valor y bloquea el cierre mientras dura.
+   Así el diálogo se puede cancelar a los 0,2 s aunque la escala termine de asentarse después. */
+.modal.fade .modal-dialog {
+    transform: translateY(10px) scale(0.96);
+    opacity: 0;
+    transition: opacity 0.2s var(--pf-ease), transform 0.32s var(--pf-ease-out);
+}
+
+.modal.show .modal-dialog {
+    transform: none;
+    opacity: 1;
+}
+
+.modal-content {
+    border: none;
+    border-radius: 16px !important;
+    box-shadow: 0 24px 64px rgba(0, 23, 54, 0.28), 0 2px 8px rgba(0, 23, 54, 0.08);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .modal-backdrop.show {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        opacity: 0.6;
+    }
+}
+
+/* --- Diálogo de confirmación (estilo alerta): cerrar sesión --- */
+.pf-alert-dialog {
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 16px;
+}
+
+.pf-alert-dialog .modal-content {
+    padding: 28px 24px 20px;
+    text-align: center;
+}
+
+.pf-alert-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 26px;
+    color: var(--pf-orange-hover);
+    background-color: rgba(235, 125, 38, 0.12);
+}
+
+.modal.show .pf-alert-icon {
+    animation: pf-icon-pop 0.42s var(--pf-ease-out) 0.06s backwards;
+}
+
+@keyframes pf-icon-pop {
+    from { opacity: 0; transform: scale(0.6); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.pf-alert-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--pf-text-dark);
+    margin-bottom: 6px;
+}
+
+.pf-alert-text {
+    font-size: 15px;
+    color: #4B5563;
+    margin-bottom: 22px;
+}
+
+.pf-alert-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.pf-alert-btn {
+    height: 44px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--pf-duration-base) var(--pf-ease),
+                transform var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-alert-btn:active {
+    transform: scale(0.97);
+}
+
+.pf-alert-btn:focus-visible {
+    outline: 2px solid var(--pf-blue);
+    outline-offset: 2px;
+}
+
+.pf-alert-btn--secondary {
+    background-color: #EEF0F3;
+    color: var(--pf-text-dark);
+}
+
+.pf-alert-btn--secondary:hover {
+    background-color: #E2E6EA;
+}
+
+.pf-alert-btn--primary {
+    background-color: var(--pf-navy);
+    color: #FFFFFF;
+}
+
+.pf-alert-btn--primary:hover {
+    background-color: #0A2E63;
+}
+
+/* --- Estado "procesando" de los botones de envío --- */
+.pf-spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: 0.45em;
+    vertical-align: -0.15em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: pf-spin 0.7s linear infinite;
+}
+
+@keyframes pf-spin {
+    to { transform: rotate(360deg); }
+}
+
+.is-loading {
+    pointer-events: none;
+    opacity: 0.85;
+}
+
+/* --- Filas que aparecen con "Ver más" --- */
+@keyframes pf-row-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.pf-reveal {
+    animation: pf-row-in 0.24s var(--pf-ease-out) backwards;
+}
+
+/* --- Menús de filtro de los encabezados (solo opacidad y "translate": Popper usa "transform") --- */
+@keyframes pf-menu-in {
+    from { opacity: 0; translate: 0 -4px; }
+    to   { opacity: 1; translate: 0 0; }
+}
+
+.th-filtro-menu.show {
+    animation: pf-menu-in 0.16s var(--pf-ease-out);
+}
+
+/* --- Fila recién modificada: se resalta un instante para ubicar el cambio --- */
+@keyframes pf-row-flash {
+    from { background-color: rgba(59, 113, 202, 0.18); }
+    to   { background-color: transparent; }
+}
+
+.mockup-table tbody tr.pf-row-flash td {
+    animation: pf-row-flash 1.8s var(--pf-ease) 0.35s backwards;
+}
+
+/* --- Notificaciones --- */
+.pf-notif-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4B5563;
+}
+
+.pf-notif-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.pf-notif {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 12px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background-color: #FFFFFF;
+    box-shadow: var(--pf-shadow-control);
+}
+
+.pf-notif-icon {
+    flex: 0 0 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+}
+
+.pf-notif--Info .pf-notif-icon    { color: var(--pf-blue); background-color: rgba(59, 113, 202, 0.12); }
+.pf-notif--Warning .pf-notif-icon { color: #C25E12;        background-color: rgba(235, 125, 38, 0.14); }
+.pf-notif--Success .pf-notif-icon { color: #2E7D32;        background-color: rgba(82, 164, 71, 0.14); }
+.pf-notif--Danger .pf-notif-icon  { color: #DC2626;        background-color: rgba(220, 38, 38, 0.12); }
+
+.pf-notif-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.pf-notif-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--pf-text-dark);
+}
+
+.pf-notif-msg {
+    margin-top: 2px;
+    font-size: 15px;
+    color: #374151;
+}
+
+.pf-notif-meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--pf-text-muted);
+}
+
+.pf-notif-meta a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.pf-notif-error {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #B91C1C;
+}
+
+.pf-notif-read {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--pf-gray-border);
+    border-radius: 10px;
+    background-color: #FFFFFF;
+    color: var(--pf-text-dark);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color var(--pf-duration-base) var(--pf-ease),
+                border-color var(--pf-duration-base) var(--pf-ease),
+                color var(--pf-duration-base) var(--pf-ease),
+                transform var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-notif-read:hover {
+    border-color: var(--pf-blue);
+    color: var(--pf-blue);
+    background-color: rgba(59, 113, 202, 0.06);
+}
+
+.pf-notif-read:active {
+    transform: scale(0.96);
+}
+
+.pf-notif-read:focus-visible {
+    outline: 2px solid var(--pf-blue);
+    outline-offset: 2px;
+}
+
+.pf-notif-read.is-done,
+.pf-notif-read.is-done:hover {
+    border-color: #2E7D32;
+    background-color: #2E7D32;
+    color: #FFFFFF;
+}
+
+.pf-notif-read.is-done .bi {
+    animation: pf-icon-pop 0.3s var(--pf-ease-out);
+}
+
+@media (max-width: 575.98px) {
+    .pf-notif {
+        flex-wrap: wrap;
+    }
+
+    .pf-notif-read {
+        margin-left: 50px;
+    }
+}
+
+.pf-notif-empty {
+    text-align: center;
+    padding: 36px 16px 20px;
+}
+
+.pf-notif-empty:focus {
+    outline: none;
+}
+
+.pf-notif-empty-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 12px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 28px;
+    color: #2E7D32;
+    background-color: rgba(82, 164, 71, 0.14);
+}
+
+.pf-notif-empty-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--pf-text-dark);
+}
+
+.pf-notif-empty-text {
+    font-size: 15px;
+    color: var(--pf-text-muted);
+}
+
+.pf-appear {
+    animation: pf-page-in 0.32s var(--pf-ease-out) backwards;
+}
+
+.pf-appear .pf-notif-empty-icon {
+    animation: pf-icon-pop 0.42s var(--pf-ease-out) 0.08s backwards;
+}
+
+/* Botón que se habilita al validar (p. ej. limpiar BD): transición suave entre deshabilitado y listo */
+.btn.pf-btn-habilitable {
+    transition: opacity var(--pf-duration-base) var(--pf-ease),
+                background-color var(--pf-duration-base) var(--pf-ease),
+                box-shadow var(--pf-duration-base) var(--pf-ease);
+}
+
+.btn.pf-btn-habilitable:not(:disabled) {
+    box-shadow: 0 4px 14px rgba(220, 53, 69, 0.28);
 }
