@@ -54,8 +54,17 @@
     <!-- Información section -->
     <div class="mb-4">
         <h5 class="fw-bold mb-2 text-dark">Información</h5>
-        <div class="fs-6 mb-1"><strong>Bodega:</strong> @(Model.Bodega?.Nombre ?? "Bodega principal") <span class="text-secondary">(@(Model.Bodega?.Codigo ?? "-"))</span></div>
-        <div class="fs-6"><strong>Cliente:</strong> Cliente 001</div>
+        <div class="fs-6">
+            <strong>Bodega:</strong>
+            @if (Model.Bodega != null)
+            {
+                @Model.Bodega.Nombre <span class="text-secondary">(@Model.Bodega.Codigo)</span>
+            }
+            else
+            {
+                <span class="fst-italic" style="color: #4B5563;">Sin bodega</span>
+            }
+        </div>
     </div>
 
     <!-- Productos section -->
@@ -99,7 +108,17 @@
                                 data-pasillo="@(d.Ubicacion?.Pasillo)">
                                 <td class="fw-semibold">@d.NombreProducto</td>
                                 <td>@d.Cantidad</td>
-                                <td>@(d.Ubicacion?.CodigoUbicacion ?? "A-01-05")</td>
+                                <td>
+                                    @if (d.Ubicacion != null)
+                                    {
+                                        @d.Ubicacion.CodigoUbicacion
+                                    }
+                                    else
+                                    {
+                                        @* Nunca se inventa una ubicación: se indica que falta *@
+                                        <span class="fst-italic" style="color: #4B5563;">Sin ubicación</span>
+                                    }
+                                </td>
                             </tr>
                         }
                     }

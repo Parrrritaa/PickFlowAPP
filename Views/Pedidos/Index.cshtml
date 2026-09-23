@@ -158,10 +158,14 @@
                                 <td>@p.FechaCarga.ToString("dd/MM/yyyy")</td>
                                 <td>@p.Prioridad</td>
                                 <td>
-                                    @(p.Bodega?.Nombre ?? "Principal")
                                     @if (p.Bodega != null)
                                     {
+                                        @p.Bodega.Nombre
                                         <div class="text-secondary small">@p.Bodega.Codigo</div>
+                                    }
+                                    else
+                                    {
+                                        <span class="fst-italic" style="color: #4B5563;">Sin bodega</span>
                                     }
                                 </td>
                                 <td>@p.Estado</td>
