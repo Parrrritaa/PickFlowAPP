@@ -180,13 +180,6 @@ namespace PickingApp.Controllers
             await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Inicio de Sesión", "Autenticación",
                 "Inicio de sesión correcto en el sistema", ipAddress);
 
-            // RN-06-CU041: si la contraseña fue asignada tras una recuperación aprobada, se obliga a establecer una nueva antes de continuar.
-            if (usuario.DebeCambiarContrasena)
-            {
-                TempData["WarningMessage"] = "Tu contraseña fue restablecida. Debes establecer una nueva contraseña antes de continuar.";
-                return RedirectToAction("CambiarContrasena");
-            }
-
             // Marca la llegada como "recién logueado" para la animación de entrada del panel (solo se ve una vez).
             TempData["JustLoggedIn"] = true;
 
@@ -301,7 +294,6 @@ namespace PickingApp.Controllers
             usuario!.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
             usuario.CodigoVerificacion = null;
             usuario.CodigoVerificacionExpira = null;
-            usuario.DebeCambiarContrasena = false;
             usuario.IntentosFallidos = 0;
             if (usuario.Estado == "Bloqueado")
             {
@@ -356,26 +348,10 @@ namespace PickingApp.Controllers
             if (usuario.Rol == "Administrador")
             {
                 usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
-                usuario.DebeCambiarContrasena = false;
                 await _context.SaveChangesAsync();
 
                 await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Cambio de Contraseña", "Seguridad",
                     "El usuario actualizó su contraseña exitosamente");
-
-                TempData["SuccessMessage"] = "Tu contraseña ha sido actualizada con éxito.";
-                return RedirectToAction("Index", "Home");
-            }
-
-            // Si esta contraseña fue forzada tras una recuperación aprobada, se aplica de inmediato:
-            // el usuario ya demostró conocer la clave temporal, así que no tiene sentido pedir otra verificación.
-            if (usuario.DebeCambiarContrasena)
-            {
-                usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
-                usuario.DebeCambiarContrasena = false;
-                await _context.SaveChangesAsync();
-
-                await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Cambio de Contraseña", "Seguridad",
-                    "El usuario estableció su nueva contraseña tras una recuperación aprobada");
 
                 TempData["SuccessMessage"] = "Tu contraseña ha sido actualizada con éxito.";
                 return RedirectToAction("Index", "Home");
@@ -452,7 +428,6 @@ namespace PickingApp.Controllers
             usuario.PasswordPendienteHash = null;
             usuario.CodigoVerificacion = null;
             usuario.CodigoVerificacionExpira = null;
-            usuario.DebeCambiarContrasena = false;
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Cambio de Contraseña", "Seguridad",

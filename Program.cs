@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
-using PickingApp.Filters;
 using PickingApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,10 +31,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 // Soporte para MVC con Vistas
-builder.Services.AddControllersWithViews(options =>
-{
-    options.Filters.Add<ForzarCambioContrasenaFilter>();
-});
+builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
