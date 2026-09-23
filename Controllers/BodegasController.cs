@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -421,7 +421,7 @@ namespace PickingApp.Controllers
                 {
                     RolDestino = "Administrador",
                     Titulo = "Solicitud de Edición de Ubicación",
-                    Mensaje = $"El supervisor {userEmail} solicitó modificar la ubicación {ubicacionExistente.CodigoUbicacion}.",
+                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar la ubicación {ubicacionExistente.CodigoUbicacion}.",
                     Tipo = "Info",
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
@@ -495,7 +495,7 @@ namespace PickingApp.Controllers
                 {
                     RolDestino = "Administrador",
                     Titulo = "Solicitud de Eliminación de Ubicación",
-                    Mensaje = $"El supervisor {userEmail} solicitó eliminar la ubicación {ubicacion.CodigoUbicacion}.",
+                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó eliminar la ubicación {ubicacion.CodigoUbicacion}.",
                     Tipo = "Warning",
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"

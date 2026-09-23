@@ -13,6 +13,13 @@ namespace PickingApp.Models
         [StringLength(100)]
         public string Usuario { get; set; } = string.Empty;
 
+        // FK al usuario registrado que realizó la acción; null si no corresponde a un usuario existente
+        // (p. ej. intentos de acceso con correos no registrados o acciones del "Sistema").
+        // Usuario y Rol se conservan como texto para mantener la trazabilidad histórica.
+        public int? UsuarioId { get; set; }
+
+        public Usuario? UsuarioAsociado { get; set; }
+
         [Required]
         [StringLength(50)]
         public string Rol { get; set; } = string.Empty;

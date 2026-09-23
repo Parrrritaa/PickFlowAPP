@@ -122,7 +122,7 @@ namespace PickingApp.Controllers
                     {
                         RolDestino = "Administrador",
                         Titulo = "Cuenta Bloqueada",
-                        Mensaje = $"La cuenta del usuario {usuario.NombreCompleto} ({usuario.Correo}) ha sido bloqueada por 5 intentos fallidos.",
+                        Mensaje = $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.Rol)} ha sido bloqueada por 5 intentos fallidos.",
                         Tipo = "Danger",
                         FechaCreacion = DateTime.Now
                     });
@@ -186,6 +186,9 @@ namespace PickingApp.Controllers
                 TempData["WarningMessage"] = "Tu contraseña fue restablecida. Debes establecer una nueva contraseña antes de continuar.";
                 return RedirectToAction("CambiarContrasena");
             }
+
+            // Marca la llegada como "recién logueado" para la animación de entrada del panel (solo se ve una vez).
+            TempData["JustLoggedIn"] = true;
 
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {

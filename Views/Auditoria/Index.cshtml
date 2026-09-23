@@ -1,14 +1,22 @@
-@model IEnumerable<PickingApp.Models.LogSistema>
+﻿@model IEnumerable<PickingApp.Models.LogSistema>
 @{
     ViewData["Title"] = "LOG del sistema";
+    var modulo = ViewBag.ModuloFiltro as string;
+    var usuario = ViewBag.UsuarioFiltro as string;
+    var fechaDesde = ViewBag.FechaDesdeFiltro as string;
+    var fechaHasta = ViewBag.FechaHastaFiltro as string;
+    var totalFiltrado = ViewBag.TotalFiltrado as int? ?? 0;
+    var maxRegistros = ViewBag.MaxRegistros as int? ?? 200;
+    var hayFiltroFecha = !string.IsNullOrEmpty(fechaDesde) || !string.IsNullOrEmpty(fechaHasta);
+    var hoy = DateTime.Today.ToString("yyyy-MM-dd");
 }
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
     <h1 class="pf-page-title mb-0">LOG del sistema</h1>
     <div class="d-flex gap-2">
-        <a asp-action="ExportarPdf" asp-route-modulo="@ViewBag.ModuloFiltro" asp-route-usuario="@ViewBag.UsuarioFiltro" asp-route-fecha="@ViewBag.FechaFiltro" class="btn btn-outline-secondary">
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalExportarPdf">
             <i class="bi bi-file-earmark-pdf-fill me-1"></i> Exportar a PDF
-        </a>
+        </button>
         <a asp-action="Configuracion" class="btn btn-outline-secondary">
             <i class="bi bi-gear-fill me-1"></i> Configuración
         </a>
@@ -19,11 +27,48 @@
 </div>
 
 <div class="mockup-card">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <span class="text-muted small fw-semibold">
+            @if (totalFiltrado > maxRegistros)
+            {
+                @($"Mostrando los {maxRegistros} más recientes de {totalFiltrado} registros. Use el PDF para ver el rango completo.")
+            }
+            else
+            {
+                @($"{totalFiltrado} registro(s){(hayFiltroFecha ? " en el rango seleccionado" : "")}")
+            }
+        </span>
+        @if (hayFiltroFecha)
+        {
+            <a asp-action="Index" asp-route-modulo="@modulo" asp-route-usuario="@usuario" class="small fw-semibold text-decoration-none">
+                <i class="bi bi-x-circle"></i> Quitar filtro de fecha
+            </a>
+        }
+    </div>
+
     <div class="table-responsive">
         <table class="mockup-table">
             <thead>
                 <tr>
-                    <th>Fecha</th>
+                    <th>
+                        <form method="get" asp-action="Index" id="formFiltroFechaLog" class="dropdown">
+                            <input type="hidden" name="modulo" value="@modulo" />
+                            <input type="hidden" name="usuario" value="@usuario" />
+                            <button type="button" class="th-filtro-btn @(hayFiltroFecha ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                Fecha <i class="bi @(hayFiltroFecha ? "bi-funnel-fill" : "bi-funnel")"></i>
+                            </button>
+                            <div class="dropdown-menu th-filtro-menu">
+                                <label class="form-label small fw-semibold mb-1" for="filtroDesde">Desde</label>
+                                <input type="date" id="filtroDesde" name="fechaDesde" value="@fechaDesde" max="@hoy" class="form-control form-control-sm mb-2" />
+                                <label class="form-label small fw-semibold mb-1" for="filtroHasta">Hasta</label>
+                                <input type="date" id="filtroHasta" name="fechaHasta" value="@fechaHasta" max="@hoy" class="form-control form-control-sm" />
+                                <div class="th-filtro-acciones">
+                                    <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
+                                    <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                </div>
+                            </div>
+                        </form>
+                    </th>
                     <th>Usuario</th>
                     <th>Accion</th>
                     <th>Descripcion</th>
@@ -55,3 +100,66 @@
         </table>
     </div>
 </div>
+
+<!-- Modal Exportar LOG a PDF: pide el rango de fechas a exportar -->
+<div class="modal fade" id="modalExportarPdf" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content rounded-4 border-0 p-2">
+            <form asp-action="ExportarPdf" method="get" id="formExportarPdf">
+                <input type="hidden" name="modulo" value="@modulo" />
+                <input type="hidden" name="usuario" value="@usuario" />
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-dark">Exportar LOG a PDF</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Seleccione el periodo que desea exportar. Para un solo día, use la misma fecha en ambos campos.</p>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold" for="exportDesde">Desde</label>
+                            <input type="date" id="exportDesde" name="fechaDesde" value="@(fechaDesde ?? hoy)" max="@hoy" class="form-control" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold" for="exportHasta">Hasta</label>
+                            <input type="date" id="exportHasta" name="fechaHasta" value="@(fechaHasta ?? hoy)" max="@hoy" class="form-control" required />
+                        </div>
+                    </div>
+                    <div id="exportError" class="text-danger small mt-2 d-none">La fecha desde no puede ser posterior a la fecha hasta.</div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue"><i class="bi bi-download me-1"></i> Descargar PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            // Filtro de fecha en el encabezado: menú con posición fija para no quedar recortado por la tabla
+            var formFecha = document.getElementById('formFiltroFechaLog');
+            new bootstrap.Dropdown(formFecha.querySelector('.th-filtro-btn'), { autoClose: 'outside', popperConfig: { strategy: 'fixed' } });
+            formFecha.querySelector('[data-limpiar-filtro]').addEventListener('click', function () {
+                formFecha.querySelectorAll('input[type=date]').forEach(function (i) { i.value = ''; });
+                formFecha.submit();
+            });
+        })();
+
+        (function () {
+            var form = document.getElementById('formExportarPdf');
+            var desde = document.getElementById('exportDesde');
+            var hasta = document.getElementById('exportHasta');
+            var error = document.getElementById('exportError');
+
+            form.addEventListener('submit', function (e) {
+                var invalido = desde.value && hasta.value && desde.value > hasta.value;
+                error.classList.toggle('d-none', !invalido);
+                if (invalido) { e.preventDefault(); return; }
+                // La descarga no cambia de página: se cierra el modal tras enviar
+                setTimeout(function () { bootstrap.Modal.getInstance(document.getElementById('modalExportarPdf'))?.hide(); }, 300);
+            });
+        })();
+    </script>
+}

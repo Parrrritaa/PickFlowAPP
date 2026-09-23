@@ -1,9 +1,17 @@
-@model PickingApp.Models.Pedido
+﻿@model PickingApp.Models.Pedido
 @{
     ViewData["Title"] = $"Pedido {Model.CodigoPedido}";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
     var totalUbicaciones = Model.Detalles.Select(d => d.UbicacionId).Distinct().Count();
     if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
+    const int productosVisibles = 5;
+    var productosOcultos = Math.Max(0, (Model.Detalles?.Count ?? 0) - productosVisibles);
+    var pasillosPedido = (Model.Detalles ?? new List<PickingApp.Models.DetallePedido>())
+        .Where(d => d.Ubicacion != null)
+        .Select(d => d.Ubicacion!.Pasillo)
+        .Distinct()
+        .OrderBy(x => int.TryParse(x, out var n) ? n : int.MaxValue)
+        .ToList();
 }
 
 <h1 class="pf-page-title">Pedido @Model.CodigoPedido</h1>
@@ -52,9 +60,27 @@
 
     <!-- Productos section -->
     <div class="mb-4">
-        <h5 class="fw-bold mb-3 text-dark">Productos</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h5 class="fw-bold mb-0 text-dark">Productos</h5>
+            @if (Model.Detalles != null && Model.Detalles.Count > 1)
+            {
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <input type="text" id="filtroProductoTexto" class="mockup-search-input" placeholder="Buscar producto, código o ubicación..." />
+                    @if (pasillosPedido.Count > 1)
+                    {
+                        <select id="filtroProductoPasillo" class="form-select form-select-sm" style="width: auto;">
+                            <option value="">Todos los pasillos</option>
+                            @foreach (var pas in pasillosPedido)
+                            {
+                                <option value="@pas">Pasillo @pas</option>
+                            }
+                        </select>
+                    }
+                </div>
+            }
+        </div>
         <div class="table-responsive">
-            <table class="mockup-table">
+            <table class="mockup-table" id="tablaProductosPedido">
                 <thead>
                     <tr>
                         <th>Producto</th>
@@ -65,9 +91,12 @@
                 <tbody>
                     @if (Model.Detalles != null && Model.Detalles.Any())
                     {
+                        var indice = 0;
                         @foreach (var d in Model.Detalles)
                         {
-                            <tr>
+                            <tr class="fila-producto @(indice++ >= productosVisibles ? "fila-extra d-none" : "")"
+                                data-buscar="@($"{d.NombreProducto} {d.CodigoProducto} {d.Ubicacion?.CodigoUbicacion}".ToLowerInvariant())"
+                                data-pasillo="@(d.Ubicacion?.Pasillo)">
                                 <td class="fw-semibold">@d.NombreProducto</td>
                                 <td>@d.Cantidad</td>
                                 <td>@(d.Ubicacion?.CodigoUbicacion ?? "A-01-05")</td>
@@ -80,9 +109,22 @@
                             <td colspan="3" class="text-center text-muted py-3">No hay productos registrados en este pedido</td>
                         </tr>
                     }
+                    <tr id="filaSinCoincidencias" class="d-none">
+                        <td colspan="3" class="text-center text-muted py-3">Ningún producto coincide con el filtro</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
+        @if (productosOcultos > 0)
+        {
+            <div class="text-center mt-2" id="contenedorVerMasProductos">
+                <button type="button" id="btnVerMasProductos" class="btn btn-link fw-semibold text-decoration-none"
+                        data-ver-mas="tablaProductosPedido"
+                        data-texto-mas="Ver más (@productosOcultos productos)" data-texto-menos="Ver menos">
+                    Ver más (@productosOcultos productos)
+                </button>
+            </div>
+        }
     </div>
 
     <!-- Novedades registradas (CU-29 / CU-30) -->
@@ -330,3 +372,41 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        // Con un filtro activo se muestran todas las coincidencias (sin el límite de 5);
+        // al limpiarlo se recupera el estado de "Ver más / Ver menos".
+        (function () {
+            var texto = document.getElementById('filtroProductoTexto');
+            var pasillo = document.getElementById('filtroProductoPasillo');
+            if (!texto) return;
+            var filas = document.querySelectorAll('#tablaProductosPedido .fila-producto');
+            var sinCoincidencias = document.getElementById('filaSinCoincidencias');
+            var contenedorVerMas = document.getElementById('contenedorVerMasProductos');
+            var btnVerMas = document.getElementById('btnVerMasProductos');
+
+            function aplicar() {
+                var t = texto.value.trim().toLowerCase();
+                var pas = pasillo ? pasillo.value : '';
+                var activo = t !== '' || pas !== '';
+                var expandido = btnVerMas && btnVerMas.dataset.expandido === 'true';
+                var visibles = 0;
+
+                filas.forEach(function (f) {
+                    var mostrar = activo
+                        ? f.dataset.buscar.indexOf(t) !== -1 && (pas === '' || f.dataset.pasillo === pas)
+                        : !f.classList.contains('fila-extra') || expandido;
+                    f.classList.toggle('d-none', !mostrar);
+                    if (mostrar) visibles++;
+                });
+
+                sinCoincidencias.classList.toggle('d-none', !(activo && visibles === 0));
+                if (contenedorVerMas) contenedorVerMas.classList.toggle('d-none', activo);
+            }
+
+            texto.addEventListener('input', aplicar);
+            if (pasillo) pasillo.addEventListener('change', aplicar);
+        })();
+    </script>
+}

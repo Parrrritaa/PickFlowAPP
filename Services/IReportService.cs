@@ -33,6 +33,6 @@ namespace PickingApp.Services
         byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, DateTime fechaInicio, DateTime fechaFin);
         byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, DateTime fechaInicio, DateTime fechaFin);
         byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, DateTime fechaInicio, DateTime fechaFin);
-        byte[] GenerarReporteLogSistemaPdf(List<LogSistema> logs, string? modulo, string? usuario, DateTime? fecha);
+        byte[] GenerarReporteLogSistemaPdf(List<LogSistema> logs, string? modulo, string? usuario, DateTime fechaDesde, DateTime fechaHasta);
     }
 }

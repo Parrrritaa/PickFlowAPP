@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +29,8 @@ namespace PickingApp.Controllers
         }
 
         // CU-24: Consultar pedidos con filtros
-        public async Task<IActionResult> Index(string? estado, string? prioridad, int? bodegaId, string? busqueda)
+        public async Task<IActionResult> Index(string? estado, string? prioridad, int? bodegaId, string? busqueda,
+            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta)
         {
             var query = _context.Pedidos
                 .Include(p => p.Bodega)
@@ -59,10 +60,37 @@ namespace PickingApp.Controllers
                                          p.Detalles.Any(d => d.NombreProducto.ToLower().Contains(b) || d.CodigoProducto.ToLower().Contains(b)));
             }
 
-            ViewBag.Bodegas = await _context.Bodegas.Where(b => b.Activa).ToListAsync();
+            // empleadoId = -1 filtra los pedidos sin empleado asignado
+            if (empleadoId == -1)
+            {
+                query = query.Where(p => p.EmpleadoId == null);
+            }
+            else if (empleadoId.HasValue && empleadoId.Value > 0)
+            {
+                query = query.Where(p => p.EmpleadoId == empleadoId.Value);
+            }
+
+            if (fechaDesde.HasValue)
+            {
+                var desde = fechaDesde.Value.Date;
+                query = query.Where(p => p.FechaCarga >= desde);
+            }
+
+            if (fechaHasta.HasValue)
+            {
+                var hastaExclusivo = fechaHasta.Value.Date.AddDays(1);
+                query = query.Where(p => p.FechaCarga < hastaExclusivo);
+            }
+
+            // Se listan todas las bodegas (no solo las activas) para poder consultar pedidos históricos de bodegas desactivadas
+            ViewBag.Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync();
+            ViewBag.Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync();
             ViewBag.FiltroEstado = estado;
             ViewBag.FiltroPrioridad = prioridad;
             ViewBag.FiltroBodegaId = bodegaId;
+            ViewBag.FiltroEmpleadoId = empleadoId;
+            ViewBag.FiltroFechaDesde = fechaDesde?.ToString("yyyy-MM-dd");
+            ViewBag.FiltroFechaHasta = fechaHasta?.ToString("yyyy-MM-dd");
             ViewBag.Busqueda = busqueda;
 
             var pedidos = await query
@@ -186,13 +214,30 @@ namespace PickingApp.Controllers
                 .ToList();
 
             var tiemposEstimados = new Dictionary<int, double>();
+            var motivosNoAsignable = new Dictionary<int, string>();
             foreach (var emp in empleados)
             {
                 tiemposEstimados[emp.Id] = await _pickingEngine.CalcularTiempoEstimadoAsync(id, emp.Id);
+
+                // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante)
+                var validacion = await _pickingEngine.ValidarAsignacionAsync(id, emp.Id);
+                if (!validacion.PuedeAsignar)
+                {
+                    motivosNoAsignable[emp.Id] = validacion.MotivoCorto ?? "No disponible";
+                }
             }
+
+            // Primero los que pueden recibir el pedido, por menor tiempo estimado; el recomendado es el primero de ellos
+            empleados = empleados
+                .OrderBy(e => motivosNoAsignable.ContainsKey(e.Id))
+                .ThenBy(e => motivosNoAsignable.ContainsKey(e.Id) ? 0 : tiemposEstimados[e.Id])
+                .ThenByDescending(e => e.MesesExperiencia)
+                .ToList();
 
             ViewBag.Pedido = pedido;
             ViewBag.TiemposEstimados = tiemposEstimados;
+            ViewBag.MotivosNoAsignable = motivosNoAsignable;
+            ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(e => !motivosNoAsignable.ContainsKey(e.Id))?.Id;
             return View(empleados);
         }
 
@@ -228,7 +273,7 @@ namespace PickingApp.Controllers
                 {
                     RolDestino = "Administrador",
                     Titulo = "Alerta de Asignación de Picking",
-                    Mensaje = $"El supervisor {userEmail} asignó el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} (menos de 6 meses de experiencia con más de 10 ubicaciones).",
+                    Mensaje = $"El {User.DescripcionParaNotificacion()} asignó el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} (menos de 6 meses de experiencia con más de 10 ubicaciones).",
                     Tipo = "Warning",
                     FechaCreacion = DateTime.Now
                 });

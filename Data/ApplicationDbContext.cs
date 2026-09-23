@@ -105,6 +105,20 @@ namespace PickingApp.Data
                 .WithMany()
                 .HasForeignKey(s => s.UsuarioRespondeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Cascade: con SetNull una notificación personal quedaría sin destino ni rol y se volvería visible para todos.
+            modelBuilder.Entity<Notificacion>()
+                .HasOne(n => n.UsuarioDestino)
+                .WithMany()
+                .HasForeignKey(n => n.UsuarioDestinoId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: el historial de auditoría nunca se pierde; conserva Usuario/Rol en texto.
+            modelBuilder.Entity<LogSistema>()
+                .HasOne(l => l.UsuarioAsociado)
+                .WithMany()
+                .HasForeignKey(l => l.UsuarioId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }
