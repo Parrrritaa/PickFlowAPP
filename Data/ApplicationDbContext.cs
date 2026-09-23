@@ -21,6 +21,7 @@ namespace PickingApp.Data
         public DbSet<LogSistema> LogsSistema { get; set; } = null!;
         public DbSet<ConfiguracionSistema> ConfiguracionesSistema { get; set; } = null!;
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
+        public DbSet<CategoriaProducto> CategoriasProducto { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -50,6 +51,25 @@ namespace PickingApp.Data
             modelBuilder.Entity<Producto>()
                 .HasIndex(p => p.Codigo)
                 .IsUnique();
+
+            modelBuilder.Entity<CategoriaProducto>()
+                .HasIndex(c => c.Nombre)
+                .IsUnique();
+
+            // Al eliminar una categoría, sus productos pasan a usar la predeterminada (CategoriaProductoId = null)
+            modelBuilder.Entity<Producto>()
+                .HasOne(p => p.Categoria)
+                .WithMany(c => c.Productos)
+                .HasForeignKey(p => p.CategoriaProductoId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Categorías iniciales. "Mediano" (1,5 min/u) es la predeterminada: coincide con el cálculo anterior,
+            // así los productos existentes conservan su tiempo hasta que se clasifiquen.
+            modelBuilder.Entity<CategoriaProducto>().HasData(
+                new CategoriaProducto { Id = 1, Nombre = "Pequeño", MinutosPorUnidad = 0.3, Descripcion = "Mouse, memorias USB, cables", EsPredeterminada = false },
+                new CategoriaProducto { Id = 2, Nombre = "Mediano", MinutosPorUnidad = 1.5, Descripcion = "Teclados, routers, audífonos", EsPredeterminada = true },
+                new CategoriaProducto { Id = 3, Nombre = "Grande", MinutosPorUnidad = 4, Descripcion = "Monitores, impresoras", EsPredeterminada = false },
+                new CategoriaProducto { Id = 4, Nombre = "Voluminoso / pesado", MinutosPorUnidad = 10, Descripcion = "Torres de PC, UPS", EsPredeterminada = false });
 
             // Relaciones y eliminaciones en cascada/restringidas
             modelBuilder.Entity<Ubicacion>()

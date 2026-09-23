@@ -13,44 +13,50 @@ namespace PickingApp.Services
             _context = context;
         }
 
-        public async Task<double> CalcularTiempoEstimadoAsync(int pedidoId, int empleadoId)
+        // Tiempo estándar = Σ (unidades × minutos por unidad de la categoría del producto) + ubicaciones × minutos de recorrido.
+        // Los productos sin categoría usan la predeterminada.
+        public async Task<double> CalcularTiempoEstandarAsync(int pedidoId)
         {
-            var pedido = await _context.Pedidos
-                .Include(p => p.Detalles)
-                .FirstOrDefaultAsync(p => p.Id == pedidoId);
-
-            if (pedido == null) return 10.0;
-
-            var totalItems = pedido.Detalles.Sum(d => d.Cantidad);
-            var totalUbicaciones = pedido.Detalles.Select(d => d.UbicacionId).Distinct().Count();
-
-            var empleado = await _context.Empleados.FindAsync(empleadoId);
-            var fechaReinicio = empleado?.FechaReinicioPromedio;
-
-            // Buscar histórico de pedidos completados del empleado (ignora los anteriores a un reinicio de historial)
-            var pedidosCompletados = await _context.Pedidos
-                .Include(p => p.Detalles)
-                .Where(p => p.EmpleadoId == empleadoId && p.Estado == "Completado" && p.TiempoProcesamientoMinutos.HasValue
-                    && (fechaReinicio == null || p.FechaFinalizacion > fechaReinicio))
+            var lineas = await _context.DetallesPedido
+                .Where(d => d.PedidoId == pedidoId)
+                .Select(d => new
+                {
+                    d.Cantidad,
+                    d.UbicacionId,
+                    MinutosPorUnidad = (double?)d.Ubicacion!.Producto!.Categoria!.MinutosPorUnidad
+                })
                 .ToListAsync();
 
-            if (pedidosCompletados.Any())
-            {
-                // Calcular promedio de minutos por producto o por pedido
-                var totalMinutosHistorico = pedidosCompletados.Sum(p => p.TiempoProcesamientoMinutos!.Value);
-                var totalProductosHistorico = pedidosCompletados.Sum(p => p.Detalles.Sum(d => d.Cantidad));
+            if (!lineas.Any()) return 0;
 
-                if (totalProductosHistorico > 0)
-                {
-                    var promedioMinutosPorUnidad = totalMinutosHistorico / totalProductosHistorico;
-                    var estimado = Math.Round(totalItems * promedioMinutosPorUnidad, 1);
-                    return estimado < 2.0 ? 2.0 : estimado;
-                }
-            }
+            var minutosPredeterminados = await ObtenerMinutosPredeterminadosAsync();
+            var minutosPorUbicacion = await ObtenerMinutosPorUbicacionAsync();
 
-            // Estimación base por defecto si no tiene histórico: 1.5 minutos por unidad + 1 minuto por ubicación
-            var tiempoBase = (totalItems * 1.5) + (totalUbicaciones * 1.0);
-            return Math.Round(Math.Max(5.0, tiempoBase), 1);
+            var tiempoUnidades = lineas.Sum(l => l.Cantidad * (l.MinutosPorUnidad ?? minutosPredeterminados));
+            var tiempoRecorrido = lineas.Select(l => l.UbicacionId).Distinct().Count() * minutosPorUbicacion;
+
+            return Math.Round(Math.Max(1.0, tiempoUnidades + tiempoRecorrido), 1);
+        }
+
+        // Tiempo estimado para un empleado concreto. Hoy coincide con el tiempo estándar del pedido.
+        public async Task<double> CalcularTiempoEstimadoAsync(int pedidoId, int empleadoId)
+        {
+            return await CalcularTiempoEstandarAsync(pedidoId);
+        }
+
+        public async Task<double> ObtenerMinutosPredeterminadosAsync()
+        {
+            var minutos = await _context.CategoriasProducto
+                .Where(c => c.EsPredeterminada)
+                .Select(c => (double?)c.MinutosPorUnidad)
+                .FirstOrDefaultAsync();
+            return minutos ?? 1.5;
+        }
+
+        public async Task<double> ObtenerMinutosPorUbicacionAsync()
+        {
+            var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MinutosPorUbicacion");
+            return cfg != null && Formato.TryParseDecimal(cfg.Valor, out var valor) && valor >= 0 ? valor : 1.0;
         }
 
         public async Task<AsignacionValidationResult> ValidarAsignacionAsync(int pedidoId, int empleadoId)
@@ -140,6 +146,7 @@ namespace PickingApp.Services
             // Regla 4: Tiempo estimado vs Tiempo restante de jornada
             var tiempoEstimado = await CalcularTiempoEstimadoAsync(pedidoId, empleadoId);
             result.TiempoEstimadoMinutos = tiempoEstimado;
+            result.TiempoEstandarMinutos = await CalcularTiempoEstandarAsync(pedidoId);
 
             TimeSpan tiempoRestanteJornada;
             if (empleado.HorarioSalida > horaActual)
@@ -154,8 +161,8 @@ namespace PickingApp.Services
             if (tiempoRestanteJornada.TotalMinutes < tiempoEstimado)
             {
                 result.PuedeAsignar = false;
-                result.MensajeError = $"El tiempo estimado para el pedido ({tiempoEstimado} min) supera el tiempo restante de la jornada del empleado ({Math.Round(tiempoRestanteJornada.TotalMinutes, 0)} min).";
-                result.MotivoCorto = $"Jornada insuficiente ({Math.Round(tiempoRestanteJornada.TotalMinutes, 0)} min restantes)";
+                result.MensajeError = $"El tiempo estimado para el pedido ({Formato.Duracion(tiempoEstimado)}) supera el tiempo restante de la jornada del empleado ({Formato.Duracion(tiempoRestanteJornada.TotalMinutes)}).";
+                result.MotivoCorto = $"Jornada insuficiente ({Formato.Duracion(tiempoRestanteJornada.TotalMinutes)} restantes)";
                 return result;
             }
 

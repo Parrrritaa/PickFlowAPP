@@ -108,6 +108,15 @@
                     @if (userRole == "Administrador")
                     {
                         <li class="pf-nav-item">
+                            <a class="pf-nav-link @(currentController == "Productos" ? "active" : "")" asp-controller="Productos" asp-action="Index">
+                                Productos
+                            </a>
+                        </li>
+                    }
+
+                    @if (userRole == "Administrador")
+                    {
+                        <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Auditoria" ? "active" : "")" asp-controller="Auditoria" asp-action="Index">
                                 Log del sistema
                             </a>

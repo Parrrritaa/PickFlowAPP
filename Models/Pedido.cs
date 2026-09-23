@@ -41,6 +41,10 @@ namespace PickingApp.Models
 
         public double? TiempoEstimadoMinutos { get; set; }
 
+        // Tiempo estándar según las categorías de sus productos, sin ajustar por empleado.
+        // Se congela al asignar para que el historial no cambie si luego se editan las categorías.
+        public double? TiempoEstandarMinutos { get; set; }
+
         public double? TiempoProcesamientoMinutos { get; set; }
 
         [StringLength(250)]

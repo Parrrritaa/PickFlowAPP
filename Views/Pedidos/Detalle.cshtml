@@ -3,6 +3,10 @@
     ViewData["Title"] = $"Pedido {Model.CodigoPedido}";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
     var totalUbicaciones = Model.Detalles.Select(d => d.UbicacionId).Distinct().Count();
+    var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
+    var maxHorasJornada = ViewBag.MaxHorasJornada as double? ?? 9.0;
+    var categoriaPredeterminada = ViewBag.CategoriaPredeterminada as string ?? "Predeterminada";
+    var superaJornada = tiempoEstandar > maxHorasJornada * 60;
     if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
     const int productosVisibles = 5;
     var productosOcultos = Math.Max(0, (Model.Detalles?.Count ?? 0) - productosVisibles);
@@ -65,6 +69,20 @@
                 <span class="fst-italic" style="color: #4B5563;">Sin bodega</span>
             }
         </div>
+        @if (Model.Detalles.Any())
+        {
+            <div class="fs-6 mt-1">
+                <strong>Tiempo estándar:</strong> @PickingApp.Services.Formato.Duracion(tiempoEstandar)
+                <span class="text-secondary small">(según la categoría de cada producto)</span>
+            </div>
+            @if (superaJornada)
+            {
+                <div class="pf-aviso-jornada mt-2" role="note">
+                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                    Este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h), así que ningún empleado podrá recibirlo entero.
+                </div>
+            }
+        }
     </div>
 
     <!-- Productos section -->
@@ -93,6 +111,7 @@
                 <thead>
                     <tr>
                         <th>Producto</th>
+                        <th>Categoría</th>
                         <th>Cantidad</th>
                         <th>Ubicación</th>
                     </tr>
@@ -107,6 +126,16 @@
                                 data-buscar="@($"{d.NombreProducto} {d.CodigoProducto} {d.Ubicacion?.CodigoUbicacion}".ToLowerInvariant())"
                                 data-pasillo="@(d.Ubicacion?.Pasillo)">
                                 <td class="fw-semibold">@d.NombreProducto</td>
+                                <td>
+                                    @if (d.Ubicacion?.Producto?.Categoria != null)
+                                    {
+                                        @d.Ubicacion.Producto.Categoria.Nombre
+                                    }
+                                    else
+                                    {
+                                        <span style="color: #4B5563;">@categoriaPredeterminada <span class="small">(por defecto)</span></span>
+                                    }
+                                </td>
                                 <td>@d.Cantidad</td>
                                 <td>
                                     @if (d.Ubicacion != null)
@@ -125,11 +154,11 @@
                     else
                     {
                         <tr>
-                            <td colspan="3" class="text-center text-muted py-3">No hay productos registrados en este pedido</td>
+                            <td colspan="4" class="text-center text-muted py-3">No hay productos registrados en este pedido</td>
                         </tr>
                     }
                     <tr id="filaSinCoincidencias" class="d-none">
-                        <td colspan="3" class="text-center text-muted py-3">Ningún producto coincide con el filtro</td>
+                        <td colspan="4" class="text-center text-muted py-3">Ningún producto coincide con el filtro</td>
                     </tr>
                 </tbody>
             </table>

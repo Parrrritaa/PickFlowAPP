@@ -15,6 +15,11 @@ namespace PickingApp.Models
         [StringLength(150)]
         public string Nombre { get; set; } = string.Empty;
 
+        // Sin categoría = se usa la categoría predeterminada al calcular tiempos
+        public int? CategoriaProductoId { get; set; }
+
+        public virtual CategoriaProducto? Categoria { get; set; }
+
         public virtual ICollection<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
     }
 }

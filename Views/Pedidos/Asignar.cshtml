@@ -39,7 +39,7 @@
                         var estadoText = motivosNoAsignable.TryGetValue(emp.Id, out var motivo)
                             ? motivo
                             : (emp.EstadoDisponibilidad == "Disponible" ? "Libre" : emp.EstadoDisponibilidad);
-                        var tiempoEstimado = tiemposEstimados.TryGetValue(emp.Id, out var minutos) ? $"{minutos:0.#} min" : "-";
+                        var tiempoEstimado = tiemposEstimados.TryGetValue(emp.Id, out var minutos) ? PickingApp.Services.Formato.Duracion(minutos) : "-";
 
                         <tr class="@highlightClass">
                             <td class="fw-semibold">@emp.NombreCompleto</td>

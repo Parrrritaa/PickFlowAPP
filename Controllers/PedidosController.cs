@@ -109,10 +109,19 @@ namespace PickingApp.Controllers
                 .Include(p => p.Empleado)
                 .Include(p => p.Detalles)
                     .ThenInclude(d => d.Ubicacion)
+                        .ThenInclude(u => u!.Producto)
+                            .ThenInclude(pr => pr!.Categoria)
                 .Include(p => p.Novedades)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (pedido == null) return NotFound();
+
+            // Tiempo estándar según las categorías de los productos, comparado con una jornada completa
+            ViewBag.TiempoEstandar = pedido.TiempoEstandarMinutos ?? await _pickingEngine.CalcularTiempoEstandarAsync(pedido.Id);
+            ViewBag.CategoriaPredeterminada = await _context.CategoriasProducto
+                .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync();
+            var cfgJornada = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MaxHorasJornada");
+            ViewBag.MaxHorasJornada = cfgJornada != null && Formato.TryParseDecimal(cfgJornada.Valor, out var horas) ? horas : 9.0;
 
             // Cargar empleados disponibles para posible asignación
             ViewBag.EmpleadosDisponibles = await _context.Empleados
@@ -284,13 +293,14 @@ namespace PickingApp.Controllers
             pedido.FechaAsignacion = DateTime.Now;
             pedido.FechaInicioProceso = DateTime.Now.AddMinutes(2); // Margen de 2 minutos reglamentario
             pedido.TiempoEstimadoMinutos = validacion.TiempoEstimadoMinutos;
+            pedido.TiempoEstandarMinutos = validacion.TiempoEstandarMinutos;
 
             empleado.EstadoDisponibilidad = "EnPicking";
 
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(userEmail, userRole, "Asignar Pedido", "Pedidos", 
-                $"Pedido {pedido.CodigoPedido} asignado al empleado {empleado.NombreCompleto}. Estimado: {validacion.TiempoEstimadoMinutos} min");
+                $"Pedido {pedido.CodigoPedido} asignado al empleado {empleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}");
 
             if (validacion.GeneraAdvertencia)
             {
@@ -345,6 +355,7 @@ namespace PickingApp.Controllers
             pedido.FechaAsignacion = DateTime.Now;
             pedido.FechaInicioProceso = DateTime.Now.AddMinutes(2);
             pedido.TiempoEstimadoMinutos = validacion.TiempoEstimadoMinutos;
+            pedido.TiempoEstandarMinutos = validacion.TiempoEstandarMinutos;
 
             nuevoEmpleado.EstadoDisponibilidad = "EnPicking";
 

@@ -172,6 +172,7 @@ namespace PickingApp.Controllers
             if (bodega == null) return NotFound();
 
             ViewBag.Bodega = bodega;
+            await CargarCategoriasAsync(null);
             var model = new Ubicacion { BodegaId = bodegaId };
             return View(model);
         }
@@ -179,11 +180,13 @@ namespace PickingApp.Controllers
         [Authorize(Roles = "Administrador,Supervisor")]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CrearUbicacion(Ubicacion model, string numeroProducto, string nombreProducto)
+        public async Task<IActionResult> CrearUbicacion(Ubicacion model, string numeroProducto, string nombreProducto, string? categoriaProductoId)
         {
             var bodega = await _context.Bodegas.FindAsync(model.BodegaId);
             if (bodega == null) return NotFound();
             ViewBag.Bodega = bodega;
+            var categoriaId = await ResolverCategoriaAsync(categoriaProductoId);
+            await CargarCategoriasAsync(categoriaId);
 
             numeroProducto = (numeroProducto ?? string.Empty).Trim();
             nombreProducto = (nombreProducto ?? string.Empty).Trim();
@@ -231,12 +234,14 @@ namespace PickingApp.Controllers
                 .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == codigoProducto.ToUpper());
             if (producto == null)
             {
-                producto = new Producto { Codigo = codigoProducto, Nombre = nombreProducto };
+                producto = new Producto { Codigo = codigoProducto, Nombre = nombreProducto, CategoriaProductoId = categoriaId };
                 _context.Productos.Add(producto);
             }
             else
             {
                 producto.Nombre = nombreProducto;
+                // Un producto existente conserva su categoría salvo que se elija otra
+                if (categoriaId.HasValue) producto.CategoriaProductoId = categoriaId;
             }
 
             model.Producto = producto;
@@ -265,21 +270,25 @@ namespace PickingApp.Controllers
             if (ubicacion == null) return NotFound();
 
             ViewBag.Bodega = ubicacion.Bodega;
+            await CargarCategoriasAsync(ubicacion.Producto?.CategoriaProductoId);
             return View(ubicacion);
         }
 
         [Authorize(Roles = "Administrador,Supervisor")]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, string numeroProducto, string nombreProducto, string? motivo)
+        public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, string numeroProducto, string nombreProducto, string? motivo, string? categoriaProductoId)
         {
             var ubicacionExistente = await _context.Ubicaciones
                 .Include(u => u.Bodega)
                 .Include(u => u.Producto)
+                    .ThenInclude(p => p!.Categoria)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (ubicacionExistente == null) return NotFound();
             ViewBag.Bodega = ubicacionExistente.Bodega;
+            var categoriaId = await ResolverCategoriaAsync(categoriaProductoId);
+            await CargarCategoriasAsync(categoriaId);
 
             ModelState.Remove("Producto");
             ModelState.Remove("CodigoUbicacion");
@@ -363,6 +372,7 @@ namespace PickingApp.Controllers
                 ubicacionExistente.CodigoUbicacion = codigoUbicacionNuevo;
                 ubicacionExistente.Activa = model.Activa;
                 ubicacionExistente.Producto = producto;
+                producto.CategoriaProductoId = categoriaId;
 
                 await _context.SaveChangesAsync();
 
@@ -387,6 +397,10 @@ namespace PickingApp.Controllers
                 AgregarCambio("Estado", ubicacionExistente.Activa ? "Activa" : "Inactiva", model.Activa ? "Activa" : "Inactiva");
                 AgregarCambio("Código de producto", codigoProductoAnterior, codigoProductoNuevo);
                 AgregarCambio("Nombre de producto", nombreProductoAnterior, nombreProducto);
+                var nombreCategoriaNueva = categoriaId.HasValue
+                    ? (await _context.CategoriasProducto.FindAsync(categoriaId.Value))?.Nombre ?? "Sin clasificar"
+                    : "Sin clasificar";
+                AgregarCambio("Categoría", ubicacionExistente.Producto?.Categoria?.Nombre ?? "Sin clasificar", nombreCategoriaNueva);
 
                 var datosSolicitud = new
                 {
@@ -403,7 +417,8 @@ namespace PickingApp.Controllers
                         CodigoUbicacion = codigoUbicacionNuevo,
                         Activa = model.Activa,
                         CodigoProducto = codigoProductoNuevo,
-                        NombreProducto = nombreProducto
+                        NombreProducto = nombreProducto,
+                        CategoriaProductoId = categoriaId
                     }
                 };
 
@@ -514,6 +529,20 @@ namespace PickingApp.Controllers
             }
 
             return RedirectToAction(nameof(Detalle), new { id = ubicacion.BodegaId });
+        }
+
+        // Lista de categorías para el formulario de ubicación
+        private async Task CargarCategoriasAsync(int? seleccionada)
+        {
+            ViewBag.Categorias = await _context.CategoriasProducto.OrderBy(c => c.MinutosPorUnidad).ToListAsync();
+            ViewBag.CategoriaSeleccionada = seleccionada?.ToString() ?? "";
+        }
+
+        // Valor del formulario → Id de categoría existente, o null (sin clasificar)
+        private async Task<int?> ResolverCategoriaAsync(string? valor)
+        {
+            if (!int.TryParse(valor, out var id)) return null;
+            return await _context.CategoriasProducto.AnyAsync(c => c.Id == id) ? id : null;
         }
     }
 }

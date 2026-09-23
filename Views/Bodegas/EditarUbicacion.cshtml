@@ -1,9 +1,11 @@
-@model PickingApp.Models.Ubicacion
+﻿@model PickingApp.Models.Ubicacion
 @{
     var bodega = ViewBag.Bodega as PickingApp.Models.Bodega;
     var numeroProducto = ViewBag.NumeroProducto as string;
     var nombreProducto = (ViewBag.NombreProducto as string) ?? Model.Producto?.Nombre;
     var motivo = ViewBag.Motivo as string;
+    var categorias = ViewBag.Categorias as List<PickingApp.Models.CategoriaProducto> ?? new List<PickingApp.Models.CategoriaProducto>();
+    var categoriaSeleccionada = ViewBag.CategoriaSeleccionada as string ?? "";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
     var esAdministrador = userRole == "Administrador";
 
@@ -77,6 +79,20 @@
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Nombre de producto <span class="text-danger">*</span></label>
                 <input type="text" name="nombreProducto" class="mockup-input" placeholder="Mouse Inalámbrico Logitech" value="@nombreProducto" required />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label" for="categoriaProductoId">Categoría del producto</label>
+                <select name="categoriaProductoId" id="categoriaProductoId" class="mockup-input">
+                    <option value="">Sin clasificar (usa «@(categorias.FirstOrDefault(c => c.EsPredeterminada)?.Nombre ?? "por defecto")»)</option>
+                    @foreach (var c in categorias)
+                    {
+                        <option value="@c.Id" selected="@(categoriaSeleccionada == c.Id.ToString())">@c.Nombre · @c.MinutosPorUnidad.ToString("0.##") min/u</option>
+                    }
+                </select>
+                <div class="form-text small">Define cuánto se tarda en recoger una unidad; aplica al producto en todas sus ubicaciones.</div>
             </div>
         </div>
 

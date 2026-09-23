@@ -58,6 +58,71 @@ namespace PickingApp.Migrations
                     b.ToTable("Bodegas");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.CategoriaProducto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<bool>("EsPredeterminada")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<double>("MinutosPorUnidad")
+                        .HasColumnType("double");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("CategoriasProducto");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Descripcion = "Mouse, memorias USB, cables",
+                            EsPredeterminada = false,
+                            MinutosPorUnidad = 0.29999999999999999,
+                            Nombre = "Pequeño"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Descripcion = "Teclados, routers, audífonos",
+                            EsPredeterminada = true,
+                            MinutosPorUnidad = 1.5,
+                            Nombre = "Mediano"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Descripcion = "Monitores, impresoras",
+                            EsPredeterminada = false,
+                            MinutosPorUnidad = 4.0,
+                            Nombre = "Grande"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Descripcion = "Torres de PC, UPS",
+                            EsPredeterminada = false,
+                            MinutosPorUnidad = 10.0,
+                            Nombre = "Voluminoso / pesado"
+                        });
+                });
+
             modelBuilder.Entity("PickingApp.Models.ConfiguracionSistema", b =>
                 {
                     b.Property<int>("Id")
@@ -373,6 +438,9 @@ namespace PickingApp.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<double?>("TiempoEstandarMinutos")
+                        .HasColumnType("double");
+
                     b.Property<double?>("TiempoEstimadoMinutos")
                         .HasColumnType("double");
 
@@ -399,6 +467,9 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("CategoriaProductoId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Codigo")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -410,6 +481,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("varchar(150)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoriaProductoId");
 
                     b.HasIndex("Codigo")
                         .IsUnique();
@@ -644,6 +717,16 @@ namespace PickingApp.Migrations
                     b.Navigation("Empleado");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.Producto", b =>
+                {
+                    b.HasOne("PickingApp.Models.CategoriaProducto", "Categoria")
+                        .WithMany("Productos")
+                        .HasForeignKey("CategoriaProductoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Categoria");
+                });
+
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
                     b.HasOne("PickingApp.Models.Usuario", "UsuarioResponde")
@@ -685,6 +768,11 @@ namespace PickingApp.Migrations
                     b.Navigation("Pedidos");
 
                     b.Navigation("Ubicaciones");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.CategoriaProducto", b =>
+                {
+                    b.Navigation("Productos");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Empleado", b =>

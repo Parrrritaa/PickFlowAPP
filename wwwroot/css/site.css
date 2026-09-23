@@ -1252,3 +1252,74 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 .pf-dependiente {
     margin-top: 10px;
 }
+
+/* --- Productos y categorías --- */
+.pf-seccion-desc {
+    max-width: 720px;
+    margin: 0;
+    font-size: 14px;
+    color: #4B5563;
+}
+
+.pf-badge-defecto {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--pf-blue-hover);
+    background-color: rgba(59, 113, 202, 0.12);
+    vertical-align: 1px;
+}
+
+.pf-aplicar-lote {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: #374151;
+}
+
+.mockup-table tbody tr.pf-fila-modificada td {
+    background-color: rgba(59, 113, 202, 0.08);
+    transition: background-color var(--pf-duration-base) var(--pf-ease);
+}
+
+/* Barra de guardado: queda visible al final de la vista mientras se recorre una lista larga */
+.pf-barra-guardar {
+    position: sticky;
+    bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background-color: #FFFFFF;
+    box-shadow: 0 6px 20px rgba(0, 23, 54, 0.12);
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    z-index: 5;
+}
+
+.pf-barra-guardar .btn-pf-blue:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Aviso en el detalle del pedido cuando el tiempo estándar supera una jornada */
+.pf-aviso-jornada {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--pf-warning-text);
+    background-color: var(--pf-warning-bg);
+}

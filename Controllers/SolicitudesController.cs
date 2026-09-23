@@ -212,6 +212,17 @@ namespace PickingApp.Controllers
                                     ubiEdit.CodigoUbicacion = codigoUbicacionNuevo;
                                     ubiEdit.Activa = nuevosDatosUbiEl.TryGetProperty("Activa", out var activaProp) && activaProp.GetBoolean();
                                     ubiEdit.Producto = productoUbi;
+
+                                    // Solicitudes nuevas traen la categoría; si fue eliminada mientras tanto, queda sin clasificar
+                                    if (nuevosDatosUbiEl.TryGetProperty("CategoriaProductoId", out var categoriaProp))
+                                    {
+                                        int? categoriaId = categoriaProp.ValueKind == JsonValueKind.Number ? categoriaProp.GetInt32() : null;
+                                        if (categoriaId.HasValue && !await _context.CategoriasProducto.AnyAsync(c => c.Id == categoriaId.Value))
+                                        {
+                                            categoriaId = null;
+                                        }
+                                        productoUbi.CategoriaProductoId = categoriaId;
+                                    }
                                 }
                             }
                         }
