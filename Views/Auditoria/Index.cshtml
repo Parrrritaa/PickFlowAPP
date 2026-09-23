@@ -79,12 +79,9 @@
                 {
                     @foreach (var l in Model)
                     {
-                        var usuarioDisplay = l.Usuario.Contains("@") ? l.Usuario.Split('@')[0] : l.Usuario;
-                        usuarioDisplay = char.ToUpper(usuarioDisplay[0]) + usuarioDisplay.Substring(1);
-
                         <tr>
                             <td>@l.FechaHora.ToString("dd/MM/yyyy HH:mm")</td>
-                            <td class="fw-semibold">@usuarioDisplay</td>
+                            <td class="fw-semibold">@l.UsuarioParaMostrar</td>
                             <td>@l.Accion</td>
                             <td>@l.Detalle</td>
                         </tr>

@@ -78,7 +78,7 @@ namespace PickingApp.Controllers
 
             var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
             await _auditService.LogAsync(adminEmail, "Administrador", "Crear Usuario", "Usuarios", 
-                $"Usuario creado: {model.Correo} con rol {model.Rol}");
+                $"Usuario creado: {model.NombreCompleto} con rol {model.Rol}");
 
             TempData["SuccessMessage"] = $"Usuario '{model.NombreCompleto}' ({model.Correo}) creado con éxito.";
             return RedirectToAction(nameof(Index));
@@ -120,7 +120,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(adminEmail, "Administrador", "Editar Usuario/Rol", "Usuarios", 
-                $"Usuario {usuario.Correo} actualizado: Rol={rol}, Estado={estado}");
+                $"Usuario {usuario.NombreCompleto} actualizado: Rol={rol}, Estado={estado}");
 
             TempData["SuccessMessage"] = $"Usuario '{usuario.Correo}' actualizado exitosamente.";
             return RedirectToAction(nameof(Index));
@@ -142,7 +142,7 @@ namespace PickingApp.Controllers
 
             var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
             await _auditService.LogAsync(adminEmail, "Administrador", "Desbloquear Usuario", "Seguridad", 
-                $"Cuenta de usuario {usuario.Correo} desbloqueada manualmente.");
+                $"Cuenta de usuario {usuario.NombreCompleto} desbloqueada manualmente.");
 
             TempData["SuccessMessage"] = $"La cuenta de '{usuario.Correo}' ha sido desbloqueada.";
             return RedirectToAction(nameof(Index));

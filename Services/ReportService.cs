@@ -391,7 +391,7 @@ namespace PickingApp.Services
                             foreach (var l in logs)
                             {
                                 table.Cell().Element(CellStyleRow).Text(l.FechaHora.ToString("dd/MM/yyyy HH:mm"));
-                                table.Cell().Element(CellStyleRow).Text(l.Usuario);
+                                table.Cell().Element(CellStyleRow).Text(l.UsuarioParaMostrar);
                                 table.Cell().Element(CellStyleRow).Text(l.Accion);
                                 table.Cell().Element(CellStyleRow).Text(l.Detalle);
                             }

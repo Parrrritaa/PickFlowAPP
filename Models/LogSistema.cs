@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
@@ -37,5 +38,24 @@ namespace PickingApp.Models
 
         [StringLength(50)]
         public string? DireccionIp { get; set; }
+
+        // Cómo se muestra el usuario en el LOG: "Nombre (Rol)", nunca el correo.
+        // Requiere cargar UsuarioAsociado. El rol es el que tenía al momento de la acción.
+        [NotMapped]
+        public string UsuarioParaMostrar
+        {
+            get
+            {
+                var rol = Rol is "Administrador" or "Supervisor" or "Auxiliar" ? Rol : UsuarioAsociado?.Rol;
+
+                if (UsuarioAsociado != null)
+                    return rol != null ? $"{UsuarioAsociado.NombreCompleto} ({rol})" : UsuarioAsociado.NombreCompleto;
+
+                if (!Usuario.Contains('@')) return Usuario; // "Sistema"
+
+                // Correo que ya no corresponde a ningún usuario registrado
+                return rol != null ? $"Usuario no registrado ({rol})" : "Correo no registrado";
+            }
+        }
     }
 }

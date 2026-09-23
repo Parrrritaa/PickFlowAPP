@@ -17,6 +17,7 @@
                         <p class="small mb-0">
                             Esta función está restringida exclusivamente al Administrador y se mantendrá principalmente para pruebas del proyecto universitario. 
                             <strong>Eliminará todos los pedidos, líneas de productos, novedades, solicitudes y notificaciones</strong>, dejando la base de datos lista para una nueva simulación.
+                            El LOG del sistema se conserva, salvo que marque la opción de limpiarlo.
                         </p>
                     </div>
 
@@ -26,6 +27,16 @@
 
                     <form asp-action="ConfirmarLimpiezaBaseDatos" method="post">
                         @Html.AntiForgeryToken()
+
+                        <div class="pf-opcion-limpieza mb-4">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" name="limpiarLog" value="true" id="limpiarLog" aria-describedby="ayudaLimpiarLog" />
+                                <label class="form-check-label fw-semibold" for="limpiarLog">Limpiar también el LOG del sistema</label>
+                            </div>
+                            <div id="ayudaLimpiarLog" class="form-text ms-5">
+                                Borra todo el historial de auditoría. Solo quedará el registro de esta limpieza.
+                            </div>
+                        </div>
 
                         <div class="mb-4">
                             <label class="form-label fw-semibold text-danger">

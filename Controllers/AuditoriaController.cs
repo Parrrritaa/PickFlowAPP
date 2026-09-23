@@ -34,6 +34,7 @@ namespace PickingApp.Controllers
                 .OrderByDescending(l => l.FechaHora)
                 .Take(MaxRegistrosPantalla)
                 .ToListAsync();
+            await ReemplazarCorreosEnDetalleAsync(logs);
 
             ViewBag.ModuloFiltro = modulo;
             ViewBag.UsuarioFiltro = usuario;
@@ -65,6 +66,7 @@ namespace PickingApp.Controllers
             var logs = await FiltrarLogs(modulo, usuario, fechaDesde, fechaHasta)
                 .OrderByDescending(l => l.FechaHora)
                 .ToListAsync();
+            await ReemplazarCorreosEnDetalleAsync(logs);
 
             var pdfBytes = _reportService.GenerarReporteLogSistemaPdf(logs, modulo, usuario, fechaDesde.Value.Date, fechaHasta.Value.Date);
 
@@ -77,7 +79,11 @@ namespace PickingApp.Controllers
 
         private IQueryable<LogSistema> FiltrarLogs(string? modulo, string? usuario, DateTime? fechaDesde, DateTime? fechaHasta)
         {
-            var query = _context.LogsSistema.AsQueryable();
+            // Sin seguimiento: los registros se ajustan solo para mostrarlos y nunca se guardan
+            var query = _context.LogsSistema
+                .AsNoTracking()
+                .Include(l => l.UsuarioAsociado)
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(modulo))
             {
@@ -86,7 +92,9 @@ namespace PickingApp.Controllers
 
             if (!string.IsNullOrEmpty(usuario))
             {
-                query = query.Where(l => l.Usuario.Contains(usuario.Trim()));
+                var texto = usuario.Trim();
+                query = query.Where(l => l.Usuario.Contains(texto)
+                    || (l.UsuarioAsociado != null && l.UsuarioAsociado.NombreCompleto.Contains(texto)));
             }
 
             if (fechaDesde.HasValue)
@@ -103,6 +111,24 @@ namespace PickingApp.Controllers
 
             return query;
         }
+
+        // Registros antiguos guardaron correos en la descripción: se muestran como "Nombre (Rol)"
+        // si pertenecen a un usuario registrado. Los correos no registrados se conservan como evidencia.
+        private async Task ReemplazarCorreosEnDetalleAsync(List<LogSistema> logs)
+        {
+            var usuarios = await _context.Usuarios.AsNoTracking()
+                .Select(u => new { u.Correo, u.NombreCompleto, u.Rol })
+                .ToListAsync();
+            var nombresPorCorreo = usuarios.ToDictionary(u => u.Correo, u => $"{u.NombreCompleto} ({u.Rol})", StringComparer.OrdinalIgnoreCase);
+
+            foreach (var l in logs)
+            {
+                l.Detalle = RegexCorreo.Replace(l.Detalle, m => nombresPorCorreo.TryGetValue(m.Value, out var nombre) ? nombre : m.Value);
+            }
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex RegexCorreo =
+            new(@"[\w.+-]+@[\w-]+(\.[\w-]+)+", System.Text.RegularExpressions.RegexOptions.Compiled);
 
         // CU-39: Habilitar o deshabilitar registro de LOG y configurar parámetros
         [HttpGet]
@@ -180,7 +206,7 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ConfirmarLimpiezaBaseDatos(string confirmacion)
+        public async Task<IActionResult> ConfirmarLimpiezaBaseDatos(string confirmacion, bool limpiarLog = false)
         {
             if (confirmacion != "LIMPIAR_SISTEMA")
             {
@@ -197,6 +223,14 @@ namespace PickingApp.Controllers
             _context.Solicitudes.RemoveRange(_context.Solicitudes);
             _context.Notificaciones.RemoveRange(_context.Notificaciones);
 
+            // Opcional: vaciar el LOG. El registro de esta limpieza se escribe después, así queda como primer registro.
+            var logsEliminados = 0;
+            if (limpiarLog)
+            {
+                logsEliminados = await _context.LogsSistema.CountAsync();
+                _context.LogsSistema.RemoveRange(_context.LogsSistema);
+            }
+
             // Reiniciar estado de empleados a Disponible
             var empleados = await _context.Empleados.ToListAsync();
             foreach (var e in empleados)
@@ -206,10 +240,13 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, "Administrador", "Limpieza de Base de Datos", "Mantenimiento", 
-                "Se ejecutó una limpieza completa de datos operativos (pedidos, novedades y solicitudes).");
+            await _auditService.LogAsync(userEmail, "Administrador", "Limpieza de Base de Datos", "Mantenimiento",
+                "Se ejecutó una limpieza completa de datos operativos (pedidos, novedades y solicitudes)"
+                + (limpiarLog ? $" y del LOG del sistema ({logsEliminados} registros eliminados)." : "."));
 
-            TempData["SuccessMessage"] = "La base de datos operativa ha sido limpiada con éxito para pruebas. Los usuarios y maestros se mantuvieron protegidos.";
+            TempData["SuccessMessage"] = limpiarLog
+                ? "La base de datos operativa y el LOG del sistema fueron limpiados con éxito. Los usuarios y maestros se mantuvieron protegidos."
+                : "La base de datos operativa ha sido limpiada con éxito para pruebas. Los usuarios y maestros se mantuvieron protegidos.";
             return RedirectToAction("Index", "Home");
         }
     }

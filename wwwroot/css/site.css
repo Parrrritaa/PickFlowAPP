@@ -1323,3 +1323,22 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     color: var(--pf-warning-text);
     background-color: var(--pf-warning-bg);
 }
+
+/* Limpiar BD: opción de vaciar también el LOG; se tiñe de rojo al activarla */
+.pf-opcion-limpieza {
+    padding: 12px 14px;
+    border: 1px solid var(--pf-gray-border);
+    border-radius: var(--pf-radius-control);
+    background: var(--pf-gray-light);
+    transition: background-color var(--pf-duration-base) var(--pf-ease), border-color var(--pf-duration-base) var(--pf-ease);
+}
+
+.pf-opcion-limpieza:has(.form-check-input:checked) {
+    background: #FDECEC;
+    border-color: #F1AEB5;
+}
+
+.pf-opcion-limpieza .form-check-input:checked {
+    background-color: #DC3545;
+    border-color: #DC3545;
+}

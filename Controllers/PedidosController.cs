@@ -276,7 +276,7 @@ namespace PickingApp.Controllers
             if (validacion.GeneraAdvertencia)
             {
                 await _auditService.LogAsync(userEmail, userRole, "Advertencia de Asignación", "Pedidos", 
-                    $"{validacion.MensajeAdvertencia} - Asignado por {userEmail} al pedido {pedido.CodigoPedido}");
+                    $"{validacion.MensajeAdvertencia} - Asignado por {User.FindFirstValue(ClaimTypes.Name)} ({userRole}) al pedido {pedido.CodigoPedido}");
 
                 _context.Notificaciones.Add(new Notificacion
                 {
