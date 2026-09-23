@@ -19,11 +19,13 @@ namespace PickingApp.Controllers
 
         public async Task<IActionResult> Index()
         {
-            var pendientes = await _context.Pedidos.CountAsync(p => p.Estado == "Pendiente");
-            var enProceso = await _context.Pedidos.CountAsync(p => p.Estado == "Asignado" || p.Estado == "EnProceso");
-            var completados = await _context.Pedidos.CountAsync(p => p.Estado == "Completado");
-            var cancelados = await _context.Pedidos.CountAsync(p => p.Estado == "Cancelado");
-            var reasignados = await _context.Pedidos.CountAsync(p => p.Estado == "Reasignado");
+            // Un pedido dividido se cuenta por sus partes, no como un pedido más
+            var pedidosDeTrabajo = _context.Pedidos.Where(p => !p.Partes.Any());
+            var pendientes = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Pendiente");
+            var enProceso = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Asignado" || p.Estado == "EnProceso");
+            var completados = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Completado");
+            var cancelados = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Cancelado");
+            var reasignados = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Reasignado");
 
             ViewBag.TotalPendientes = pendientes;
             ViewBag.TotalEnProceso = enProceso;

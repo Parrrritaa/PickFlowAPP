@@ -433,6 +433,12 @@ namespace PickingApp.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("varchar(250)");
 
+                    b.Property<int?>("NumeroParte")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PedidoPadreId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Prioridad")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -455,6 +461,8 @@ namespace PickingApp.Migrations
                         .IsUnique();
 
                     b.HasIndex("EmpleadoId");
+
+                    b.HasIndex("PedidoPadreId");
 
                     b.ToTable("Pedidos");
                 });
@@ -712,9 +720,16 @@ namespace PickingApp.Migrations
                         .HasForeignKey("EmpleadoId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("PickingApp.Models.Pedido", "PedidoPadre")
+                        .WithMany("Partes")
+                        .HasForeignKey("PedidoPadreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Bodega");
 
                     b.Navigation("Empleado");
+
+                    b.Navigation("PedidoPadre");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Producto", b =>
@@ -785,6 +800,8 @@ namespace PickingApp.Migrations
                     b.Navigation("Detalles");
 
                     b.Navigation("Novedades");
+
+                    b.Navigation("Partes");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Producto", b =>

@@ -24,7 +24,7 @@ namespace PickingApp.Models
 
         [Required]
         [StringLength(30)]
-        public string Estado { get; set; } = "Pendiente"; // "Pendiente", "Asignado", "EnProceso", "Completado", "Cancelado", "Reasignado"
+        public string Estado { get; set; } = "Pendiente"; // "Pendiente", "Asignado", "EnProceso", "Completado", "Cancelado", "Reasignado", "Dividido"
 
         public int? EmpleadoId { get; set; }
 
@@ -54,6 +54,16 @@ namespace PickingApp.Models
         public string? MotivoReasignacion { get; set; }
 
         public bool ConfirmacionFisica { get; set; } = false;
+
+        // División de pedidos grandes: el pedido original queda "Dividido" y cada parte es un pedido
+        // normal (se asigna, completa o cancela por separado) con código PED-XXX-P1, PED-XXX-P2...
+        public int? PedidoPadreId { get; set; }
+
+        public virtual Pedido? PedidoPadre { get; set; }
+
+        public int? NumeroParte { get; set; }
+
+        public virtual ICollection<Pedido> Partes { get; set; } = new List<Pedido>();
 
         public virtual ICollection<DetallePedido> Detalles { get; set; } = new List<DetallePedido>();
         public virtual ICollection<NovedadPedido> Novedades { get; set; } = new List<NovedadPedido>();

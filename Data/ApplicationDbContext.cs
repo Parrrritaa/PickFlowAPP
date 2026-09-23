@@ -96,6 +96,13 @@ namespace PickingApp.Data
                 .HasForeignKey(p => p.EmpleadoId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Partes de un pedido dividido: no se puede borrar el pedido original mientras tenga partes
+            modelBuilder.Entity<Pedido>()
+                .HasOne(p => p.PedidoPadre)
+                .WithMany(p => p.Partes)
+                .HasForeignKey(p => p.PedidoPadreId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<DetallePedido>()
                 .HasOne(d => d.Pedido)
                 .WithMany(p => p.Detalles)

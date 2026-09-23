@@ -7,6 +7,14 @@
     var maxHorasJornada = ViewBag.MaxHorasJornada as double? ?? 9.0;
     var categoriaPredeterminada = ViewBag.CategoriaPredeterminada as string ?? "Predeterminada";
     var superaJornada = tiempoEstandar > maxHorasJornada * 60;
+    var partesSugeridas = Math.Max(2, (int)Math.Ceiling(tiempoEstandar / (maxHorasJornada * 60)));
+    var esDividido = Model.Estado == PickingApp.Models.PedidoEstados.Dividido;
+    var partes = Model.Partes.OrderBy(pa => pa.NumeroParte).ToList();
+    var tiemposPartes = ViewBag.TiemposPartes as Dictionary<int, double> ?? new Dictionary<int, double>();
+    var partesTerminadas = partes.Count(pa => PickingApp.Models.PedidoEstados.Finalizados.Contains(pa.Estado));
+    var puedeDividir = Model.Estado == "Pendiente" && Model.PedidoPadreId == null && Model.Detalles.Sum(d => d.Cantidad) >= 2;
+    var puedeDeshacerDivision = esDividido && partes.All(pa => pa.Estado == "Pendiente");
+    var esGestor = userRole == "Administrador" || userRole == "Supervisor";
     if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
     const int productosVisibles = 5;
     var productosOcultos = Math.Max(0, (Model.Detalles?.Count ?? 0) - productosVisibles);
@@ -19,6 +27,17 @@
 }
 
 <h1 class="pf-page-title">Pedido @Model.CodigoPedido</h1>
+
+@if (Model.PedidoPadre != null)
+{
+    <div class="pf-banner-parte mb-3">
+        <i class="bi bi-diagram-3" aria-hidden="true"></i>
+        <span>
+            Parte @Model.NumeroParte de @Model.PedidoPadre.Partes.Count del pedido
+            <a asp-action="Detalle" asp-route-id="@Model.PedidoPadreId">@Model.PedidoPadre.CodigoPedido</a>
+        </span>
+    </div>
+}
 
 <div class="mockup-card">
     <!-- 4 White Stat Cards matching Slide 7 -->
@@ -50,7 +69,7 @@
         <div class="col-md-3">
             <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
                 <div class="text-secondary fw-semibold small mb-1">Empleado</div>
-                <div class="fw-bold fs-3 text-dark">@(Model.Empleado?.NombreCompleto ?? "Sin asignar")</div>
+                <div class="fw-bold fs-3 text-dark">@(esDividido ? "Por partes" : Model.Empleado?.NombreCompleto ?? "Sin asignar")</div>
             </div>
         </div>
     </div>
@@ -92,16 +111,63 @@
             {
                 <div class="pf-aviso-jornada mt-2" role="note">
                     <i class="bi bi-hourglass-split" aria-hidden="true"></i>
-                    A ritmo estándar, este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h). Solo un empleado más rápido que el estándar podría recibirlo entero.
+                    A ritmo estándar, este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h).
+                    @if (esGestor && puedeDividir)
+                    {
+                        <a asp-action="Dividir" asp-route-id="@Model.Id" class="fw-semibold">Dividirlo en @partesSugeridas partes</a>
+                    }
                 </div>
             }
         }
     </div>
 
+    @if (partes.Any())
+    {
+        <!-- Partes del pedido dividido -->
+        <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <h5 class="fw-bold mb-0 text-dark">Partes</h5>
+                <span class="text-muted fw-semibold small">@partesTerminadas de @partes.Count partes finalizadas</span>
+            </div>
+            <div class="pf-progreso-partes mb-3" role="img" aria-label="@partesTerminadas de @partes.Count partes finalizadas">
+                <span style="width: @((partes.Count == 0 ? 0 : partesTerminadas * 100 / partes.Count))%"></span>
+            </div>
+            <div class="table-responsive">
+                <table class="mockup-table">
+                    <thead>
+                        <tr>
+                            <th>Parte</th>
+                            <th>Estado</th>
+                            <th>Empleado</th>
+                            <th class="text-end">Unidades</th>
+                            <th class="text-end">Tiempo estándar</th>
+                            <th class="text-center">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pa in partes)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@pa.CodigoPedido</td>
+                                <td>@pa.Estado</td>
+                                <td>@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                <td class="text-end">@pa.Detalles.Sum(d => d.Cantidad)</td>
+                                <td class="text-end">@PickingApp.Services.Formato.Duracion(pa.TiempoEstandarMinutos ?? tiemposPartes.GetValueOrDefault(pa.Id))</td>
+                                <td class="text-center">
+                                    <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">Ver</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
     <!-- Productos section -->
     <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <h5 class="fw-bold mb-0 text-dark">Productos</h5>
+            <h5 class="fw-bold mb-0 text-dark">@(esDividido || partes.Any() ? "Productos del pedido original" : "Productos")</h5>
             @if (Model.Detalles != null && Model.Detalles.Count > 1)
             {
                 <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -256,6 +322,22 @@
                 <a asp-action="Asignar" asp-route-id="@Model.Id" class="btn-pf-blue">
                     Asignar Empleado
                 </a>
+                @if (puedeDividir)
+                {
+                    <a asp-action="Dividir" asp-route-id="@Model.Id" class="btn-pf-gray">
+                        <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i> Dividir pedido
+                    </a>
+                }
+            }
+            else if (puedeDeshacerDivision)
+            {
+                <form asp-action="DeshacerDivision" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="pedidoId" value="@Model.Id" />
+                    <button type="submit" class="btn-pf-gray">
+                        <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Deshacer división
+                    </button>
+                </form>
             }
             else if (Model.Estado == "Asignado" || Model.Estado == "EnProceso" || Model.Estado == "Reasignado")
             {
@@ -354,6 +436,10 @@
                 <div class="modal-body">
                     <div class="mockup-alert-warning mt-0 mb-3">
                         <strong>Atención:</strong> Un pedido cancelado no podrá reactivarse.
+                        @if (esDividido)
+                        {
+                            <div class="mt-1">También se cancelarán las partes que no hayan terminado; las completadas se conservan.</div>
+                        }
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Motivo de Cancelación (Obligatorio):</label>

@@ -168,6 +168,13 @@ namespace PickingApp.Services
                 return result;
             }
 
+            if (pedido.Estado == PedidoEstados.Dividido)
+            {
+                result.PuedeAsignar = false;
+                result.MensajeError = "El pedido fue dividido en partes: asigne cada parte por separado.";
+                return result;
+            }
+
             var empleado = await _context.Empleados
                 .Include(e => e.PedidosAsignados)
                 .FirstOrDefaultAsync(e => e.Id == empleadoId);

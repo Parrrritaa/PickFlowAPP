@@ -29,14 +29,25 @@ namespace PickingApp.Controllers
         }
 
         // CU-24: Consultar pedidos con filtros
+        // vista = "divididos" muestra aparte los pedidos divididos con sus partes, para no saturar la lista principal
         public async Task<IActionResult> Index(string? estado, string? prioridad, int? bodegaId, string? busqueda,
-            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta)
+            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta, string? vista)
         {
+            var verDivididos = vista == "divididos";
+
             var query = _context.Pedidos
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
-                .Include(p => p.Detalles)
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Empleado)
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Detalles)
+                .AsSplitQuery()
                 .AsQueryable();
+
+            query = verDivididos
+                ? query.Where(p => p.Partes.Any())
+                : query.Where(p => p.PedidoPadreId == null && !p.Partes.Any());
 
             if (!string.IsNullOrEmpty(estado))
             {
@@ -60,14 +71,18 @@ namespace PickingApp.Controllers
                                          p.Detalles.Any(d => d.NombreProducto.ToLower().Contains(b) || d.CodigoProducto.ToLower().Contains(b)));
             }
 
-            // empleadoId = -1 filtra los pedidos sin empleado asignado
+            // empleadoId = -1 filtra los pedidos sin empleado asignado; en los divididos se mira el empleado de sus partes
             if (empleadoId == -1)
             {
-                query = query.Where(p => p.EmpleadoId == null);
+                query = verDivididos
+                    ? query.Where(p => p.Partes.Any(pa => pa.EmpleadoId == null && !PedidoEstados.Finalizados.Contains(pa.Estado)))
+                    : query.Where(p => p.EmpleadoId == null);
             }
             else if (empleadoId.HasValue && empleadoId.Value > 0)
             {
-                query = query.Where(p => p.EmpleadoId == empleadoId.Value);
+                query = verDivididos
+                    ? query.Where(p => p.Partes.Any(pa => pa.EmpleadoId == empleadoId.Value))
+                    : query.Where(p => p.EmpleadoId == empleadoId.Value);
             }
 
             if (fechaDesde.HasValue)
@@ -92,10 +107,13 @@ namespace PickingApp.Controllers
             ViewBag.FiltroFechaDesde = fechaDesde?.ToString("yyyy-MM-dd");
             ViewBag.FiltroFechaHasta = fechaHasta?.ToString("yyyy-MM-dd");
             ViewBag.Busqueda = busqueda;
+            ViewBag.Vista = verDivididos ? "divididos" : null;
+            ViewBag.DivididosEnCurso = await _context.Pedidos.CountAsync(p => p.Estado == PedidoEstados.Dividido);
 
             var pedidos = await query
                 .OrderByDescending(p => p.Prioridad == "Alta")
                 .ThenByDescending(p => p.FechaCarga)
+                .ThenBy(p => p.CodigoPedido)
                 .ToListAsync();
 
             return View(pedidos);
@@ -112,6 +130,13 @@ namespace PickingApp.Controllers
                         .ThenInclude(u => u!.Producto)
                             .ThenInclude(pr => pr!.Categoria)
                 .Include(p => p.Novedades)
+                .Include(p => p.PedidoPadre)
+                    .ThenInclude(pp => pp!.Partes)
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Empleado)
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Detalles)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (pedido == null) return NotFound();
@@ -120,8 +145,8 @@ namespace PickingApp.Controllers
             ViewBag.TiempoEstandar = pedido.TiempoEstandarMinutos ?? await _pickingEngine.CalcularTiempoEstandarAsync(pedido.Id);
             ViewBag.CategoriaPredeterminada = await _context.CategoriasProducto
                 .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync();
-            var cfgJornada = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MaxHorasJornada");
-            ViewBag.MaxHorasJornada = cfgJornada != null && Formato.TryParseDecimal(cfgJornada.Valor, out var horas) ? horas : 9.0;
+            ViewBag.MaxHorasJornada = await ObtenerMaxHorasJornadaAsync();
+            ViewBag.TiemposPartes = await _pickingEngine.CalcularTiemposEstandarAsync(pedido.Partes.Select(pa => pa.Id).ToList());
 
             // Cargar empleados disponibles para posible asignación
             ViewBag.EmpleadosDisponibles = await _context.Empleados
@@ -211,6 +236,12 @@ namespace PickingApp.Controllers
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (pedido == null) return NotFound();
+
+            if (pedido.Estado == PedidoEstados.Dividido)
+            {
+                TempData["ErrorMessage"] = "El pedido fue dividido en partes: asigne cada parte por separado.";
+                return RedirectToAction(nameof(Detalle), new { id });
+            }
 
             // MesesExperiencia es [NotMapped] (propiedad calculada en C#), por lo que
             // no puede ser traducida a SQL por EF Core. Se trae primero a memoria
@@ -389,6 +420,12 @@ namespace PickingApp.Controllers
             var pedido = await _context.Pedidos.FindAsync(pedidoId);
             if (pedido == null) return NotFound();
 
+            if (!PedidoEstados.EnCurso.Contains(pedido.Estado))
+            {
+                TempData["ErrorMessage"] = "Solo se puede completar un pedido que esté asignado a un empleado.";
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
             var fechaFin = DateTime.Now;
             var tiempoReal = _pickingEngine.CalcularTiempoProcesamiento(pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10), fechaFin);
 
@@ -412,8 +449,10 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, userRole, "Completar Pedido", "Pedidos", 
+            await _auditService.LogAsync(userEmail, userRole, "Completar Pedido", "Pedidos",
                 $"Pedido {pedido.CodigoPedido} marcado como completado con entrega física. Tiempo real calculado: {tiempoReal} min");
+
+            await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
 
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' completado exitosamente. Tiempo de procesamiento: {tiempoReal} minutos.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
@@ -447,13 +486,24 @@ namespace PickingApp.Controllers
             }
 
             // Liberar empleado si tenía uno asignado
-            if (pedido.EmpleadoId.HasValue)
+            await LiberarEmpleadoAsync(pedido.EmpleadoId);
+
+            // Pedido dividido: se cancelan también las partes que no hayan terminado; las completadas se conservan
+            var partesCanceladas = 0;
+            if (pedido.Estado == PedidoEstados.Dividido)
             {
-                var empleado = await _context.Empleados.FindAsync(pedido.EmpleadoId.Value);
-                if (empleado != null)
+                var partesActivas = await _context.Pedidos
+                    .Where(pa => pa.PedidoPadreId == pedido.Id && !PedidoEstados.Finalizados.Contains(pa.Estado))
+                    .ToListAsync();
+                foreach (var parte in partesActivas)
                 {
-                    empleado.EstadoDisponibilidad = "Disponible";
+                    await LiberarEmpleadoAsync(parte.EmpleadoId);
+                    parte.Estado = "Cancelado";
+                    parte.MotivoCancelacion = $"Cancelado junto con el pedido {pedido.CodigoPedido}: {motivoCancelacion.Trim()}";
+                    if (parte.MotivoCancelacion.Length > 250) parte.MotivoCancelacion = parte.MotivoCancelacion[..250];
+                    parte.FechaFinalizacion = DateTime.Now;
                 }
+                partesCanceladas = partesActivas.Count;
             }
 
             pedido.Estado = "Cancelado";
@@ -465,10 +515,14 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, userRole, "Cancelar Pedido", "Pedidos", 
-                $"Pedido {pedido.CodigoPedido} cancelado. Motivo: {motivoCancelacion}");
+            await _auditService.LogAsync(userEmail, userRole, "Cancelar Pedido", "Pedidos",
+                $"Pedido {pedido.CodigoPedido} cancelado{(partesCanceladas > 0 ? $" junto con {partesCanceladas} parte(s) sin terminar" : "")}. Motivo: {motivoCancelacion}");
 
-            TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' cancelado correctamente.";
+            await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
+
+            TempData["SuccessMessage"] = partesCanceladas > 0
+                ? $"Pedido '{pedido.CodigoPedido}' y {partesCanceladas} parte(s) sin terminar cancelados correctamente."
+                : $"Pedido '{pedido.CodigoPedido}' cancelado correctamente.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 
@@ -563,6 +617,13 @@ namespace PickingApp.Controllers
             var prioridadAnterior = pedido.Prioridad;
             pedido.Prioridad = nuevaPrioridad;
 
+            if (pedido.Estado == PedidoEstados.Dividido)
+            {
+                await _context.Pedidos
+                    .Where(pa => pa.PedidoPadreId == pedido.Id && !PedidoEstados.Finalizados.Contains(pa.Estado))
+                    .ForEachAsync(pa => pa.Prioridad = nuevaPrioridad);
+            }
+
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
 
             await _context.SaveChangesAsync();
@@ -572,6 +633,238 @@ namespace PickingApp.Controllers
 
             TempData["SuccessMessage"] = $"Prioridad cambiada a '{nuevaPrioridad}' para el pedido {pedido.CodigoPedido}.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+        }
+    
+
+        private const int MaxPartes = 20;
+
+        // Dividir un pedido grande en partes que se asignan por separado (p. ej. cuando supera una jornada)
+        [Authorize(Roles = "Administrador,Supervisor")]
+        [HttpGet]
+        public async Task<IActionResult> Dividir(int id)
+        {
+            var pedido = await _context.Pedidos
+                .Include(p => p.Bodega)
+                .Include(p => p.Detalles)
+                    .ThenInclude(d => d.Ubicacion)
+                        .ThenInclude(u => u!.Producto)
+                            .ThenInclude(pr => pr!.Categoria)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedido == null) return NotFound();
+
+            var error = MotivoNoDivisible(pedido);
+            if (error != null)
+            {
+                TempData["ErrorMessage"] = error;
+                return RedirectToAction(nameof(Detalle), new { id });
+            }
+
+            var tiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
+            var jornadaMinutos = await ObtenerMaxHorasJornadaAsync() * 60;
+            var maxPartes = Math.Min(MaxPartes, pedido.Detalles.Sum(d => d.Cantidad));
+
+            ViewBag.TiempoEstandar = tiempoEstandar;
+            ViewBag.JornadaMinutos = jornadaMinutos;
+            ViewBag.MinutosPredeterminados = await _pickingEngine.ObtenerMinutosPredeterminadosAsync();
+            ViewBag.MinutosPorUbicacion = await _pickingEngine.ObtenerMinutosPorUbicacionAsync();
+            ViewBag.MaxPartes = maxPartes;
+            // Sugerencia: las partes necesarias para que cada una quepa en una jornada a ritmo estándar
+            ViewBag.PartesSugeridas = Math.Clamp((int)Math.Ceiling(tiempoEstandar / jornadaMinutos), 2, maxPartes);
+            return View(pedido);
+        }
+
+        // cantidades["{detalleId}_{parte}"] = unidades de esa línea que van en esa parte
+        [Authorize(Roles = "Administrador,Supervisor")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Dividir(int pedidoId, int partes, Dictionary<string, string>? cantidades)
+        {
+            var pedido = await _context.Pedidos
+                .Include(p => p.Detalles)
+                .FirstOrDefaultAsync(p => p.Id == pedidoId);
+
+            if (pedido == null) return NotFound();
+
+            var error = MotivoNoDivisible(pedido);
+            if (error != null)
+            {
+                TempData["ErrorMessage"] = error;
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
+            var maxPartes = Math.Min(MaxPartes, pedido.Detalles.Sum(d => d.Cantidad));
+            if (partes < 2 || partes > maxPartes)
+            {
+                return ErrorDivision(pedidoId, $"El número de partes debe estar entre 2 y {maxPartes}.");
+            }
+
+            cantidades ??= new Dictionary<string, string>();
+            var detalles = pedido.Detalles.OrderBy(d => d.Id).ToList();
+            var reparto = new Dictionary<(int DetalleId, int Parte), int>();
+
+            foreach (var d in detalles)
+            {
+                var suma = 0;
+                for (var k = 1; k <= partes; k++)
+                {
+                    var texto = cantidades.GetValueOrDefault($"{d.Id}_{k}");
+                    var unidades = 0;
+                    if (!string.IsNullOrWhiteSpace(texto) && (!int.TryParse(texto, out unidades) || unidades < 0))
+                    {
+                        return ErrorDivision(pedidoId, $"La cantidad de «{d.NombreProducto}» en la parte {k} no es válida.");
+                    }
+                    reparto[(d.Id, k)] = unidades;
+                    suma += unidades;
+                }
+                if (suma != d.Cantidad)
+                {
+                    return ErrorDivision(pedidoId, $"«{d.NombreProducto}» tiene {d.Cantidad} unidades y se repartieron {suma}.");
+                }
+            }
+
+            for (var k = 1; k <= partes; k++)
+            {
+                if (detalles.All(d => reparto[(d.Id, k)] == 0))
+                {
+                    return ErrorDivision(pedidoId, $"La parte {k} quedó sin productos.");
+                }
+            }
+
+            var codigos = Enumerable.Range(1, partes).Select(k => $"{pedido.CodigoPedido}-P{k}").ToList();
+            if (codigos.Any(c => c.Length > 50) || await _context.Pedidos.AnyAsync(p => codigos.Contains(p.CodigoPedido)))
+            {
+                return ErrorDivision(pedidoId, "Ya existen pedidos con los códigos de las partes; revise los pedidos cargados.");
+            }
+
+            var resumen = new List<string>();
+            for (var k = 1; k <= partes; k++)
+            {
+                var parte = new Pedido
+                {
+                    CodigoPedido = codigos[k - 1],
+                    BodegaId = pedido.BodegaId,
+                    Prioridad = pedido.Prioridad,
+                    Estado = "Pendiente",
+                    FechaCarga = pedido.FechaCarga,
+                    PedidoPadreId = pedido.Id,
+                    NumeroParte = k,
+                    Detalles = detalles
+                        .Where(d => reparto[(d.Id, k)] > 0)
+                        .Select(d => new DetallePedido
+                        {
+                            CodigoProducto = d.CodigoProducto,
+                            NombreProducto = d.NombreProducto,
+                            Cantidad = reparto[(d.Id, k)],
+                            UbicacionId = d.UbicacionId
+                        })
+                        .ToList()
+                };
+                _context.Pedidos.Add(parte);
+                resumen.Add($"{parte.CodigoPedido} ({parte.Detalles.Sum(d => d.Cantidad)} uds)");
+            }
+
+            pedido.Estado = PedidoEstados.Dividido;
+            await _context.SaveChangesAsync();
+
+            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
+            await _auditService.LogAsync(userEmail, userRole, "Dividir Pedido", "Pedidos",
+                $"Pedido {pedido.CodigoPedido} dividido en {partes} partes: {string.Join(", ", resumen)}.");
+
+            TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' dividido en {partes} partes. Ahora puede asignar cada parte.";
+            return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+        }
+
+        // Volver a unir las partes mientras ninguna se haya asignado ni tenga novedades
+        [Authorize(Roles = "Administrador,Supervisor")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeshacerDivision(int pedidoId)
+        {
+            var pedido = await _context.Pedidos
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Novedades)
+                .FirstOrDefaultAsync(p => p.Id == pedidoId);
+
+            if (pedido == null) return NotFound();
+
+            if (pedido.Estado != PedidoEstados.Dividido)
+            {
+                TempData["ErrorMessage"] = "El pedido no está dividido.";
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
+            if (pedido.Partes.Any(pa => pa.Estado != "Pendiente" || pa.Novedades.Any()))
+            {
+                TempData["ErrorMessage"] = "No se puede deshacer la división: alguna parte ya fue asignada, finalizada o tiene novedades.";
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
+            var totalPartes = pedido.Partes.Count;
+            _context.Pedidos.RemoveRange(pedido.Partes);
+            pedido.Estado = "Pendiente";
+            await _context.SaveChangesAsync();
+
+            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
+            await _auditService.LogAsync(userEmail, userRole, "Deshacer División", "Pedidos",
+                $"Se unieron de nuevo las {totalPartes} partes del pedido {pedido.CodigoPedido}.");
+
+            TempData["SuccessMessage"] = $"Se deshizo la división: el pedido '{pedido.CodigoPedido}' vuelve a estar pendiente como un solo pedido.";
+            return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+        }
+
+        private static string? MotivoNoDivisible(Pedido pedido)
+        {
+            if (pedido.PedidoPadreId != null) return "Una parte no puede dividirse de nuevo.";
+            if (pedido.Estado != "Pendiente") return "Solo se pueden dividir pedidos pendientes (sin asignar).";
+            if (pedido.Detalles.Sum(d => d.Cantidad) < 2) return "El pedido necesita al menos 2 unidades para dividirse.";
+            return null;
+        }
+
+        private IActionResult ErrorDivision(int pedidoId, string mensaje)
+        {
+            TempData["ErrorMessage"] = mensaje;
+            return RedirectToAction(nameof(Dividir), new { id = pedidoId });
+        }
+
+        // Cuando todas las partes terminan, el pedido original se cierra: completado si al menos una parte se entregó
+        private async Task CerrarPedidoDivididoSiTerminoAsync(int? pedidoPadreId)
+        {
+            if (pedidoPadreId == null) return;
+
+            var padre = await _context.Pedidos
+                .Include(p => p.Partes)
+                .FirstOrDefaultAsync(p => p.Id == pedidoPadreId);
+
+            if (padre == null || padre.Estado != PedidoEstados.Dividido) return;
+            if (padre.Partes.Any(pa => !PedidoEstados.Finalizados.Contains(pa.Estado))) return;
+
+            var algunaCompletada = padre.Partes.Any(pa => pa.Estado == "Completado");
+            padre.Estado = algunaCompletada ? "Completado" : "Cancelado";
+            padre.ConfirmacionFisica = algunaCompletada;
+            padre.FechaFinalizacion = padre.Partes.Max(pa => pa.FechaFinalizacion) ?? DateTime.Now;
+            if (!algunaCompletada) padre.MotivoCancelacion = "Todas sus partes fueron canceladas.";
+            await _context.SaveChangesAsync();
+
+            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
+            await _auditService.LogAsync(userEmail, userRole, algunaCompletada ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
+                $"Pedido {padre.CodigoPedido} {(algunaCompletada ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
+        }
+
+        private async Task LiberarEmpleadoAsync(int? empleadoId)
+        {
+            if (empleadoId == null) return;
+            var empleado = await _context.Empleados.FindAsync(empleadoId.Value);
+            if (empleado != null) empleado.EstadoDisponibilidad = "Disponible";
+        }
+
+        private async Task<double> ObtenerMaxHorasJornadaAsync()
+        {
+            var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MaxHorasJornada");
+            return cfg != null && Formato.TryParseDecimal(cfg.Valor, out var horas) && horas > 0 ? horas : 9.0;
         }
     }
 }

@@ -166,9 +166,11 @@ namespace PickingApp.Controllers
             var periodo = new PeriodoReporte(fechaInicio, fechaFin);
             if (!periodo.EsValido) return FiltroInvalido("La fecha inicial no puede ser posterior a la fecha final.");
 
+            // Los pedidos divididos se reportan por sus partes
             var query = _context.Pedidos
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
+                .Where(p => !p.Partes.Any())
                 .AsQueryable();
 
             if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
@@ -214,7 +216,7 @@ namespace PickingApp.Controllers
             var estados = string.IsNullOrEmpty(estado) ? EstadosReporte : new[] { estado };
             var query = _context.Pedidos
                 .Include(p => p.Empleado)
-                .Where(p => estados.Contains(p.Estado));
+                .Where(p => estados.Contains(p.Estado) && !p.Partes.Any());
 
             if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
             if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaCarga < hasta);

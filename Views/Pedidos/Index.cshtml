@@ -10,6 +10,8 @@
     var filtroFechaDesde = ViewBag.FiltroFechaDesde as string;
     var filtroFechaHasta = ViewBag.FiltroFechaHasta as string;
     var busqueda = ViewBag.Busqueda as string;
+    var verDivididos = (ViewBag.Vista as string) == "divididos";
+    var divididosEnCurso = ViewBag.DivididosEnCurso as int? ?? 0;
 
     var activoPedido = !string.IsNullOrWhiteSpace(busqueda);
     var activoFecha = !string.IsNullOrEmpty(filtroFechaDesde) || !string.IsNullOrEmpty(filtroFechaHasta);
@@ -19,15 +21,38 @@
     var activoEmpleado = (filtroEmpleadoId ?? 0) != 0;
     var hayFiltros = activoPedido || activoFecha || activoPrioridad || activoBodega || activoEstado || activoEmpleado;
 
-    var estados = new[] { ("Pendiente", "Pendiente"), ("Asignado", "Asignado"), ("Reasignado", "Reasignado"),
-                          ("EnProceso", "En proceso"), ("Completado", "Completado"), ("Cancelado", "Cancelado") };
+    // En la vista de divididos se filtra por el estado del pedido original
+    var estados = verDivididos
+        ? new[] { ("Dividido", "En curso (dividido)"), ("Completado", "Completado"), ("Cancelado", "Cancelado") }
+        : new[] { ("Pendiente", "Pendiente"), ("Asignado", "Asignado"), ("Reasignado", "Reasignado"),
+                  ("EnProceso", "En proceso"), ("Completado", "Completado"), ("Cancelado", "Cancelado") };
 }
 
 <h1 class="pf-page-title">Gestión de pedidos</h1>
 
+<nav class="pf-vista-tabs mb-3" aria-label="Tipo de pedidos">
+    <a asp-action="Index" class="@(verDivididos ? "" : "activo")" aria-current="@(verDivididos ? null : "page")">Pedidos</a>
+    <a asp-action="Index" asp-route-vista="divididos" class="@(verDivididos ? "activo" : "")" aria-current="@(verDivididos ? "page" : null)">
+        Divididos
+        @if (divididosEnCurso > 0)
+        {
+            <span class="pf-vista-tabs__contador" title="Pedidos divididos en curso">@divididosEnCurso</span>
+        }
+    </a>
+</nav>
+
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <span class="text-muted fw-semibold">@(Model?.Count() ?? 0) pedido(s)@(hayFiltros ? " con los filtros aplicados" : "")</span>
+        <span class="text-muted fw-semibold">
+            @if (verDivididos)
+            {
+                @($"{Model?.Count() ?? 0} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+            }
+            else
+            {
+                @($"{Model?.Count() ?? 0} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+            }
+        </span>
         <div>
             <a asp-action="CargarExcel" class="btn-pf-blue">
                 + Cargar Excel
@@ -35,7 +60,18 @@
         </div>
     </div>
 
+    @if (verDivididos)
+    {
+        <p class="pf-seccion-desc small mb-3">
+            Pedidos repartidos en partes. Cada parte se asigna y completa por separado; el pedido original se cierra cuando terminan todas.
+        </p>
+    }
+
     <form method="get" asp-action="Index" id="formFiltrosPedidos">
+        @if (verDivididos)
+        {
+            <input type="hidden" name="vista" value="divididos" />
+        }
         <div class="table-responsive">
             <table class="mockup-table">
                 <thead>
@@ -141,7 +177,7 @@
                             Acción
                             @if (hayFiltros)
                             {
-                                <a asp-action="Index" class="d-block small fw-semibold text-decoration-none mt-1">
+                                <a asp-action="Index" asp-route-vista="@(verDivididos ? "divididos" : null)" class="d-block small fw-semibold text-decoration-none mt-1">
                                     <i class="bi bi-x-circle"></i> Limpiar filtros
                                 </a>
                             }
@@ -153,8 +189,16 @@
                     {
                         @foreach (var p in Model)
                         {
-                            <tr>
-                                <td class="fw-semibold">@p.CodigoPedido</td>
+                            var partesPedido = p.Partes.OrderBy(pa => pa.NumeroParte).ToList();
+                            var finalizadas = partesPedido.Count(pa => PickingApp.Models.PedidoEstados.Finalizados.Contains(pa.Estado));
+                            <tr class="@(verDivididos ? "pf-fila-dividido" : "")">
+                                <td class="fw-semibold">
+                                    @p.CodigoPedido
+                                    @if (verDivididos)
+                                    {
+                                        <div class="text-secondary small fw-normal">@partesPedido.Count partes · @finalizadas finalizada(s)</div>
+                                    }
+                                </td>
                                 <td>@p.FechaCarga.ToString("dd/MM/yyyy")</td>
                                 <td>@p.Prioridad</td>
                                 <td>
@@ -169,20 +213,53 @@
                                     }
                                 </td>
                                 <td>@p.Estado</td>
-                                <td>@(p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                <td>@(verDivididos ? "Por partes" : p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
                                 <td class="text-center">
                                     <a asp-action="Detalle" asp-route-id="@p.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
                                         Ver
                                     </a>
                                 </td>
                             </tr>
+                            @foreach (var pa in verDivididos ? partesPedido : new List<PickingApp.Models.Pedido>())
+                            {
+                                <tr class="pf-fila-parte">
+                                    <td>
+                                        <span class="pf-fila-parte__codigo">
+                                            <i class="bi bi-arrow-return-right" aria-hidden="true"></i>
+                                            @pa.CodigoPedido
+                                        </span>
+                                        <div class="text-secondary small">@pa.Detalles.Sum(d => d.Cantidad) uds</div>
+                                    </td>
+                                    <td></td>
+                                    <td>@pa.Prioridad</td>
+                                    <td></td>
+                                    <td>@pa.Estado</td>
+                                    <td>@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                    <td class="text-center">
+                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-gray" style="padding: 4px 20px; font-size: 14px;">
+                                            Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
                         }
                     }
                     else
                     {
                         <tr>
                             <td colspan="7" class="text-center text-muted py-4">
-                                @(hayFiltros ? "Ningún pedido coincide con los filtros aplicados." : "No se encontraron pedidos registrados.")
+                                @if (hayFiltros)
+                                {
+                                    @("Ningún pedido coincide con los filtros aplicados.")
+                                }
+                                else if (verDivididos)
+                                {
+                                    @("Todavía no hay pedidos divididos. Un pedido pendiente se divide desde su detalle, con «Dividir pedido».")
+                                }
+                                else
+                                {
+                                    @("No se encontraron pedidos registrados.")
+                                }
                             </td>
                         </tr>
                     }

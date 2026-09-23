@@ -1368,3 +1368,253 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     color: var(--pf-text-muted);
     border: 1px solid var(--pf-gray-border);
 }
+
+/* ---------- Dividir pedido en partes ---------- */
+.pf-dato-resumen {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 14px;
+    border-radius: var(--pf-radius-control);
+    background: var(--pf-gray-light);
+    border: 1px solid var(--pf-gray-border);
+    height: 100%;
+}
+
+.pf-dato-resumen__etiqueta {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--pf-text-muted);
+}
+
+.pf-dato-resumen__valor {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--pf-text-dark);
+}
+
+.pf-dividir-controles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.pf-stepper {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--pf-gray-border);
+    border-radius: var(--pf-radius-control);
+    overflow: hidden;
+    background: #fff;
+    box-shadow: var(--pf-shadow-control);
+}
+
+.pf-stepper__btn {
+    width: 40px;
+    min-height: 40px;
+    border: 0;
+    background: var(--pf-gray-light);
+    color: var(--pf-navy);
+    font-size: 16px;
+    transition: background-color var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-stepper__btn:hover:not(:disabled) { background: var(--pf-gray-bg); }
+.pf-stepper__btn:disabled { color: #9CA3AF; cursor: not-allowed; }
+.pf-stepper__btn:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: -2px; }
+
+.pf-stepper__campo {
+    width: 64px;
+    border: 0;
+    border-left: 1px solid var(--pf-gray-border);
+    border-right: 1px solid var(--pf-gray-border);
+    text-align: center;
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--pf-text-dark);
+    -moz-appearance: textfield;
+}
+
+.pf-stepper__campo::-webkit-inner-spin-button,
+.pf-stepper__campo::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.pf-stepper__campo:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: -2px; }
+
+/* Tarjetas de las partes: cuánto de una jornada ocupa cada una */
+.pf-partes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 12px;
+}
+
+.pf-parte-card {
+    padding: 12px 14px;
+    border-radius: var(--pf-radius-control);
+    background: #fff;
+    border: 1px solid var(--pf-gray-border);
+    box-shadow: var(--pf-shadow-control);
+}
+
+.pf-parte-card__titulo { font-size: 13px; font-weight: 600; color: var(--pf-text-muted); }
+.pf-parte-card__tiempo { font-size: 20px; font-weight: 700; color: var(--pf-navy); margin: 2px 0 8px; }
+.pf-parte-card__detalle { font-size: 13px; color: var(--pf-text-muted); margin-top: 6px; }
+
+.pf-parte-card__barra {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--pf-gray-bg);
+    overflow: hidden;
+}
+
+.pf-parte-card__barra span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--pf-blue);
+    transition: width var(--pf-duration-base) var(--pf-ease-out);
+}
+
+.pf-parte-card.is-excede { border-color: #F3C49B; }
+.pf-parte-card.is-excede .pf-parte-card__barra span { background: var(--pf-orange); }
+.pf-parte-card.is-excede .pf-parte-card__detalle { color: #9A4A0C; font-weight: 600; }
+.pf-parte-card.is-vacia { border-style: dashed; }
+.pf-parte-card.is-vacia .pf-parte-card__tiempo { color: #B91C1C; }
+
+/* Tabla de reparto: el producto queda fijo al desplazar muchas partes */
+.pf-tabla-reparto th,
+.pf-tabla-reparto td { white-space: nowrap; }
+
+.pf-tabla-reparto .pf-col-fija {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fff;
+    white-space: normal;
+    min-width: 200px;
+    box-shadow: 1px 0 0 var(--pf-gray-border);
+}
+
+.pf-tabla-reparto thead .pf-col-fija { z-index: 2; }
+
+.pf-input-cantidad {
+    width: 76px;
+    min-height: 36px;
+    padding: 4px 8px;
+    border: 1px solid var(--pf-gray-border);
+    border-radius: 8px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pf-input-cantidad:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 1px; border-color: var(--pf-blue); }
+
+.pf-por-repartir { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pf-por-repartir.is-ok { color: #2F6B27; }
+.pf-por-repartir.is-error { color: #B91C1C; }
+
+.pf-mensaje-reparto {
+    padding: 10px 14px;
+    border-radius: var(--pf-radius-control);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.pf-mensaje-reparto.is-ok { background: #E3F2E1; color: #2F6B27; }
+.pf-mensaje-reparto.is-error { background: #FDECEC; color: #9B1C1C; }
+
+#btnDividir:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Partes de un pedido dividido (detalle) */
+.pf-banner-parte {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--pf-radius-control);
+    background: #E8EFFA;
+    color: var(--pf-navy);
+    font-weight: 600;
+}
+
+.pf-progreso-partes {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--pf-gray-bg);
+    overflow: hidden;
+    max-width: 320px;
+}
+
+.pf-progreso-partes span {
+    display: block;
+    height: 100%;
+    background: var(--pf-success);
+    border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pf-parte-card__barra span { transition: none; }
+}
+
+/* Pestañas de la sección Pedidos: navegan entre la lista principal y los pedidos divididos */
+.pf-vista-tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background-color: #E5E7EB;
+}
+
+.pf-vista-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4B5563;
+    text-decoration: none;
+    transition: background-color var(--pf-duration-base) var(--pf-ease), color var(--pf-duration-base) var(--pf-ease);
+}
+
+.pf-vista-tabs a:hover { color: var(--pf-text-dark); }
+
+.pf-vista-tabs a.activo {
+    background-color: #FFFFFF;
+    color: var(--pf-text-dark);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.pf-vista-tabs a:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 2px; }
+
+.pf-vista-tabs__contador {
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--pf-blue-hover);
+    color: #fff;
+    font-size: 12px;
+    line-height: 18px;
+    text-align: center;
+}
+
+/* Vista de divididos: el pedido original y, debajo, sus partes con sangría */
+.pf-fila-dividido td { border-top: 2px solid var(--pf-gray-border); }
+
+.pf-fila-parte td {
+    background: var(--pf-gray-light);
+    font-size: 14px;
+}
+
+.pf-fila-parte__codigo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 14px;
+    font-weight: 600;
+    color: var(--pf-text-dark);
+}
+
+.pf-fila-parte__codigo i { color: var(--pf-text-muted); }
