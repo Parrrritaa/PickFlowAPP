@@ -1342,3 +1342,29 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     background-color: #DC3545;
     border-color: #DC3545;
 }
+
+/* Rendimiento del empleado frente al tiempo estándar (Asignar y Empleados) */
+.pf-rendimiento {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pf-rendimiento--rapido {
+    background: #E3F2E1;
+    color: #2F6B27;
+}
+
+.pf-rendimiento--lento {
+    background: var(--pf-warning-bg);
+    color: var(--pf-warning-text);
+}
+
+.pf-rendimiento--neutro {
+    background: var(--pf-gray-light);
+    color: var(--pf-text-muted);
+    border: 1px solid var(--pf-gray-border);
+}

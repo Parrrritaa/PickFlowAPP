@@ -8,6 +8,9 @@
     var tiemposEstimados = ViewBag.TiemposEstimados as Dictionary<int, double> ?? new Dictionary<int, double>();
     var motivosNoAsignable = ViewBag.MotivosNoAsignable as Dictionary<int, string> ?? new Dictionary<int, string>();
     var empleadoRecomendadoId = ViewBag.EmpleadoRecomendadoId as int?;
+    var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
+    var rendimientos = ViewBag.Rendimientos as Dictionary<int, PickingApp.Services.RendimientoEmpleado> ?? new Dictionary<int, PickingApp.Services.RendimientoEmpleado>();
+    var minimoPedidos = rendimientos.Values.FirstOrDefault()?.MinimoPedidos ?? 3;
 }
 
 <h1 class="pf-page-title">Asignar pedido</h1>
@@ -15,7 +18,7 @@
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold mb-0" style="color: #1F2937;">Empleados disponibles</h4>
-        <span class="text-muted fw-semibold">Pedido: <strong>@(pedido?.CodigoPedido)</strong> &bull; Ubicaciones: <strong>@totalUbicaciones</strong></span>
+        <span class="text-muted fw-semibold">Pedido: <strong>@(pedido?.CodigoPedido)</strong> &bull; Ubicaciones: <strong>@totalUbicaciones</strong> &bull; Tiempo estándar: <strong>@PickingApp.Services.Formato.Duracion(tiempoEstandar)</strong></span>
     </div>
 
     <div class="table-responsive mb-3">
@@ -26,6 +29,7 @@
                     <th>Estado</th>
                     <th>Experiencia</th>
                     <th>Turno</th>
+                    <th>Rendimiento</th>
                     <th>Tiempo estimado</th>
                     <th class="text-center">Acción</th>
                 </tr>
@@ -46,6 +50,13 @@
                             <td>@estadoText</td>
                             <td>@emp.MesesExperiencia meses</td>
                             <td>@(string.IsNullOrEmpty(emp.JornadaLaboral) ? "Sin turno asignado" : emp.JornadaLaboral)</td>
+                            <td>
+                                @if (rendimientos.TryGetValue(emp.Id, out var rendimiento))
+                                {
+                                    <span class="pf-rendimiento @ClaseRendimiento(rendimiento)">@rendimiento.Descripcion</span>
+                                    <div class="small text-muted">@rendimiento.Detalle</div>
+                                }
+                            </td>
                             <td>@tiempoEstimado</td>
                             <td class="text-center">
                                 <form asp-action="Asignar" method="post" class="d-inline">
@@ -64,12 +75,17 @@
                 else
                 {
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No hay empleados registrados.</td>
+                        <td colspan="7" class="text-center text-muted py-4">No hay empleados registrados.</td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
+
+    <p class="pf-seccion-desc small mb-3">
+        Tiempo estimado = tiempo estándar del pedido × rendimiento del empleado (su tiempo real frente al estándar en sus pedidos completados).
+        Con menos de @minimoPedidos pedidos completados se usa el tiempo estándar.
+    </p>
 
     @if (tieneEmpleadoPocaExp && totalUbicaciones > 10)
     {
@@ -87,3 +103,12 @@
         </a>
     </div>
 </div>
+
+@functions {
+    // Verde si tarda menos que el estándar, ámbar si tarda más, neutro sin historial o al ritmo estándar
+    string ClaseRendimiento(PickingApp.Services.RendimientoEmpleado r)
+    {
+        if (!r.TieneHistorialSuficiente || Math.Abs(1 - r.Factor) < 0.05) return "pf-rendimiento--neutro";
+        return r.Factor < 1 ? "pf-rendimiento--rapido" : "pf-rendimiento--lento";
+    }
+}

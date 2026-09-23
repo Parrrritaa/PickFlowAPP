@@ -17,31 +17,111 @@ namespace PickingApp.Services
         // Los productos sin categoría usan la predeterminada.
         public async Task<double> CalcularTiempoEstandarAsync(int pedidoId)
         {
+            var tiempos = await CalcularTiemposEstandarAsync(new[] { pedidoId });
+            return tiempos.GetValueOrDefault(pedidoId);
+        }
+
+        // Varios pedidos en una sola consulta (p. ej. el historial de un empleado)
+        public async Task<Dictionary<int, double>> CalcularTiemposEstandarAsync(IReadOnlyCollection<int> pedidoIds)
+        {
+            if (pedidoIds.Count == 0) return new Dictionary<int, double>();
+
             var lineas = await _context.DetallesPedido
-                .Where(d => d.PedidoId == pedidoId)
+                .Where(d => pedidoIds.Contains(d.PedidoId))
                 .Select(d => new
                 {
+                    d.PedidoId,
                     d.Cantidad,
                     d.UbicacionId,
                     MinutosPorUnidad = (double?)d.Ubicacion!.Producto!.Categoria!.MinutosPorUnidad
                 })
                 .ToListAsync();
 
-            if (!lineas.Any()) return 0;
-
             var minutosPredeterminados = await ObtenerMinutosPredeterminadosAsync();
             var minutosPorUbicacion = await ObtenerMinutosPorUbicacionAsync();
 
-            var tiempoUnidades = lineas.Sum(l => l.Cantidad * (l.MinutosPorUnidad ?? minutosPredeterminados));
-            var tiempoRecorrido = lineas.Select(l => l.UbicacionId).Distinct().Count() * minutosPorUbicacion;
-
-            return Math.Round(Math.Max(1.0, tiempoUnidades + tiempoRecorrido), 1);
+            return lineas
+                .GroupBy(l => l.PedidoId)
+                .ToDictionary(g => g.Key, g =>
+                {
+                    var tiempoUnidades = g.Sum(l => l.Cantidad * (l.MinutosPorUnidad ?? minutosPredeterminados));
+                    var tiempoRecorrido = g.Select(l => l.UbicacionId).Distinct().Count() * minutosPorUbicacion;
+                    return Math.Round(Math.Max(1.0, tiempoUnidades + tiempoRecorrido), 1);
+                });
         }
 
-        // Tiempo estimado para un empleado concreto. Hoy coincide con el tiempo estándar del pedido.
+        // Tiempo estimado para un empleado concreto: tiempo estándar × su factor de rendimiento
         public async Task<double> CalcularTiempoEstimadoAsync(int pedidoId, int empleadoId)
         {
-            return await CalcularTiempoEstandarAsync(pedidoId);
+            var rendimiento = await CalcularRendimientoAsync(empleadoId);
+            return rendimiento.Estimar(await CalcularTiempoEstandarAsync(pedidoId));
+        }
+
+        public async Task<RendimientoEmpleado> CalcularRendimientoAsync(int empleadoId)
+        {
+            var rendimientos = await CalcularRendimientosAsync(new[] { empleadoId });
+            return rendimientos[empleadoId];
+        }
+
+        public async Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds)
+        {
+            var minimoPedidos = await ObtenerMinimoPedidosRendimientoAsync();
+
+            var reinicios = await _context.Empleados
+                .Where(e => empleadoIds.Contains(e.Id))
+                .ToDictionaryAsync(e => e.Id, e => e.FechaReinicioPromedio);
+
+            var completados = (await _context.Pedidos
+                .Where(p => p.EmpleadoId != null && empleadoIds.Contains(p.EmpleadoId.Value)
+                    && p.Estado == "Completado" && p.TiempoProcesamientoMinutos != null)
+                .Select(p => new
+                {
+                    p.Id,
+                    EmpleadoId = p.EmpleadoId!.Value,
+                    p.FechaFinalizacion,
+                    Real = p.TiempoProcesamientoMinutos!.Value,
+                    p.TiempoEstandarMinutos
+                })
+                .ToListAsync())
+                // Los pedidos anteriores a un reinicio de historial no cuentan
+                .Where(p => reinicios.GetValueOrDefault(p.EmpleadoId) is not DateTime reinicio || p.FechaFinalizacion > reinicio)
+                .ToList();
+
+            // Pedidos completados antes de guardar el tiempo estándar: se calcula con las categorías actuales
+            var estandarCalculado = await CalcularTiemposEstandarAsync(
+                completados.Where(p => p.TiempoEstandarMinutos == null).Select(p => p.Id).ToList());
+
+            var resultado = new Dictionary<int, RendimientoEmpleado>();
+            foreach (var empleadoId in empleadoIds.Distinct())
+            {
+                var pedidos = completados
+                    .Where(p => p.EmpleadoId == empleadoId)
+                    .Select(p => new { p.Real, Estandar = p.TiempoEstandarMinutos ?? estandarCalculado.GetValueOrDefault(p.Id) })
+                    .Where(p => p.Estandar > 0)
+                    .ToList();
+
+                var rendimiento = new RendimientoEmpleado { MinimoPedidos = minimoPedidos, PedidosConsiderados = pedidos.Count };
+                if (pedidos.Any())
+                {
+                    // Ponderado por el tamaño del pedido: los pedidos grandes pesan más que los pequeños
+                    rendimiento.FactorMedido = pedidos.Sum(p => p.Real) / pedidos.Sum(p => p.Estandar);
+                }
+                if (rendimiento.TieneHistorialSuficiente && rendimiento.FactorMedido.HasValue)
+                {
+                    // Se limita para que datos atípicos (pedidos cerrados de inmediato u olvidados abiertos) no distorsionen
+                    rendimiento.Factor = Math.Round(Math.Clamp(rendimiento.FactorMedido.Value,
+                        RendimientoEmpleado.FactorMinimo, RendimientoEmpleado.FactorMaximo), 2);
+                }
+                resultado[empleadoId] = rendimiento;
+            }
+
+            return resultado;
+        }
+
+        private async Task<int> ObtenerMinimoPedidosRendimientoAsync()
+        {
+            var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MinPedidosRendimiento");
+            return cfg != null && int.TryParse(cfg.Valor, out var valor) && valor >= 1 ? valor : 3;
         }
 
         public async Task<double> ObtenerMinutosPredeterminadosAsync()
@@ -144,9 +224,10 @@ namespace PickingApp.Services
             }
 
             // Regla 4: Tiempo estimado vs Tiempo restante de jornada
-            var tiempoEstimado = await CalcularTiempoEstimadoAsync(pedidoId, empleadoId);
-            result.TiempoEstimadoMinutos = tiempoEstimado;
             result.TiempoEstandarMinutos = await CalcularTiempoEstandarAsync(pedidoId);
+            result.Rendimiento = await CalcularRendimientoAsync(empleadoId);
+            var tiempoEstimado = result.Rendimiento.Estimar(result.TiempoEstandarMinutos);
+            result.TiempoEstimadoMinutos = tiempoEstimado;
 
             TimeSpan tiempoRestanteJornada;
             if (empleado.HorarioSalida > horaActual)

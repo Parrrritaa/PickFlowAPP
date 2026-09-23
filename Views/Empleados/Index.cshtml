@@ -6,6 +6,7 @@
     var esAuxiliar = userRole == "Auxiliar";
     // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
+    var rendimientos = ViewBag.Rendimientos as Dictionary<int, PickingApp.Services.RendimientoEmpleado> ?? new Dictionary<int, PickingApp.Services.RendimientoEmpleado>();
 }
 
 <h1 class="pf-page-title">Gestión de empleados</h1>
@@ -27,6 +28,7 @@
                     @if (!esAuxiliar)
                     {
                         <th>Experiencia</th>
+                        <th>Rendimiento</th>
                     }
                     <th>Turno</th>
                     <th class="text-center">Acción</th>
@@ -44,6 +46,13 @@
                             @if (!esAuxiliar)
                             {
                                 <td>@emp.MesesExperiencia meses</td>
+                                <td>
+                                    @if (rendimientos.TryGetValue(emp.Id, out var rendimiento))
+                                    {
+                                        <span class="pf-rendimiento @ClaseRendimiento(rendimiento)">@rendimiento.Descripcion</span>
+                                        <div class="small text-muted">@rendimiento.Detalle</div>
+                                    }
+                                </td>
                             }
                             <td>@(string.IsNullOrEmpty(emp.JornadaLaboral) ? "Sin turno asignado" : emp.JornadaLaboral)</td>
                             <td class="text-center d-flex gap-2 justify-content-center">
@@ -71,7 +80,7 @@
                                     <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
                                             data-bs-toggle="modal" data-bs-target="#modalReiniciarPromedio"
                                             onclick="document.getElementById('reiniciarPromedioId').value='@emp.Id'; document.getElementById('reiniciarPromedioNombre').innerText='@emp.NombreCompleto';">
-                                        Reiniciar promedio
+                                        Reiniciar rendimiento
                                     </button>
                                 }
                             </td>
@@ -81,7 +90,7 @@
                 else
                 {
                     <tr>
-                        <td colspan="@(esAuxiliar ? 4 : 5)" class="text-center text-muted py-4">No hay empleados registrados.</td>
+                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">No hay empleados registrados.</td>
                     </tr>
                 }
             </tbody>
@@ -127,13 +136,13 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" id="reiniciarPromedioId" name="id" value="" />
                     <div class="modal-header border-0">
-                        <h5 class="modal-title fw-bold text-dark">Reiniciar promedio de tiempos</h5>
+                        <h5 class="modal-title fw-bold text-dark">Reiniciar rendimiento</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <p>Empleado: <strong id="reiniciarPromedioNombre"></strong></p>
                         <div class="mockup-alert-warning mb-0">
-                            Los pedidos completados hasta ahora se conservan en el historial, pero dejarán de contar para calcular su tiempo promedio. A partir de este momento, el promedio se recalculará solo con sus próximos pedidos completados.
+                            Los pedidos completados hasta ahora se conservan en el historial, pero dejarán de contar para calcular su rendimiento. Hasta que complete de nuevo el mínimo de pedidos, sus estimaciones usarán el tiempo estándar.
                         </div>
                     </div>
                     <div class="modal-footer border-0">
@@ -144,4 +153,13 @@
             </div>
         </div>
     </div>
+}
+
+@functions {
+    // Verde si tarda menos que el estándar, ámbar si tarda más, neutro sin historial o al ritmo estándar
+    string ClaseRendimiento(PickingApp.Services.RendimientoEmpleado r)
+    {
+        if (!r.TieneHistorialSuficiente || Math.Abs(1 - r.Factor) < 0.05) return "pf-rendimiento--neutro";
+        return r.Factor < 1 ? "pf-rendimiento--rapido" : "pf-rendimiento--lento";
+    }
 }

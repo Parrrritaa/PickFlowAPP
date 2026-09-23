@@ -222,11 +222,15 @@ namespace PickingApp.Controllers
                 .ThenByDescending(e => e.MesesExperiencia)
                 .ToList();
 
+            // Tiempo estimado de cada empleado = tiempo estándar del pedido × su factor de rendimiento
+            var tiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
+            var rendimientos = await _pickingEngine.CalcularRendimientosAsync(empleados.Select(e => e.Id).ToList());
+
             var tiemposEstimados = new Dictionary<int, double>();
             var motivosNoAsignable = new Dictionary<int, string>();
             foreach (var emp in empleados)
             {
-                tiemposEstimados[emp.Id] = await _pickingEngine.CalcularTiempoEstimadoAsync(id, emp.Id);
+                tiemposEstimados[emp.Id] = rendimientos[emp.Id].Estimar(tiempoEstandar);
 
                 // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante)
                 var validacion = await _pickingEngine.ValidarAsignacionAsync(id, emp.Id);
@@ -245,6 +249,8 @@ namespace PickingApp.Controllers
 
             ViewBag.Pedido = pedido;
             ViewBag.TiemposEstimados = tiemposEstimados;
+            ViewBag.TiempoEstandar = tiempoEstandar;
+            ViewBag.Rendimientos = rendimientos;
             ViewBag.MotivosNoAsignable = motivosNoAsignable;
             ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(e => !motivosNoAsignable.ContainsKey(e.Id))?.Id;
             return View(empleados);
@@ -300,7 +306,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(userEmail, userRole, "Asignar Pedido", "Pedidos", 
-                $"Pedido {pedido.CodigoPedido} asignado al empleado {empleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}");
+                $"Pedido {pedido.CodigoPedido} asignado al empleado {empleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)} (estándar {Formato.Duracion(validacion.TiempoEstandarMinutos)} × rendimiento {validacion.Rendimiento?.Factor ?? 1:0.00})");
 
             if (validacion.GeneraAdvertencia)
             {
@@ -362,7 +368,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(userEmail, userRole, "Reasignar Pedido", "Pedidos", 
-                $"Pedido {pedido.CodigoPedido} reasignado a {nuevoEmpleado.NombreCompleto}. Motivo: {motivoReasignacion}");
+                $"Pedido {pedido.CodigoPedido} reasignado a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivoReasignacion}");
 
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' reasignado exitosamente a '{nuevoEmpleado.NombreCompleto}'.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });

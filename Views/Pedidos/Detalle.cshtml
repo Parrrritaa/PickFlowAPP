@@ -75,11 +75,24 @@
                 <strong>Tiempo estándar:</strong> @PickingApp.Services.Formato.Duracion(tiempoEstandar)
                 <span class="text-secondary small">(según la categoría de cada producto)</span>
             </div>
-            @if (superaJornada)
+            @if (Model.Empleado != null && Model.TiempoEstimadoMinutos.HasValue)
+            {
+                <div class="fs-6 mt-1">
+                    <strong>Tiempo estimado:</strong> @PickingApp.Services.Formato.Duracion(Model.TiempoEstimadoMinutos.Value)
+                    <span class="text-secondary small">(según el rendimiento de @Model.Empleado.NombreCompleto al asignarlo)</span>
+                </div>
+            }
+            @if (Model.Estado == "Completado" && Model.TiempoProcesamientoMinutos.HasValue)
+            {
+                <div class="fs-6 mt-1">
+                    <strong>Tiempo real:</strong> @PickingApp.Services.Formato.Duracion(Model.TiempoProcesamientoMinutos.Value)
+                </div>
+            }
+            @if (superaJornada && Model.Estado == "Pendiente")
             {
                 <div class="pf-aviso-jornada mt-2" role="note">
                     <i class="bi bi-hourglass-split" aria-hidden="true"></i>
-                    Este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h), así que ningún empleado podrá recibirlo entero.
+                    A ritmo estándar, este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h). Solo un empleado más rápido que el estándar podría recibirlo entero.
                 </div>
             }
         }

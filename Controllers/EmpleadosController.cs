@@ -13,11 +13,13 @@ namespace PickingApp.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly IPickingEngine _pickingEngine;
 
-        public EmpleadosController(ApplicationDbContext context, IAuditService auditService)
+        public EmpleadosController(ApplicationDbContext context, IAuditService auditService, IPickingEngine pickingEngine)
         {
             _context = context;
             _auditService = auditService;
+            _pickingEngine = pickingEngine;
         }
 
         // CU-16: Consultar empleados
@@ -28,6 +30,7 @@ namespace PickingApp.Controllers
                 .OrderBy(e => e.NombreCompleto)
                 .ToListAsync();
 
+            ViewBag.Rendimientos = await _pickingEngine.CalcularRendimientosAsync(empleados.Select(e => e.Id).ToList());
             return View(empleados);
         }
 
@@ -332,7 +335,7 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Reiniciar el historial de tiempos usado para calcular el promedio del empleado (Solo Administrador).
+        // Reiniciar el historial de tiempos usado para calcular el rendimiento del empleado (Solo Administrador).
         // No elimina ni desvincula los pedidos completados: solo deja de contarlos a partir de ahora.
         [Authorize(Roles = "Administrador")]
         [HttpPost]
@@ -347,10 +350,10 @@ namespace PickingApp.Controllers
             TempData["EmpleadoDestacadoId"] = empleado.Id;
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(userEmail, "Administrador", "Reiniciar Promedio de Tiempos", "Empleados",
-                $"Se reinició el historial de tiempos del empleado {empleado.Identificacion} - {empleado.NombreCompleto}. Los pedidos completados antes de esta fecha ya no se contarán para su promedio.");
+            await _auditService.LogAsync(userEmail, "Administrador", "Reiniciar Rendimiento", "Empleados",
+                $"Se reinició el historial de tiempos del empleado {empleado.Identificacion} - {empleado.NombreCompleto}. Los pedidos completados antes de esta fecha ya no se contarán para su rendimiento.");
 
-            TempData["SuccessMessage"] = $"El historial de tiempos de '{empleado.NombreCompleto}' fue reiniciado. Sus pedidos anteriores se conservan, pero no se contarán en su próximo promedio.";
+            TempData["SuccessMessage"] = $"El historial de tiempos de '{empleado.NombreCompleto}' fue reiniciado. Sus pedidos anteriores se conservan, pero no se contarán para su rendimiento.";
             return RedirectToAction(nameof(Index));
         }
 
