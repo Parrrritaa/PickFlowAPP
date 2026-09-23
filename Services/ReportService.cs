@@ -1,4 +1,4 @@
-using QuestPDF.Fluent;
+﻿using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using PickingApp.Models;
@@ -238,12 +238,12 @@ namespace PickingApp.Services
             return document.GeneratePdf();
         }
 
-        public byte[] GenerarReporteLogSistemaPdf(List<LogSistema> logs, string? modulo, string? usuario, DateTime? fecha)
+        public byte[] GenerarReporteLogSistemaPdf(List<LogSistema> logs, string? modulo, string? usuario, DateTime fechaDesde, DateTime fechaHasta)
         {
             var filtros = new List<string>();
             if (!string.IsNullOrWhiteSpace(modulo)) filtros.Add($"Módulo: {modulo}");
             if (!string.IsNullOrWhiteSpace(usuario)) filtros.Add($"Usuario: {usuario}");
-            if (fecha.HasValue) filtros.Add($"Fecha: {fecha.Value:dd/MM/yyyy}");
+            filtros.Add($"{logs.Count} registro(s)");
             var filtrosTexto = filtros.Any() ? string.Join(" • ", filtros) : "Sin filtros aplicados";
 
             var document = Document.Create(container =>
@@ -255,7 +255,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "LOG del Sistema (CU-38)", DateTime.Now, DateTime.Now));
+                    page.Header().Element(c => ComposeHeader(c, "LOG del Sistema (CU-38)", fechaDesde, fechaHasta));
 
                     page.Content().PaddingVertical(10).Column(col =>
                     {

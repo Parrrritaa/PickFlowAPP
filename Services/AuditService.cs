@@ -48,10 +48,20 @@ namespace PickingApp.Services
             {
                 if (!await IsLogEnabledAsync()) return;
 
+                int? usuarioId = null;
+                if (!string.IsNullOrWhiteSpace(usuario))
+                {
+                    usuarioId = await _context.Usuarios
+                        .Where(u => u.Correo == usuario)
+                        .Select(u => (int?)u.Id)
+                        .FirstOrDefaultAsync();
+                }
+
                 var log = new LogSistema
                 {
                     FechaHora = DateTime.Now,
                     Usuario = string.IsNullOrWhiteSpace(usuario) ? "Sistema" : usuario,
+                    UsuarioId = usuarioId,
                     Rol = string.IsNullOrWhiteSpace(rol) ? "Sistema" : rol,
                     Accion = accion,
                     Modulo = modulo,

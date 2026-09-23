@@ -9,6 +9,8 @@ namespace PickingApp.Models
 
         public int? UsuarioDestinoId { get; set; }
 
+        public Usuario? UsuarioDestino { get; set; }
+
         [StringLength(50)]
         public string? RolDestino { get; set; } // "Administrador", "Supervisor", "Auxiliar" o null
 

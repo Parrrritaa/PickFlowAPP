@@ -1,4 +1,4 @@
-/* PickFlow Mockup Theme */
+﻿/* PickFlow Mockup Theme */
 :root {
     --pf-navy: #00204A;
     --pf-navy-dark: #001736;
@@ -16,6 +16,69 @@
     --pf-warning-bg: #F2E3B8;
     --pf-warning-text: #603813;
     --pf-banner-blue: #BFDBFE;
+
+    /* Motion & depth tokens — not part of the color palette, used to keep
+       transitions and shadows consistent across components. */
+    --pf-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --pf-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --pf-duration-fast: 0.12s;
+    --pf-duration-base: 0.2s;
+    --pf-duration-sidebar: 0.28s;
+    --pf-radius-control: 10px;
+    --pf-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 18px rgba(0, 0, 0, 0.05);
+    --pf-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Session entrance/exit — plays once per login or logout, never on routine navigation. */
+@keyframes pf-fade-up-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pf-shell-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pf-shell-out {
+    to { opacity: 0; transform: translateY(-6px) scale(0.995); }
+}
+
+.pf-login-card {
+    animation: pf-fade-up-in 0.5s var(--pf-ease-out) both;
+}
+
+body.pf-just-logged-in .pf-sidebar {
+    animation: pf-shell-in 0.45s var(--pf-ease-out) both;
+}
+
+body.pf-just-logged-in .pf-main-wrapper {
+    animation: pf-shell-in 0.5s var(--pf-ease-out) 0.06s both;
+}
+
+body.pf-logging-out .pf-sidebar,
+body.pf-logging-out .pf-main-wrapper {
+    animation: pf-shell-out 0.22s var(--pf-ease) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pf-login-card,
+    body.pf-just-logged-in .pf-sidebar,
+    body.pf-just-logged-in .pf-main-wrapper,
+    body.pf-logging-out .pf-sidebar,
+    body.pf-logging-out .pf-main-wrapper {
+        animation: none !important;
+    }
 }
 
 * {
@@ -51,10 +114,18 @@ body {
     font-size: 32px;
     font-weight: 800;
     letter-spacing: -0.5px;
-    margin-bottom: 24px;
     padding-left: 8px;
     text-decoration: none;
     display: inline-block;
+}
+
+/* Fila superior del menú: logo + botón para ocultar */
+.pf-sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 24px;
 }
 
 .pf-sidebar-brand .brand-pick {
@@ -87,12 +158,24 @@ body {
     font-size: 16px;
     font-weight: 500;
     border-radius: 10px;
-    transition: background-color 0.15s ease, color 0.15s ease;
+    transition: background-color var(--pf-duration-base) var(--pf-ease),
+                color var(--pf-duration-base) var(--pf-ease),
+                transform var(--pf-duration-fast) var(--pf-ease);
 }
 
 .pf-nav-link:hover {
     background-color: var(--pf-navy-hover);
     color: #FFFFFF;
+    transform: translateX(2px);
+}
+
+.pf-nav-link:active {
+    transform: translateX(2px) scale(0.98);
+}
+
+.pf-nav-link:focus-visible {
+    outline: 2px solid #FFFFFF;
+    outline-offset: -2px;
 }
 
 .pf-nav-link.active {
@@ -116,12 +199,22 @@ body {
     padding: 12px;
     cursor: pointer;
     text-align: center;
-    transition: background-color 0.15s ease;
+    transition: background-color var(--pf-duration-base) var(--pf-ease),
+                transform var(--pf-duration-fast) var(--pf-ease);
 }
 
 .btn-pf-logout:hover {
     background-color: var(--pf-orange-hover);
     color: #FFFFFF;
+}
+
+.btn-pf-logout:active {
+    transform: scale(0.98);
+}
+
+.btn-pf-logout:focus-visible {
+    outline: 2px solid #FFFFFF;
+    outline-offset: 2px;
 }
 
 /* Main Content Area */
@@ -169,7 +262,7 @@ body {
     border-radius: 28px;
     padding: 32px 36px;
     margin-bottom: 28px;
-    box-shadow: none;
+    box-shadow: var(--pf-shadow-card);
     border: none;
 }
 
@@ -183,6 +276,14 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    box-shadow: var(--pf-shadow-card);
+    transition: transform var(--pf-duration-base) var(--pf-ease-out),
+                box-shadow var(--pf-duration-base) var(--pf-ease-out);
+}
+
+.pf-metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05), 0 10px 22px rgba(0, 0, 0, 0.07);
 }
 
 .pf-metric-card .metric-label {
@@ -205,67 +306,68 @@ body {
 .pf-metric-card .val-dark { color: #1F2937; }
 
 /* Buttons */
-.btn-pf-blue {
-    background-color: var(--pf-blue);
+.btn-pf-blue,
+.btn-pf-orange,
+.btn-pf-gray {
     border: none;
     color: #FFFFFF !important;
     font-weight: 600;
-    border-radius: 8px;
-    padding: 8px 22px;
+    border-radius: var(--pf-radius-control);
     font-size: 15px;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.15s ease;
     cursor: pointer;
+    transition: background-color var(--pf-duration-base) var(--pf-ease),
+                transform var(--pf-duration-fast) var(--pf-ease),
+                box-shadow var(--pf-duration-fast) var(--pf-ease);
+}
+
+.btn-pf-blue:active,
+.btn-pf-orange:active,
+.btn-pf-gray:active {
+    transform: scale(0.97);
+}
+
+.btn-pf-blue:focus-visible,
+.btn-pf-orange:focus-visible,
+.btn-pf-gray:focus-visible {
+    outline: 2px solid var(--pf-blue);
+    outline-offset: 2px;
+}
+
+.btn-pf-blue {
+    background-color: var(--pf-blue);
+    padding: 8px 22px;
 }
 
 .btn-pf-blue:hover {
     background-color: var(--pf-blue-hover);
     color: #FFFFFF !important;
+    box-shadow: var(--pf-shadow-control);
 }
 
 .btn-pf-orange {
     background-color: var(--pf-orange);
-    border: none;
-    color: #FFFFFF !important;
-    font-weight: 600;
-    border-radius: 8px;
     padding: 10px 24px;
-    font-size: 15px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.15s ease;
-    cursor: pointer;
 }
 
 .btn-pf-orange:hover {
     background-color: var(--pf-orange-hover);
     color: #FFFFFF !important;
+    box-shadow: var(--pf-shadow-control);
 }
 
 .btn-pf-gray {
     background-color: #9CA3AF;
-    border: none;
-    color: #FFFFFF !important;
-    font-weight: 600;
-    border-radius: 8px;
     padding: 8px 22px;
-    font-size: 15px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.15s ease;
-    cursor: pointer;
 }
 
 .btn-pf-gray:hover {
     background-color: #6B7280;
     color: #FFFFFF !important;
+    box-shadow: var(--pf-shadow-control);
 }
 
 /* Form Styles */
@@ -284,13 +386,18 @@ body {
 .mockup-input {
     background-color: #FFFFFF !important;
     border: 1px solid var(--pf-gray-border) !important;
-    border-radius: 8px !important;
+    border-radius: var(--pf-radius-control) !important;
     height: 44px;
     font-size: 15px;
     padding: 8px 14px;
     width: 100%;
     color: #1F2937;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color var(--pf-duration-base) var(--pf-ease),
+                box-shadow var(--pf-duration-base) var(--pf-ease);
+}
+
+.mockup-input:hover {
+    border-color: var(--pf-text-muted) !important;
 }
 
 .mockup-input:focus {
@@ -334,6 +441,24 @@ body {
 
 .mockup-table tbody tr:not(:last-child) td {
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.mockup-table tbody tr {
+    transition: background-color var(--pf-duration-fast) var(--pf-ease);
+}
+
+.mockup-table tbody tr:hover:not(.mockup-row-highlight) {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+.mockup-table tbody tr:hover:not(.mockup-row-highlight) td:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.mockup-table tbody tr:hover:not(.mockup-row-highlight) td:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
 }
 
 .mockup-row-highlight {
@@ -396,6 +521,14 @@ body {
     flex-direction: column;
     justify-content: space-between;
     height: 100%;
+    box-shadow: var(--pf-shadow-card);
+    transition: transform var(--pf-duration-base) var(--pf-ease-out),
+                box-shadow var(--pf-duration-base) var(--pf-ease-out);
+}
+
+.mockup-report-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05), 0 10px 22px rgba(0, 0, 0, 0.07);
 }
 
 .mockup-report-card h3 {
@@ -425,4 +558,213 @@ body {
 
 .mockup-search-input::placeholder {
     color: #4B5563;
+}
+/* Filtros integrados en los encabezados de tabla (Pedidos) */
+.th-filtro-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.th-filtro-btn .bi {
+    font-size: 13px;
+    color: #9CA3AF;
+    transition: color var(--pf-duration-fast) var(--pf-ease);
+}
+
+.th-filtro-btn:hover .bi,
+.th-filtro-btn:focus-visible .bi {
+    color: #4B5563;
+}
+
+.th-filtro-btn.activo,
+.th-filtro-btn.activo .bi {
+    color: #0D6EFD;
+}
+
+.th-filtro-menu {
+    min-width: 240px;
+    padding: 12px;
+    font-weight: 400;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.th-filtro-acciones {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+}
+
+/* ===== Menú lateral desplegable =====
+   Se usa la propiedad "translate" (no "transform") para no chocar con la animación de entrada
+   pf-shell-in, que anima "transform" en la barra lateral al iniciar sesión.
+   Con reducir movimiento activo, la regla global deja las transiciones en ~0 ms (cambio instantáneo). */
+.pf-sidebar {
+    transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
+                visibility 0s linear 0s;
+}
+
+.pf-main-wrapper {
+    transition: margin-left var(--pf-duration-sidebar) var(--pf-ease-out);
+}
+
+/* Oculto: fuera de pantalla y sin foco de teclado (visibility cambia al terminar el deslizamiento) */
+html.pf-sidebar-collapsed .pf-sidebar {
+    translate: -100% 0;
+    visibility: hidden;
+    transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
+                visibility 0s linear var(--pf-duration-sidebar);
+}
+
+html.pf-sidebar-collapsed .pf-main-wrapper {
+    margin-left: 0;
+}
+
+/* Carga inicial: se aplica el estado guardado sin animar */
+html.pf-sin-transicion .pf-sidebar,
+html.pf-sin-transicion .pf-main-wrapper,
+html.pf-sin-transicion .pf-sidebar-backdrop {
+    transition: none !important;
+}
+
+/* Botón de tres líneas */
+.pf-menu-toggle {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--pf-radius-control);
+    background: transparent;
+    color: var(--pf-text-dark);
+    cursor: pointer;
+    transition: background-color var(--pf-duration-fast) var(--pf-ease),
+                transform var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-menu-toggle:hover {
+    background-color: var(--pf-gray-light);
+}
+
+.pf-menu-toggle:active {
+    transform: scale(0.94);
+}
+
+.pf-menu-toggle:focus-visible {
+    outline: 2px solid var(--pf-blue);
+    outline-offset: 2px;
+}
+
+.pf-menu-toggle-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 20px;
+}
+
+.pf-menu-toggle-lines span {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background-color: currentColor;
+}
+
+/* Variante del menú: líneas blancas sobre el azul marino, mismo hover que los enlaces */
+.pf-menu-toggle--sidebar {
+    color: #FFFFFF;
+}
+
+.pf-menu-toggle--sidebar:hover {
+    background-color: var(--pf-navy-hover);
+}
+
+.pf-menu-toggle--sidebar:focus-visible {
+    outline-color: #FFFFFF;
+}
+
+/* El botón del encabezado solo aparece cuando el menú está escondido */
+.pf-menu-toggle--header {
+    display: none;
+}
+
+html.pf-sidebar-collapsed .pf-menu-toggle--header {
+    display: inline-flex;
+    animation: pf-toggle-in var(--pf-duration-sidebar) var(--pf-ease-out) both;
+}
+
+html.pf-sin-transicion .pf-menu-toggle--header {
+    animation: none;
+}
+
+@keyframes pf-toggle-in {
+    from { opacity: 0; translate: -6px 0; }
+    to   { opacity: 1; translate: 0 0; }
+}
+
+.pf-sidebar-backdrop {
+    display: none;
+}
+
+/* Pantallas angostas: el menú se superpone al contenido y arranca oculto */
+@media (max-width: 991.98px) {
+    .pf-sidebar {
+        translate: -100% 0;
+        visibility: hidden;
+        box-shadow: 8px 0 24px rgba(0, 23, 54, 0.25);
+        transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
+                    visibility 0s linear var(--pf-duration-sidebar);
+    }
+
+    html.pf-sidebar-open .pf-sidebar {
+        translate: 0 0;
+        visibility: visible;
+        transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
+                    visibility 0s linear 0s;
+    }
+
+    .pf-main-wrapper,
+    html.pf-sidebar-collapsed .pf-main-wrapper {
+        margin-left: 0;
+    }
+
+    /* En pantallas angostas el menú arranca oculto: el botón del encabezado siempre está disponible */
+    .pf-menu-toggle--header {
+        display: inline-flex;
+    }
+
+    .pf-sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        background-color: rgba(0, 23, 54, 0.4);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--pf-duration-sidebar) var(--pf-ease);
+    }
+
+    html.pf-sidebar-open .pf-sidebar-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .pf-header {
+        padding: 0 16px;
+    }
+
+    .pf-content {
+        padding: 20px 16px 48px 16px;
+    }
 }

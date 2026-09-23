@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -136,6 +136,11 @@ namespace PickingApp.Controllers
                                     var empExistente = await _context.Empleados.FindAsync(empData.Id);
                                     if (empExistente != null)
                                     {
+                                        if (empData.EstadoDisponibilidad != empExistente.EstadoDisponibilidad)
+                                        {
+                                            await ValidarSinPedidoEnCursoAsync(empExistente, "cambiar su estado");
+                                        }
+
                                         empExistente.NombreCompleto = empData.NombreCompleto;
                                         empExistente.Correo = empData.Correo;
                                         empExistente.JornadaLaboral = empData.JornadaLaboral;
@@ -157,6 +162,7 @@ namespace PickingApp.Controllers
                                 var emp = await _context.Empleados.FindAsync(empIdProp.GetInt32());
                                 if (emp != null)
                                 {
+                                    await ValidarSinPedidoEnCursoAsync(emp, "inactivarlo");
                                     emp.Activo = false;
                                     emp.EstadoDisponibilidad = "Inactivo";
                                 }
@@ -236,7 +242,7 @@ namespace PickingApp.Controllers
                 {
                     UsuarioDestinoId = solicitud.UsuarioSolicitanteId,
                     Titulo = "Solicitud Aprobada",
-                    Mensaje = $"Tu solicitud de {solicitud.TipoSolicitud} ha sido aprobada por {userEmail}.",
+                    Mensaje = $"Tu solicitud de {solicitud.TipoSolicitud} ha sido aprobada por el {User.DescripcionParaNotificacion()}.",
                     Tipo = "Success",
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/MisSolicitudes"
@@ -248,6 +254,11 @@ namespace PickingApp.Controllers
                     $"Solicitud #{solicitud.Id} ({solicitud.TipoSolicitud}) aprobada.");
 
                 TempData["SuccessMessage"] = $"Solicitud #{solicitud.Id} aprobada correctamente.";
+            }
+            catch (ReglaNegocioException ex)
+            {
+                // La solicitud queda Pendiente: se puede aprobar cuando se resuelva el impedimento, o rechazar.
+                TempData["ErrorMessage"] = ex.Message;
             }
             catch (Exception ex)
             {
@@ -303,6 +314,25 @@ namespace PickingApp.Controllers
 
             TempData["SuccessMessage"] = $"Solicitud #{solicitud.Id} rechazada.";
             return RedirectToAction(nameof(Index));
+        }
+
+        // El empleado pudo tomar un pedido entre la creación de la solicitud y su aprobación.
+        private async Task ValidarSinPedidoEnCursoAsync(Empleado empleado, string accion)
+        {
+            var pedidoEnCurso = await _context.Pedidos
+                .Where(p => p.EmpleadoId == empleado.Id && PedidoEstados.EnCurso.Contains(p.Estado))
+                .Select(p => p.CodigoPedido)
+                .FirstOrDefaultAsync();
+
+            if (pedidoEnCurso != null)
+            {
+                throw new ReglaNegocioException($"No se puede aprobar: el empleado '{empleado.NombreCompleto}' tiene el pedido {pedidoEnCurso} en curso y no es posible {accion}. Reasigne, complete o cancele el pedido primero; la solicitud sigue pendiente.");
+            }
+        }
+
+        private sealed class ReglaNegocioException : Exception
+        {
+            public ReglaNegocioException(string message) : base(message) { }
         }
     }
 }

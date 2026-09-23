@@ -214,7 +214,12 @@ namespace PickingApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
 
                     b.ToTable("LogsSistema");
                 });
@@ -260,6 +265,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UsuarioDestinoId");
 
                     b.ToTable("Notificaciones");
                 });
@@ -589,6 +596,26 @@ namespace PickingApp.Migrations
                     b.Navigation("Pedido");
 
                     b.Navigation("Ubicacion");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.LogSistema", b =>
+                {
+                    b.HasOne("PickingApp.Models.Usuario", "UsuarioAsociado")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("UsuarioAsociado");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.Notificacion", b =>
+                {
+                    b.HasOne("PickingApp.Models.Usuario", "UsuarioDestino")
+                        .WithMany()
+                        .HasForeignKey("UsuarioDestinoId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("UsuarioDestino");
                 });
 
             modelBuilder.Entity("PickingApp.Models.NovedadPedido", b =>

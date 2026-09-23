@@ -1,4 +1,4 @@
-@model IEnumerable<PickingApp.Models.Empleado>
+﻿@model IEnumerable<PickingApp.Models.Empleado>
 @{
     var pedido = ViewBag.Pedido as PickingApp.Models.Pedido;
     ViewData["Title"] = "Asignar pedido";
@@ -6,7 +6,8 @@
     var tieneEmpleadoPocaExp = Model.Any(e => e.TieneMenosDeSeisMeses);
     var empleadoPocaExp = Model.FirstOrDefault(e => e.TieneMenosDeSeisMeses);
     var tiemposEstimados = ViewBag.TiemposEstimados as Dictionary<int, double> ?? new Dictionary<int, double>();
-    bool esPrimero = true;
+    var motivosNoAsignable = ViewBag.MotivosNoAsignable as Dictionary<int, string> ?? new Dictionary<int, string>();
+    var empleadoRecomendadoId = ViewBag.EmpleadoRecomendadoId as int?;
 }
 
 <h1 class="pf-page-title">Asignar pedido</h1>
@@ -34,9 +35,10 @@
                 {
                     @foreach (var emp in Model)
                     {
-                        var highlightClass = esPrimero ? "mockup-row-highlight" : "";
-                        esPrimero = false;
-                        var estadoText = emp.EstadoDisponibilidad == "Disponible" ? "Libre" : emp.EstadoDisponibilidad;
+                        var highlightClass = emp.Id == empleadoRecomendadoId ? "mockup-row-highlight" : "";
+                        var estadoText = motivosNoAsignable.TryGetValue(emp.Id, out var motivo)
+                            ? motivo
+                            : (emp.EstadoDisponibilidad == "Disponible" ? "Libre" : emp.EstadoDisponibilidad);
                         var tiempoEstimado = tiemposEstimados.TryGetValue(emp.Id, out var minutos) ? $"{minutos:0.#} min" : "-";
 
                         <tr class="@highlightClass">

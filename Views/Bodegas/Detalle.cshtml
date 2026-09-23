@@ -4,6 +4,8 @@
     var todasBodegas = ViewBag.TodasBodegas as IEnumerable<PickingApp.Models.Bodega> ?? new List<PickingApp.Models.Bodega> { Model };
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
     var puedeEliminarUbicacion = userRole == "Administrador" || userRole == "Supervisor";
+    const int ubicacionesVisibles = 5;
+    var ubicacionesOcultas = Math.Max(0, (Model.Ubicaciones?.Count ?? 0) - ubicacionesVisibles);
 }
 
 <h1 class="pf-page-title">Bodegas y ubicaciones</h1>
@@ -48,7 +50,7 @@
             </div>
 
             <div class="table-responsive">
-                <table class="mockup-table">
+                <table class="mockup-table" id="tablaUbicaciones">
                     <thead>
                         <tr>
                             <th>Ubicación</th>
@@ -62,9 +64,10 @@
                     <tbody>
                         @if (Model.Ubicaciones != null && Model.Ubicaciones.Any())
                         {
+                            var indice = 0;
                             @foreach (var u in Model.Ubicaciones)
                             {
-                                <tr>
+                                <tr class="@(indice++ >= ubicacionesVisibles ? "fila-extra d-none" : "")">
                                     <td class="fw-semibold">@u.CodigoUbicacion</td>
                                     <td>
                                         @if (u.Producto != null)
@@ -103,6 +106,16 @@
                     </tbody>
                 </table>
             </div>
+            @if (ubicacionesOcultas > 0)
+            {
+                <div class="text-center mt-2">
+                    <button type="button" class="btn btn-link fw-semibold text-decoration-none"
+                            data-ver-mas="tablaUbicaciones"
+                            data-texto-mas="Ver más (@ubicacionesOcultas ubicaciones)" data-texto-menos="Ver menos">
+                        Ver más (@ubicacionesOcultas ubicaciones)
+                    </button>
+                </div>
+            }
         </div>
     </div>
 </div>

@@ -98,17 +98,19 @@ namespace PickingApp.Services
             {
                 result.PuedeAsignar = false;
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' se encuentra inactivo.";
+                result.MotivoCorto = "Inactivo";
                 return result;
             }
 
             // Regla 2: Un solo pedido simultáneo
             var tienePedidoActivo = await _context.Pedidos
-                .AnyAsync(p => p.EmpleadoId == empleadoId && (p.Estado == "Asignado" || p.Estado == "EnProceso") && p.Id != pedidoId);
+                .AnyAsync(p => p.EmpleadoId == empleadoId && PedidoEstados.EnCurso.Contains(p.Estado) && p.Id != pedidoId);
 
             if (tienePedidoActivo || empleado.EstadoDisponibilidad == "EnPicking")
             {
                 result.PuedeAsignar = false;
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' ya tiene un pedido asignado en curso (RN-01-CU26).";
+                result.MotivoCorto = "Con pedido en curso";
                 return result;
             }
 
@@ -131,6 +133,7 @@ namespace PickingApp.Services
             {
                 result.PuedeAsignar = false;
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' se encuentra fuera de su jornada laboral ({empleado.HorarioEntrada:hh\\:mm} - {empleado.HorarioSalida:hh\\:mm}).";
+                result.MotivoCorto = "Fuera de jornada";
                 return result;
             }
 
@@ -152,6 +155,7 @@ namespace PickingApp.Services
             {
                 result.PuedeAsignar = false;
                 result.MensajeError = $"El tiempo estimado para el pedido ({tiempoEstimado} min) supera el tiempo restante de la jornada del empleado ({Math.Round(tiempoRestanteJornada.TotalMinutes, 0)} min).";
+                result.MotivoCorto = $"Jornada insuficiente ({Math.Round(tiempoRestanteJornada.TotalMinutes, 0)} min restantes)";
                 return result;
             }
 

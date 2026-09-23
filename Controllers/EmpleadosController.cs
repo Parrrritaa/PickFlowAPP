@@ -104,7 +104,7 @@ namespace PickingApp.Controllers
                 {
                     RolDestino = "Supervisor",
                     Titulo = "Solicitud de Nuevo Empleado",
-                    Mensaje = $"El auxiliar {userEmail} solicitó el registro del empleado {model.NombreCompleto}.",
+                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó el registro del empleado {model.NombreCompleto}.",
                     Tipo = "Info",
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
@@ -154,6 +154,18 @@ namespace PickingApp.Controllers
 
             var empleadoExistente = await _context.Empleados.FindAsync(model.Id);
             if (empleadoExistente == null) return NotFound();
+
+            // Con un pedido en curso el estado lo controla el flujo del pedido, no la edición manual
+            if (model.EstadoDisponibilidad != empleadoExistente.EstadoDisponibilidad)
+            {
+                var pedidoEnCurso = await ObtenerPedidoEnCursoAsync(empleadoExistente.Id);
+                if (pedidoEnCurso != null)
+                {
+                    ModelState.AddModelError("EstadoDisponibilidad", $"No se puede cambiar el estado porque el empleado tiene el pedido {pedidoEnCurso} en curso. Reasigne, complete o cancele el pedido primero.");
+                    ViewBag.Motivo = motivo;
+                    return View(model);
+                }
+            }
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
@@ -224,7 +236,7 @@ namespace PickingApp.Controllers
                 {
                     RolDestino = "Administrador",
                     Titulo = "Solicitud de Edición de Empleado",
-                    Mensaje = $"El usuario {userEmail} solicitó modificar los datos del empleado {model.NombreCompleto}.",
+                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar los datos del empleado {model.NombreCompleto}.",
                     Tipo = "Info",
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
@@ -248,6 +260,17 @@ namespace PickingApp.Controllers
         {
             var empleado = await _context.Empleados.FindAsync(id);
             if (empleado == null) return NotFound();
+
+            // No se puede inactivar (ni solicitar inactivar) a un empleado con un pedido en curso
+            if (empleado.Activo)
+            {
+                var pedidoEnCurso = await ObtenerPedidoEnCursoAsync(empleado.Id);
+                if (pedidoEnCurso != null)
+                {
+                    TempData["ErrorMessage"] = $"No se puede inactivar a '{empleado.NombreCompleto}' porque tiene el pedido {pedidoEnCurso} en curso. Reasigne, complete o cancele el pedido primero.";
+                    return RedirectToAction(nameof(Index));
+                }
+            }
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
@@ -289,7 +312,7 @@ namespace PickingApp.Controllers
                 {
                     RolDestino = "Administrador",
                     Titulo = "Solicitud de Inactivación de Empleado",
-                    Mensaje = $"El usuario {userEmail} solicitó inactivar al empleado {empleado.NombreCompleto}.",
+                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó inactivar al empleado {empleado.NombreCompleto}.",
                     Tipo = "Warning",
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
@@ -325,6 +348,14 @@ namespace PickingApp.Controllers
 
             TempData["SuccessMessage"] = $"El historial de tiempos de '{empleado.NombreCompleto}' fue reiniciado. Sus pedidos anteriores se conservan, pero no se contarán en su próximo promedio.";
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<string?> ObtenerPedidoEnCursoAsync(int empleadoId)
+        {
+            return await _context.Pedidos
+                .Where(p => p.EmpleadoId == empleadoId && PedidoEstados.EnCurso.Contains(p.Estado))
+                .Select(p => p.CodigoPedido)
+                .FirstOrDefaultAsync();
         }
 
         private static string FormatHora(TimeSpan t) => t.ToString(@"hh\:mm");

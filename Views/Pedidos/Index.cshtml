@@ -1,20 +1,33 @@
 @model IEnumerable<PickingApp.Models.Pedido>
 @{
     ViewData["Title"] = "Gestión de pedidos";
+    var bodegas = ViewBag.Bodegas as IEnumerable<PickingApp.Models.Bodega> ?? Enumerable.Empty<PickingApp.Models.Bodega>();
+    var empleados = ViewBag.Empleados as IEnumerable<PickingApp.Models.Empleado> ?? Enumerable.Empty<PickingApp.Models.Empleado>();
+    var filtroEstado = ViewBag.FiltroEstado as string;
+    var filtroPrioridad = ViewBag.FiltroPrioridad as string;
+    var filtroBodegaId = ViewBag.FiltroBodegaId as int?;
+    var filtroEmpleadoId = ViewBag.FiltroEmpleadoId as int?;
+    var filtroFechaDesde = ViewBag.FiltroFechaDesde as string;
+    var filtroFechaHasta = ViewBag.FiltroFechaHasta as string;
+    var busqueda = ViewBag.Busqueda as string;
+
+    var activoPedido = !string.IsNullOrWhiteSpace(busqueda);
+    var activoFecha = !string.IsNullOrEmpty(filtroFechaDesde) || !string.IsNullOrEmpty(filtroFechaHasta);
+    var activoPrioridad = !string.IsNullOrEmpty(filtroPrioridad);
+    var activoBodega = (filtroBodegaId ?? 0) > 0;
+    var activoEstado = !string.IsNullOrEmpty(filtroEstado);
+    var activoEmpleado = (filtroEmpleadoId ?? 0) != 0;
+    var hayFiltros = activoPedido || activoFecha || activoPrioridad || activoBodega || activoEstado || activoEmpleado;
+
+    var estados = new[] { ("Pendiente", "Pendiente"), ("Asignado", "Asignado"), ("Reasignado", "Reasignado"),
+                          ("EnProceso", "En proceso"), ("Completado", "Completado"), ("Cancelado", "Cancelado") };
 }
 
 <h1 class="pf-page-title">Gestión de pedidos</h1>
 
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <form method="get" asp-action="Index" class="d-flex gap-2 align-items-center">
-            <input type="text" name="busqueda" value="@ViewBag.Busqueda" class="mockup-search-input" placeholder="Buscar Pedido..." onchange="this.form.submit()" />
-            @if (!string.IsNullOrEmpty(ViewBag.Busqueda as string))
-            {
-                <a asp-action="Index" class="btn-pf-gray" style="padding: 6px 12px; font-size: 13px;" title="Limpiar">✕</a>
-            }
-        </form>
-
+        <span class="text-muted fw-semibold">@(Model?.Count() ?? 0) pedido(s)@(hayFiltros ? " con los filtros aplicados" : "")</span>
         <div>
             <a asp-action="CargarExcel" class="btn-pf-blue">
                 + Cargar Excel
@@ -22,54 +35,181 @@
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="mockup-table">
-            <thead>
-                <tr>
-                    <th>Pedido</th>
-                    <th>Fecha</th>
-                    <th>Prioridad</th>
-                    <th>Bodega</th>
-                    <th>Estado</th>
-                    <th>Empleado</th>
-                    <th class="text-center">Acción</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model != null && Model.Any())
-                {
-                    @foreach (var p in Model)
+    <form method="get" asp-action="Index" id="formFiltrosPedidos">
+        <div class="table-responsive">
+            <table class="mockup-table">
+                <thead>
+                    <tr>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoPedido ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Pedido <i class="bi @(activoPedido ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <label class="form-label small fw-semibold mb-1">Buscar pedido o producto</label>
+                                    <input type="text" name="busqueda" value="@busqueda" class="form-control form-control-sm" placeholder="Código de pedido, producto..." />
+                                    <div class="th-filtro-acciones">
+                                        <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoFecha ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Fecha <i class="bi @(activoFecha ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <label class="form-label small fw-semibold mb-1">Desde</label>
+                                    <input type="date" name="fechaDesde" value="@filtroFechaDesde" class="form-control form-control-sm mb-2" />
+                                    <label class="form-label small fw-semibold mb-1">Hasta</label>
+                                    <input type="date" name="fechaHasta" value="@filtroFechaHasta" class="form-control form-control-sm" />
+                                    <div class="th-filtro-acciones">
+                                        <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoPrioridad ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Prioridad <i class="bi @(activoPrioridad ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <select name="prioridad" class="form-select form-select-sm filtro-auto">
+                                        <option value="">Todas</option>
+                                        @foreach (var pr in new[] { "Alta", "Media", "Baja" })
+                                        {
+                                            <option value="@pr" selected="@(filtroPrioridad == pr)">@pr</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoBodega ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Bodega <i class="bi @(activoBodega ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <select name="bodegaId" class="form-select form-select-sm filtro-auto">
+                                        <option value="">Todas</option>
+                                        @foreach (var b in bodegas)
+                                        {
+                                            <option value="@b.Id" selected="@(filtroBodegaId == b.Id)">@b.Codigo - @b.Nombre</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoEstado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Estado <i class="bi @(activoEstado ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <select name="estado" class="form-select form-select-sm filtro-auto">
+                                        <option value="">Todos</option>
+                                        @foreach (var (valor, texto) in estados)
+                                        {
+                                            <option value="@valor" selected="@(filtroEstado == valor)">@texto</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoEmpleado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Empleado <i class="bi @(activoEmpleado ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <select name="empleadoId" class="form-select form-select-sm filtro-auto">
+                                        <option value="">Todos</option>
+                                        <option value="-1" selected="@(filtroEmpleadoId == -1)">Sin asignar</option>
+                                        @foreach (var e in empleados)
+                                        {
+                                            <option value="@e.Id" selected="@(filtroEmpleadoId == e.Id)">@e.NombreCompleto</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="text-center">
+                            Acción
+                            @if (hayFiltros)
+                            {
+                                <a asp-action="Index" class="d-block small fw-semibold text-decoration-none mt-1">
+                                    <i class="bi bi-x-circle"></i> Limpiar filtros
+                                </a>
+                            }
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var p in Model)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@p.CodigoPedido</td>
+                                <td>@p.FechaCarga.ToString("dd/MM/yyyy")</td>
+                                <td>@p.Prioridad</td>
+                                <td>
+                                    @(p.Bodega?.Nombre ?? "Principal")
+                                    @if (p.Bodega != null)
+                                    {
+                                        <div class="text-secondary small">@p.Bodega.Codigo</div>
+                                    }
+                                </td>
+                                <td>@p.Estado</td>
+                                <td>@(p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                <td class="text-center">
+                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
+                                        Ver
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
                     {
                         <tr>
-                            <td class="fw-semibold">@p.CodigoPedido</td>
-                            <td>@p.FechaCarga.ToString("dd/MM/yyyy")</td>
-                            <td>@p.Prioridad</td>
-                            <td>
-                                @(p.Bodega?.Nombre ?? "Principal")
-                                @if (p.Bodega != null)
-                                {
-                                    <div class="text-secondary small">@p.Bodega.Codigo</div>
-                                }
-                            </td>
-                            <td>@p.Estado</td>
-                            <td>@(p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
-                            <td class="text-center">
-                                <a asp-action="Detalle" asp-route-id="@p.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
-                                    Ver
-                                </a>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                @(hayFiltros ? "Ningún pedido coincide con los filtros aplicados." : "No se encontraron pedidos registrados.")
                             </td>
                         </tr>
                     }
-                }
-                else
-                {
-                    <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
-                            No se encontraron pedidos registrados.
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var form = document.getElementById('formFiltrosPedidos');
+
+            // Posicionamiento "fixed" para que el menú no quede recortado por el scroll horizontal de la tabla.
+            form.querySelectorAll('.th-filtro-btn').forEach(function (btn) {
+                new bootstrap.Dropdown(btn, { autoClose: 'outside', popperConfig: { strategy: 'fixed' } });
+            });
+
+            // Las listas aplican el filtro al elegir una opción.
+            form.querySelectorAll('.filtro-auto').forEach(function (el) {
+                el.addEventListener('change', function () { form.submit(); });
+            });
+
+            // "Quitar" limpia solo los campos de esa columna y vuelve a filtrar.
+            form.querySelectorAll('[data-limpiar-filtro]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    btn.closest('.th-filtro-menu').querySelectorAll('input').forEach(function (i) { i.value = ''; });
+                    form.submit();
+                });
+            });
+        })();
+    </script>
+}

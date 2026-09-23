@@ -6,6 +6,7 @@ namespace PickingApp.Services
     {
         public bool PuedeAsignar { get; set; }
         public string? MensajeError { get; set; }
+        public string? MotivoCorto { get; set; } // Etiqueta breve para mostrar en la lista de asignación
         public bool GeneraAdvertencia { get; set; }
         public string? MensajeAdvertencia { get; set; }
         public double TiempoEstimadoMinutos { get; set; }
