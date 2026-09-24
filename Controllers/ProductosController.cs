@@ -16,13 +16,11 @@ namespace PickingApp.Controllers
 
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
-        private readonly IPickingEngine _pickingEngine;
 
-        public ProductosController(ApplicationDbContext context, IAuditService auditService, IPickingEngine pickingEngine)
+        public ProductosController(ApplicationDbContext context, IAuditService auditService)
         {
             _context = context;
             _auditService = auditService;
-            _pickingEngine = pickingEngine;
         }
 
         public async Task<IActionResult> Index()
@@ -31,7 +29,7 @@ namespace PickingApp.Controllers
                 .Include(c => c.Productos)
                 .OrderBy(c => c.MinutosPorUnidad)
                 .ToListAsync();
-            ViewBag.MinutosPorUbicacion = await _pickingEngine.ObtenerMinutosPorUbicacionAsync();
+            ViewBag.MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion);
 
             var productos = await _context.Productos
                 .Include(p => p.Categoria)

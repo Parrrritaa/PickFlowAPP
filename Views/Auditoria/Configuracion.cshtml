@@ -1,7 +1,15 @@
-﻿@model IEnumerable<PickingApp.Models.ConfiguracionSistema>
+﻿@model PickingApp.Models.ViewModels.ConfiguracionViewModel
+@using PickingApp.Services
 @{
     ViewData["Title"] = "Configuración del Sistema";
-    var configs = Model.ToDictionary(c => c.Clave, c => c.Valor);
+
+    // Valor, rango y paso salen de ParametrosSistema: la vista no repite valores por defecto ni límites
+    void Numero(string clave)
+    {
+        var p = ParametrosSistema.Numericos[clave];
+        <input type="number" name="configuraciones[@clave]" value="@Formato.ParaInput(Model.Valores[clave])" class="form-control"
+               min="@Formato.ParaInput(p.Minimo)" max="@Formato.ParaInput(p.Maximo)" step="@(p.Entero ? "1" : "0.1")" />
+    }
 }
 
 <div class="container py-3">
@@ -20,9 +28,9 @@
                         <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-journal-text me-1"></i> Auditoría y Registro (LOG)</h6>
                         <div class="mb-4">
                             <label class="form-label fw-semibold">Registro de LOG Habilitado</label>
-                            <select name="configuraciones[LogHabilitado]" class="form-select">
-                                <option value="true" selected="@(configs.GetValueOrDefault("LogHabilitado") == "true")">Habilitado (Recomendado)</option>
-                                <option value="false" selected="@(configs.GetValueOrDefault("LogHabilitado") == "false")">Deshabilitado</option>
+                            <select name="configuraciones[@ParametrosSistema.LogHabilitado]" class="form-select">
+                                <option value="true" selected="@Model.LogHabilitado">Habilitado (Recomendado)</option>
+                                <option value="false" selected="@(!Model.LogHabilitado)">Deshabilitado</option>
                             </select>
                             <div class="form-text small">Permite habilitar o deshabilitar temporalmente la captura de eventos en la tabla de logs.</div>
                         </div>
@@ -33,12 +41,12 @@
                         <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Cierre de Sesión por Inactividad (Minutos)</label>
-                                <input type="number" name="configuraciones[MinutosInactividadSesion]" value="@configs.GetValueOrDefault("MinutosInactividadSesion", "10")" class="form-control" min="1" max="60" />
+                                @{ Numero(ParametrosSistema.MinutosInactividadSesion); }
                                 <div class="form-text small">Estándar reglamentario: 10 minutos. Aplica desde el siguiente inicio de sesión de cada usuario.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Intentos Fallidos antes de Bloqueo</label>
-                                <input type="number" name="configuraciones[MaxIntentosFallidos]" value="@configs.GetValueOrDefault("MaxIntentosFallidos", "5")" class="form-control" min="3" max="10" />
+                                @{ Numero(ParametrosSistema.MaxIntentosFallidos); }
                                 <div class="form-text small">Estándar reglamentario: 5 intentos consecutivos.</div>
                             </div>
                         </div>
@@ -49,33 +57,33 @@
                         <div class="row g-3 mb-4">
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Margen de Inicio (Minutos)</label>
-                                <input type="number" name="configuraciones[MargenInicioMinutos]" value="@configs.GetValueOrDefault("MargenInicioMinutos", "2")" class="form-control" min="0" max="15" />
+                                @{ Numero(ParametrosSistema.MargenInicioMinutos); }
                                 <div class="form-text small">Margen reglamentario: 2 min.</div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Meses Exp. para Advertencia</label>
-                                <input type="number" name="configuraciones[MesesExperienciaAdvertencia]" value="@configs.GetValueOrDefault("MesesExperienciaAdvertencia", "6")" class="form-control" min="1" max="24" />
+                                @{ Numero(ParametrosSistema.MesesExperienciaAdvertencia); }
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Ubicaciones para Advertencia</label>
-                                <input type="number" name="configuraciones[MaxUbicacionesAdvertencia]" value="@configs.GetValueOrDefault("MaxUbicacionesAdvertencia", "10")" class="form-control" min="1" max="50" />
+                                @{ Numero(ParametrosSistema.MaxUbicacionesAdvertencia); }
                             </div>
                         </div>
 
                         <div class="row g-3 mb-4">
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Máximo Horas de Jornada Laboral</label>
-                                <input type="number" name="configuraciones[MaxHorasJornada]" value="@configs.GetValueOrDefault("MaxHorasJornada", "9")" class="form-control" min="1" max="24" />
+                                @{ Numero(ParametrosSistema.MaxHorasJornada); }
                                 <div class="form-text small">Un turno no podrá superar esta cantidad de horas.</div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Minutos de Recorrido por Ubicación</label>
-                                <input type="number" name="configuraciones[MinutosPorUbicacion]" value="@configs.GetValueOrDefault("MinutosPorUbicacion", "1")" class="form-control" min="0" max="30" step="0.1" />
+                                @{ Numero(ParametrosSistema.MinutosPorUbicacion); }
                                 <div class="form-text small">Se suman al tiempo estándar por cada ubicación del pedido. Los minutos por unidad se definen en <a asp-controller="Productos" asp-action="Index">Productos</a>.</div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Pedidos para Medir Rendimiento</label>
-                                <input type="number" name="configuraciones[MinPedidosRendimiento]" value="@configs.GetValueOrDefault("MinPedidosRendimiento", "3")" class="form-control" min="1" max="50" />
+                                @{ Numero(ParametrosSistema.MinPedidosRendimiento); }
                                 <div class="form-text small">Pedidos completados que necesita un empleado antes de ajustar su tiempo estimado; con menos se usa el tiempo estándar.</div>
                             </div>
                         </div>

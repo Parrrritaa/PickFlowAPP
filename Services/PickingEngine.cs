@@ -32,7 +32,7 @@ namespace PickingApp.Services
             if (pedidoIds.Count == 0) return new Dictionary<int, double>();
 
             var lineas = await ObtenerLineasAsync(pedidoIds);
-            var minutosPorUbicacion = await ObtenerMinutosPorUbicacionAsync();
+            var minutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion);
 
             return lineas
                 .GroupBy(l => l.PedidoId)
@@ -80,7 +80,7 @@ namespace PickingApp.Services
 
         public async Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds)
         {
-            var minimoPedidos = await ObtenerMinimoPedidosRendimientoAsync();
+            var minimoPedidos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MinPedidosRendimiento);
 
             var reinicios = await _context.Empleados
                 .Where(e => empleadoIds.Contains(e.Id))
@@ -133,12 +133,6 @@ namespace PickingApp.Services
             return resultado;
         }
 
-        private async Task<int> ObtenerMinimoPedidosRendimientoAsync()
-        {
-            var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MinPedidosRendimiento");
-            return cfg != null && int.TryParse(cfg.Valor, out var valor) && valor >= 1 ? valor : 3;
-        }
-
         private async Task<double> ObtenerMinutosPredeterminadosAsync()
         {
             var minutos = await _context.CategoriasProducto
@@ -146,12 +140,6 @@ namespace PickingApp.Services
                 .Select(c => (double?)c.MinutosPorUnidad)
                 .FirstOrDefaultAsync();
             return minutos ?? 1.5;
-        }
-
-        public async Task<double> ObtenerMinutosPorUbicacionAsync()
-        {
-            var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MinutosPorUbicacion");
-            return cfg != null && Formato.TryParseDecimal(cfg.Valor, out var valor) && valor >= 0 ? valor : 1.0;
         }
 
         public async Task<AsignacionValidationResult> ValidarAsignacionAsync(int pedidoId, int empleadoId)

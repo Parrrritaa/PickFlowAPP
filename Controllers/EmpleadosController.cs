@@ -379,11 +379,8 @@ namespace PickingApp.Controllers
             return duracion.TotalHours;
         }
 
-        private async Task<double> ObtenerMaxHorasJornadaAsync()
-        {
-            var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MaxHorasJornada");
-            return cfg != null && Formato.TryParseDecimal(cfg.Valor, out var horas) && horas > 0 ? horas : 9.0;
-        }
+        private Task<double> ObtenerMaxHorasJornadaAsync() =>
+            ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada);
 
         // Un correo no puede repetirse entre Empleados ni con ningún Usuario del sistema, aunque sean tablas distintas.
         private async Task<bool> CorreoDisponibleAsync(string correo, int? empleadoIdExcluir = null)

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -134,8 +135,11 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> Configuracion()
         {
-            var configs = await _context.ConfiguracionesSistema.ToListAsync();
-            return View(configs);
+            return View(new ConfiguracionViewModel
+            {
+                LogHabilitado = await ParametrosSistema.LogHabilitadoAsync(_context),
+                Valores = await ParametrosSistema.ObtenerTodosAsync(_context)
+            });
         }
 
         [HttpPost]
@@ -144,19 +148,35 @@ namespace PickingApp.Controllers
         {
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
 
-            // Los parámetros se aplican de inmediato: un valor fuera de rango (p. ej. 0 intentos) no se guarda
-            var errores = configuraciones
-                .Where(kvp => ParametrosSistema.Enteros.TryGetValue(kvp.Key, out var p) && !ParametrosSistema.EsValido(p, kvp.Value, out _))
-                .Select(kvp => ParametrosSistema.Enteros[kvp.Key])
-                .Select(p => $"{p.Nombre}: debe ser un número entero entre {p.Minimo} y {p.Maximo}")
-                .ToList();
+            // Los parámetros se aplican de inmediato: un valor fuera de rango (p. ej. 0 intentos) no se guarda.
+            // Solo se aceptan las claves definidas en ParametrosSistema.
+            var valores = new Dictionary<string, string>();
+            var errores = new List<string>();
+            foreach (var (clave, parametro) in ParametrosSistema.Numericos)
+            {
+                if (!configuraciones.TryGetValue(clave, out var texto)) continue;
+                if (ParametrosSistema.EsValido(parametro, texto, out var valor))
+                {
+                    valores[clave] = Formato.ParaInput(valor);
+                }
+                else
+                {
+                    var tipo = parametro.Entero ? "un número entero" : "un número";
+                    errores.Add($"{parametro.Nombre}: debe ser {tipo} entre {parametro.Minimo:0.##} y {parametro.Maximo:0.##}");
+                }
+            }
+            if (configuraciones.TryGetValue(ParametrosSistema.LogHabilitado, out var log))
+            {
+                valores[ParametrosSistema.LogHabilitado] = log == "false" ? "false" : "true";
+            }
+
             if (errores.Any())
             {
                 TempData["ErrorMessage"] = "No se guardaron los cambios. " + string.Join(". ", errores) + ".";
                 return RedirectToAction(nameof(Configuracion));
             }
 
-            foreach (var kvp in configuraciones)
+            foreach (var kvp in valores)
             {
                 var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == kvp.Key);
                 if (cfg != null)

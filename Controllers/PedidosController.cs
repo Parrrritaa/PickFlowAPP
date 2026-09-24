@@ -711,7 +711,7 @@ namespace PickingApp.Controllers
             ViewBag.TiempoEstandar = tiempoEstandar;
             ViewBag.JornadaMinutos = jornadaMinutos;
             ViewBag.MinutosPorLinea = await _pickingEngine.CalcularMinutosPorLineaAsync(id);
-            ViewBag.MinutosPorUbicacion = await _pickingEngine.ObtenerMinutosPorUbicacionAsync();
+            ViewBag.MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion);
             ViewBag.MaxPartes = pedido.MaxPartesPermitidas;
             ViewBag.PartesSugeridas = pedido.PartesSugeridas(tiempoEstandar, jornadaMinutos);
             return View(pedido);
@@ -886,10 +886,7 @@ namespace PickingApp.Controllers
                 $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
         }
 
-        private async Task<double> ObtenerMaxHorasJornadaAsync()
-        {
-            var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MaxHorasJornada");
-            return cfg != null && Formato.TryParseDecimal(cfg.Valor, out var horas) && horas > 0 ? horas : 9.0;
-        }
+        private Task<double> ObtenerMaxHorasJornadaAsync() =>
+            ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada);
     }
 }

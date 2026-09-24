@@ -1,6 +1,7 @@
 ﻿using BCrypt.Net;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Models;
+using PickingApp.Services;
 
 namespace PickingApp.Data
 {
@@ -13,16 +14,10 @@ namespace PickingApp.Data
             // 1. Configuraciones del Sistema (RNF-06, RNF-07)
             if (!await context.ConfiguracionesSistema.AnyAsync())
             {
-                var configuraciones = new List<ConfiguracionSistema>
-                {
-                    new ConfiguracionSistema { Clave = "LogHabilitado", Valor = "true" },
-                    new ConfiguracionSistema { Clave = "MargenInicioMinutos", Valor = "2" },
-                    new ConfiguracionSistema { Clave = "MinutosInactividadSesion", Valor = "10" },
-                    new ConfiguracionSistema { Clave = "MaxIntentosFallidos", Valor = "5" },
-                    new ConfiguracionSistema { Clave = "MesesExperienciaAdvertencia", Valor = "6" },
-                    new ConfiguracionSistema { Clave = "MaxUbicacionesAdvertencia", Valor = "10" },
-                    new ConfiguracionSistema { Clave = "MaxHorasJornada", Valor = "9" }
-                };
+                var configuraciones = ParametrosSistema.Numericos
+                    .Select(p => new ConfiguracionSistema { Clave = p.Key, Valor = Formato.ParaInput(p.Value.Defecto) })
+                    .Append(new ConfiguracionSistema { Clave = ParametrosSistema.LogHabilitado, Valor = "true" })
+                    .ToList();
                 await context.ConfiguracionesSistema.AddRangeAsync(configuraciones);
                 await context.SaveChangesAsync();
             }

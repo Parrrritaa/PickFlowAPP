@@ -15,15 +15,7 @@ namespace PickingApp.Services
             _options = options;
         }
 
-        public Task<bool> IsLogEnabledAsync() => LogHabilitadoAsync(_context);
-
-        private static async Task<bool> LogHabilitadoAsync(ApplicationDbContext context)
-        {
-            var config = await context.ConfiguracionesSistema
-                .FirstOrDefaultAsync(c => c.Clave == "LogHabilitado");
-            
-            return config == null || config.Valor.Equals("true", StringComparison.OrdinalIgnoreCase);
-        }
+        public Task<bool> IsLogEnabledAsync() => ParametrosSistema.LogHabilitadoAsync(_context);
 
         // El LOG usa su propio contexto: guardarlo nunca debe confirmar los cambios que el
         // controlador todavía tiene pendientes en el contexto de la petición (quedarían a medias).
@@ -32,7 +24,7 @@ namespace PickingApp.Services
             try
             {
                 await using var db = new ApplicationDbContext(_options);
-                if (!await LogHabilitadoAsync(db)) return;
+                if (!await ParametrosSistema.LogHabilitadoAsync(db)) return;
 
                 int? usuarioId = null;
                 if (!string.IsNullOrWhiteSpace(usuario))
