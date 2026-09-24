@@ -26,10 +26,14 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> Index()
         {
             var empleados = await _context.Empleados
-                .Include(e => e.PedidosAsignados)
                 .OrderBy(e => e.NombreCompleto)
                 .ToListAsync();
 
+            ViewBag.EmpleadosOcupados = (await _context.Pedidos
+                .Where(p => p.EmpleadoId != null && PedidoEstados.EnCurso.Contains(p.Estado))
+                .Select(p => p.EmpleadoId!.Value)
+                .ToListAsync())
+                .ToHashSet();
             ViewBag.Rendimientos = await _pickingEngine.CalcularRendimientosAsync(empleados.Select(e => e.Id).ToList());
             return View(empleados);
         }
@@ -51,8 +55,6 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear(Empleado model)
         {
-            // Todo empleado nuevo se registra siempre como Disponible (no aplica para CU-06/07).
-            model.EstadoDisponibilidad = "Disponible";
             model.JornadaLaboral = $"{FormatHora(model.HorarioEntrada)} - {FormatHora(model.HorarioSalida)}";
 
             if (!ModelState.IsValid)
@@ -174,18 +176,6 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            // Con un pedido en curso el estado lo controla el flujo del pedido, no la edición manual
-            if (model.EstadoDisponibilidad != empleadoExistente.EstadoDisponibilidad)
-            {
-                var pedidoEnCurso = await ObtenerPedidoEnCursoAsync(empleadoExistente.Id);
-                if (pedidoEnCurso != null)
-                {
-                    ModelState.AddModelError("EstadoDisponibilidad", $"No se puede cambiar el estado porque el empleado tiene el pedido {pedidoEnCurso} en curso. Reasigne, complete o cancele el pedido primero.");
-                    ViewBag.Motivo = motivo;
-                    return View(model);
-                }
-            }
-
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -199,7 +189,6 @@ namespace PickingApp.Controllers
                 empleadoExistente.HorarioEntrada = model.HorarioEntrada;
                 empleadoExistente.HorarioSalida = model.HorarioSalida;
                 empleadoExistente.FechaIngreso = model.FechaIngreso;
-                empleadoExistente.EstadoDisponibilidad = model.EstadoDisponibilidad;
 
                 await _context.SaveChangesAsync();
                 TempData["EmpleadoDestacadoId"] = empleadoExistente.Id;
@@ -233,7 +222,6 @@ namespace PickingApp.Controllers
                 AgregarCambio("Fecha de ingreso", empleadoExistente.FechaIngreso.ToString("dd/MM/yyyy"), model.FechaIngreso.ToString("dd/MM/yyyy"));
                 AgregarCambio("Hora de entrada", FormatHora(empleadoExistente.HorarioEntrada), FormatHora(model.HorarioEntrada));
                 AgregarCambio("Hora de salida", FormatHora(empleadoExistente.HorarioSalida), FormatHora(model.HorarioSalida));
-                AgregarCambio("Estado", empleadoExistente.EstadoDisponibilidad, model.EstadoDisponibilidad);
 
                 var datosSolicitud = new
                 {
@@ -300,7 +288,6 @@ namespace PickingApp.Controllers
             if (userRole == "Administrador")
             {
                 empleado.Activo = !empleado.Activo;
-                empleado.EstadoDisponibilidad = empleado.Activo ? "Disponible" : "Inactivo";
                 await _context.SaveChangesAsync();
                 TempData["EmpleadoDestacadoId"] = empleado.Id;
 

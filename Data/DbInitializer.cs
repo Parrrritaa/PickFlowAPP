@@ -121,7 +121,6 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddYears(-2), // 24 meses experiencia (> 6 meses)
-                        EstadoDisponibilidad = "Disponible",
                         Activo = true
                     },
                     new Empleado
@@ -133,7 +132,6 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-3), // 3 meses experiencia (< 6 meses -> generará advertencia si pedido > 10 ubicaciones)
-                        EstadoDisponibilidad = "Disponible",
                         Activo = true
                     },
                     new Empleado
@@ -145,7 +143,6 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(14, 0, 0),
                         HorarioSalida = new TimeSpan(22, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-10), // 10 meses experiencia
-                        EstadoDisponibilidad = "Disponible",
                         Activo = true
                     }
                 };

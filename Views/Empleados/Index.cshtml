@@ -6,6 +6,7 @@
     var esAuxiliar = userRole == "Auxiliar";
     // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
+    var ocupados = ViewBag.EmpleadosOcupados as HashSet<int> ?? new HashSet<int>();
     var rendimientos = ViewBag.Rendimientos as Dictionary<int, PickingApp.Services.RendimientoEmpleado> ?? new Dictionary<int, PickingApp.Services.RendimientoEmpleado>();
 }
 
@@ -39,7 +40,7 @@
                 {
                     @foreach (var emp in Model)
                     {
-                        var estadoText = emp.EstadoDisponibilidad == "Disponible" ? "Libre" : (emp.EstadoDisponibilidad == "EnPicking" ? "Ocupado" : emp.EstadoDisponibilidad);
+                        var estadoText = PickingApp.Models.Empleado.DescribirEstado(emp.Activo, ocupados.Contains(emp.Id));
                         <tr class="@(emp.Id == destacadoId ? "pf-row-flash" : "")">
                             <td class="fw-semibold">@emp.NombreCompleto</td>
                             <td>@estadoText</td>

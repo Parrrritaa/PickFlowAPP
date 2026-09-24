@@ -200,11 +200,6 @@ namespace PickingApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
-                    b.Property<string>("EstadoDisponibilidad")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
-
                     b.Property<DateTime>("FechaIngreso")
                         .HasColumnType("datetime(6)");
 

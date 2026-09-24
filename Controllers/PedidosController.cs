@@ -285,8 +285,7 @@ namespace PickingApp.Controllers
             var empleados = (await _context.Empleados
                 .Where(e => e.Activo)
                 .ToListAsync())
-                .OrderByDescending(e => e.EstadoDisponibilidad == "Disponible")
-                .ThenByDescending(e => e.MesesExperiencia)
+                .OrderByDescending(e => e.MesesExperiencia)
                 .ToList();
 
             // Tiempo estimado de cada empleado = tiempo estándar del pedido × su factor de rendimiento
@@ -373,8 +372,6 @@ namespace PickingApp.Controllers
             pedido.Asignar(empleadoId, DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync()),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
 
-            empleado.EstadoDisponibilidad = "EnPicking";
-
             await _context.SaveChangesAsync();
 
             if (validacion.GeneraAdvertencia)
@@ -436,12 +433,10 @@ namespace PickingApp.Controllers
             var nuevoEmpleado = await _context.Empleados.FindAsync(nuevoEmpleadoId);
             if (nuevoEmpleado == null) return NotFound();
 
-            // Liberar al empleado anterior
-            var empleadoAnterior = await _context.Empleados.FindAsync(pedido.EmpleadoId.Value);
-            if (empleadoAnterior != null)
-            {
-                empleadoAnterior.EstadoDisponibilidad = "Disponible";
-            }
+            var nombreEmpleadoAnterior = await _context.Empleados
+                .Where(e => e.Id == pedido.EmpleadoId.Value)
+                .Select(e => e.NombreCompleto)
+                .FirstOrDefaultAsync();
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
@@ -454,8 +449,6 @@ namespace PickingApp.Controllers
             pedido.Reasignar(nuevoEmpleadoId, motivo, DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync()),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
 
-            nuevoEmpleado.EstadoDisponibilidad = "EnPicking";
-
             await _context.SaveChangesAsync();
 
             if (validacion.GeneraAdvertencia)
@@ -463,7 +456,7 @@ namespace PickingApp.Controllers
                 await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: true, userEmail, userRole);
             }
             await _auditService.LogAsync(userEmail, userRole, "Reasignar Pedido", "Pedidos", 
-                $"Pedido {pedido.CodigoPedido} reasignado de {empleadoAnterior?.NombreCompleto ?? "(sin empleado)"} a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivo}");
+                $"Pedido {pedido.CodigoPedido} reasignado de {nombreEmpleadoAnterior ?? "(sin empleado)"} a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivo}");
 
             if (validacion.GeneraAdvertencia)
             {
@@ -531,7 +524,6 @@ namespace PickingApp.Controllers
             pedido.FechaFinalizacion = fechaFin;
             pedido.TiempoProcesamientoMinutos = tiempoReal;
 
-            await LiberarEmpleadoAsync(pedido.EmpleadoId);
             var padreCerrado = await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
@@ -574,9 +566,6 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            // Liberar empleado si tenía uno asignado
-            await LiberarEmpleadoAsync(pedido.EmpleadoId);
-
             // Pedido dividido: se cancelan también las partes que no hayan terminado; las completadas se conservan
             var partesCanceladas = 0;
             if (pedido.EstaDividido)
@@ -586,7 +575,6 @@ namespace PickingApp.Controllers
                     .ToListAsync();
                 foreach (var parte in partesActivas)
                 {
-                    await LiberarEmpleadoAsync(parte.EmpleadoId);
                     parte.Estado = PedidoEstados.Cancelado;
                     parte.MotivoCancelacion = $"Cancelado junto con el pedido {pedido.CodigoPedido}: {motivoCancelacion.Trim()}";
                     if (parte.MotivoCancelacion.Length > 250) parte.MotivoCancelacion = parte.MotivoCancelacion[..250];
@@ -931,13 +919,6 @@ namespace PickingApp.Controllers
             var completado = padre.Estado == PedidoEstados.Completado;
             await _auditService.LogAsync(userEmail, userRole, completado ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
                 $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
-        }
-
-        private async Task LiberarEmpleadoAsync(int? empleadoId)
-        {
-            if (empleadoId == null) return;
-            var empleado = await _context.Empleados.FindAsync(empleadoId.Value);
-            if (empleado != null) empleado.EstadoDisponibilidad = "Disponible";
         }
 
         private async Task<double> ObtenerMaxHorasJornadaAsync()

@@ -182,9 +182,7 @@ namespace PickingApp.Services
                 return result;
             }
 
-            var empleado = await _context.Empleados
-                .Include(e => e.PedidosAsignados)
-                .FirstOrDefaultAsync(e => e.Id == empleadoId);
+            var empleado = await _context.Empleados.FindAsync(empleadoId);
 
             if (empleado == null)
             {
@@ -206,7 +204,7 @@ namespace PickingApp.Services
             var tienePedidoActivo = await _context.Pedidos
                 .AnyAsync(p => p.EmpleadoId == empleadoId && PedidoEstados.EnCurso.Contains(p.Estado) && p.Id != pedidoId);
 
-            if (tienePedidoActivo || empleado.EstadoDisponibilidad == "EnPicking")
+            if (tienePedidoActivo)
             {
                 result.PuedeAsignar = false;
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' ya tiene un pedido asignado en curso (RN-01-CU26).";

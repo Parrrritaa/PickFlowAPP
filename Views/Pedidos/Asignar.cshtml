@@ -53,9 +53,7 @@
                     @foreach (var emp in Model)
                     {
                         var highlightClass = emp.Id == empleadoRecomendadoId ? "mockup-row-highlight" : "";
-                        var estadoText = motivosNoAsignable.TryGetValue(emp.Id, out var motivo)
-                            ? motivo
-                            : (emp.EstadoDisponibilidad == "Disponible" ? "Libre" : emp.EstadoDisponibilidad);
+                        var estadoText = motivosNoAsignable.TryGetValue(emp.Id, out var motivo) ? motivo : "Libre";
                         var tiempoEstimado = tiemposEstimados.TryGetValue(emp.Id, out var minutos) ? PickingApp.Services.Formato.Duracion(minutos) : "-";
 
                         <tr class="@highlightClass">

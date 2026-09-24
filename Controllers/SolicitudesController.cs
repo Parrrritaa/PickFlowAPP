@@ -153,11 +153,6 @@ namespace PickingApp.Controllers
                                     var empExistente = await _context.Empleados.FindAsync(empData.Id);
                                     if (empExistente != null)
                                     {
-                                        if (empData.EstadoDisponibilidad != empExistente.EstadoDisponibilidad)
-                                        {
-                                            await ValidarSinPedidoEnCursoAsync(empExistente, "cambiar su estado");
-                                        }
-
                                         var correoNuevo = string.IsNullOrWhiteSpace(empData.Correo) ? null : empData.Correo.Trim().ToLower();
                                         if (correoNuevo != null && correoNuevo != empExistente.Correo)
                                         {
@@ -170,7 +165,6 @@ namespace PickingApp.Controllers
                                         empExistente.HorarioEntrada = empData.HorarioEntrada;
                                         empExistente.HorarioSalida = empData.HorarioSalida;
                                         empExistente.FechaIngreso = empData.FechaIngreso;
-                                        empExistente.EstadoDisponibilidad = empData.EstadoDisponibilidad;
                                     }
                                 }
                             }
@@ -187,7 +181,6 @@ namespace PickingApp.Controllers
                                 {
                                     await ValidarSinPedidoEnCursoAsync(emp, "inactivarlo");
                                     emp.Activo = false;
-                                    emp.EstadoDisponibilidad = "Inactivo";
                                 }
                             }
                         }

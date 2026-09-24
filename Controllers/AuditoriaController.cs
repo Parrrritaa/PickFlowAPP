@@ -243,13 +243,6 @@ namespace PickingApp.Controllers
                 _context.LogsSistema.RemoveRange(_context.LogsSistema);
             }
 
-            // Reiniciar estado de empleados a Disponible
-            var empleados = await _context.Empleados.ToListAsync();
-            foreach (var e in empleados)
-            {
-                e.EstadoDisponibilidad = "Disponible";
-            }
-
             await _context.SaveChangesAsync();
 
             // Con las tablas ya vacías, se reinicia el autoincremento para que los próximos

@@ -34,11 +34,14 @@ namespace PickingApp.Models
         [Required]
         public DateTime FechaIngreso { get; set; } = DateTime.Today;
 
-        [Required]
-        [StringLength(30)]
-        public string EstadoDisponibilidad { get; set; } = "Disponible"; // "Disponible", "EnPicking", "Inactivo", "FueraDeJornada"
-
         public bool Activo { get; set; } = true;
+
+        // La ocupación no se guarda: un empleado está ocupado mientras tenga un pedido en curso.
+        public static string DescribirEstado(bool activo, bool conPedidoEnCurso)
+        {
+            if (!activo) return "Inactivo";
+            return conPedidoEnCurso ? "Ocupado" : "Libre";
+        }
 
         // Pedidos completados antes de esta fecha se ignoran al calcular el tiempo promedio del empleado.
         // Permite "reiniciar" su historial de tiempos sin borrar los pedidos.

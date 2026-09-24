@@ -79,15 +79,6 @@
                 <input asp-for="HorarioSalida" type="time" class="mockup-input" required />
                 <span asp-validation-for="HorarioSalida" class="text-danger small"></span>
             </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Estado <span class="text-danger">*</span></label>
-                <select asp-for="EstadoDisponibilidad" class="mockup-input">
-                    <option value="Disponible">Libre (Disponible)</option>
-                    <option value="EnPicking">Ocupado</option>
-                    <option value="Inactivo">Inactivo</option>
-                </select>
-                <span asp-validation-for="EstadoDisponibilidad" class="text-danger small"></span>
-            </div>
         </div>
 
         @if (!esAdministrador)
