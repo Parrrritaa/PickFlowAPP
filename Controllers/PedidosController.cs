@@ -198,15 +198,9 @@ namespace PickingApp.Controllers
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
 
-            foreach (var pedido in validacion.PedidosValidados)
-            {
-                // Verificar si ya existe el código de pedido para no duplicar
-                if (await _context.Pedidos.AnyAsync(p => p.CodigoPedido == pedido.CodigoPedido))
-                {
-                    pedido.CodigoPedido = $"{pedido.CodigoPedido}-{DateTime.Now:HHmmss}";
-                }
-                _context.Pedidos.Add(pedido);
-            }
+            // Los códigos de pedido duplicados ya se rechazaron en ValidarArchivoExcelAsync: un código
+            // repetido no se renombra ni se reabre, porque duplicaría el trabajo de alistamiento.
+            _context.Pedidos.AddRange(validacion.PedidosValidados);
 
             await _context.SaveChangesAsync();
 
@@ -247,6 +241,7 @@ namespace PickingApp.Controllers
                 filasConBodegaNoRegistrada = v.FilasConBodegaNoRegistrada,
                 filasConUbicacionNoRegistrada = v.FilasConUbicacionNoRegistrada,
                 filasConProductoIncorrecto = v.FilasConProductoIncorrecto,
+                filasConPedidoDuplicado = v.FilasConPedidoDuplicado,
                 totalPedidos = v.TotalPedidos,
                 totalFilas = v.TotalFilas,
                 errores = v.Errors

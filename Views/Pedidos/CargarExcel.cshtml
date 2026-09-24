@@ -65,7 +65,7 @@
             var cajaErrores = document.getElementById('erroresValidacion');
             var listaErrores = document.getElementById('listaErroresValidacion');
             var btnConfirmar = document.getElementById('btnConfirmarCarga');
-            var maxErroresVisibles = 20;
+            var erroresVisiblesInicial = 5;
 
             // Un archivo nuevo invalida el resultado anterior
             input.addEventListener('change', function () {
@@ -114,7 +114,8 @@
                     ['filasConCantidadInvalida', 'Cantidades válidas'],
                     ['filasConBodegaNoRegistrada', 'Bodegas registradas'],
                     ['filasConUbicacionNoRegistrada', 'Ubicaciones registradas'],
-                    ['filasConProductoIncorrecto', 'Productos corresponden a su ubicación']
+                    ['filasConProductoIncorrecto', 'Productos corresponden a su ubicación'],
+                    ['filasConPedidoDuplicado', 'Pedidos no registrados previamente']
                 ];
                 var erroresPrevios = 0;
                 pasos.forEach(function (p) {
@@ -141,15 +142,67 @@
                 }
 
                 var errores = r.errores || [];
-                errores.slice(0, maxErroresVisibles).forEach(function (e) {
+                errores.forEach(function (e, i) {
                     var li = document.createElement('li');
                     li.textContent = e;
+                    if (i >= erroresVisiblesInicial) li.classList.add('d-none', 'pf-error-extra');
                     listaErrores.appendChild(li);
                 });
-                if (errores.length > maxErroresVisibles) {
-                    var mas = document.createElement('li');
-                    mas.textContent = 'Y ' + plural(errores.length - maxErroresVisibles, 'observación más', 'observaciones más') + '.';
-                    listaErrores.appendChild(mas);
+                var ocultos = errores.length - erroresVisiblesInicial;
+                if (ocultos > 0) {
+                    var liToggle = document.createElement('li');
+                    liToggle.className = 'mt-1';
+                    liToggle.style.listStyleType = 'none';
+                    var btnToggle = document.createElement('button');
+                    btnToggle.type = 'button';
+                    btnToggle.className = 'btn btn-link fw-semibold text-decoration-none p-0';
+                    var textoMas = 'Ver ' + plural(ocultos, 'observación más', 'observaciones más');
+                    btnToggle.textContent = textoMas;
+                    btnToggle.addEventListener('click', function () {
+                        var expandir = btnToggle.dataset.expandido !== 'true';
+                        var items = Array.prototype.slice.call(listaErrores.querySelectorAll('.pf-error-extra'));
+                        btnToggle.disabled = true;
+                        btnToggle.dataset.expandido = expandir ? 'true' : 'false';
+                        btnToggle.textContent = expandir ? 'Ver menos' : textoMas;
+
+                        if (expandir) {
+                            // Al desplegar, cada fila aparece con un pequeño desfase (cascada) en vez de todas a la vez
+                            items.forEach(function (el, idx) {
+                                el.classList.remove('d-none');
+                                el.classList.remove('pf-reveal');
+                                if (pfReducirMovimiento()) return;
+                                el.style.animationDelay = (idx * 30) + 'ms';
+                                void el.offsetWidth;
+                                el.classList.add('pf-reveal');
+                            });
+                            btnToggle.disabled = false;
+                            return;
+                        }
+
+                        // Al ocultar, las filas se recogen hacia arriba con un fundido: más rápido que la
+                        // entrada y sin desfase notorio, para que "Ver menos" se sienta ágil, no perezoso.
+                        if (pfReducirMovimiento() || !items[0] || !items[0].animate) {
+                            items.forEach(function (el) { el.classList.add('d-none'); });
+                            btnToggle.disabled = false;
+                            return;
+                        }
+                        var salidas = items.map(function (el, idx) {
+                            return el.animate(
+                                [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px)' }],
+                                { duration: 150, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', delay: idx * 12, fill: 'forwards' }
+                            ).finished;
+                        });
+                        Promise.all(salidas).then(function () {
+                            items.forEach(function (el) {
+                                el.classList.add('d-none');
+                                el.style.opacity = '';
+                                el.style.transform = '';
+                            });
+                            btnToggle.disabled = false;
+                        });
+                    });
+                    liToggle.appendChild(btnToggle);
+                    listaErrores.appendChild(liToggle);
                 }
                 cajaErrores.hidden = errores.length === 0;
                 btnConfirmar.hidden = !r.valido;

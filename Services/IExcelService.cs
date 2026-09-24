@@ -19,6 +19,7 @@ namespace PickingApp.Services
         public int FilasConBodegaNoRegistrada { get; set; }
         public int FilasConUbicacionNoRegistrada { get; set; }
         public int FilasConProductoIncorrecto { get; set; }
+        public int FilasConPedidoDuplicado { get; set; }
     }
 
     public interface IExcelService

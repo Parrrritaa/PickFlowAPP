@@ -51,6 +51,9 @@ namespace PickingApp.Services
 
                 var bodegasDb = await _context.Bodegas.ToDictionaryAsync(b => b.Codigo.ToUpper(), b => b.Id);
                 var ubicacionesDb = await _context.Ubicaciones.Include(u => u.Producto).ToListAsync();
+                var codigosPedidoExistentes = (await _context.Pedidos.Select(p => p.CodigoPedido).ToListAsync())
+                    .Select(c => c.ToUpperInvariant())
+                    .ToHashSet();
 
                 var rows = range.RowsUsed().Skip(1);
                 var totalFilas = 0;
@@ -112,6 +115,15 @@ namespace PickingApp.Services
 
                     if (!pedidosDict.TryGetValue(codPedido, out var pedido))
                     {
+                        // Un código de pedido ya registrado no se reabre ni se renombra: dos cargas del mismo
+                        // pedido duplicarían el trabajo de alistamiento para un solo pedido del cliente.
+                        if (codigosPedidoExistentes.Contains(codPedido.ToUpperInvariant()))
+                        {
+                            result.FilasConPedidoDuplicado++;
+                            result.Errors.Add($"Fila {filaNum}: El pedido '{codPedido}' ya está registrado en el sistema. Si es una corrección, edite o cancele el pedido existente en vez de volver a cargarlo.");
+                            continue;
+                        }
+
                         prioridad = string.IsNullOrWhiteSpace(prioridad) ? "Media" : prioridad;
                         if (prioridad != "Alta" && prioridad != "Media" && prioridad != "Baja")
                         {

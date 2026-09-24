@@ -40,15 +40,23 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Crear(Usuario model, string password)
+        public async Task<IActionResult> Crear(Usuario model, string password, string confirmPassword)
         {
+            // El formulario envía la contraseña en "password", no en "PasswordHash": el binding automático
+            // la deja vacía y dispara el [Required] del modelo antes de llegar aquí. Se valida a mano abajo.
+            ModelState.Remove("PasswordHash");
+
             if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
             {
-                ModelState.AddModelError("PasswordHash", "La contraseña debe tener al menos 6 caracteres.");
+                ModelState.AddModelError(string.Empty, "La contraseña debe tener al menos 6 caracteres.");
             }
             else if (!System.Text.RegularExpressions.Regex.IsMatch(password, @"^(?=.*[A-Za-z])(?=.*\d).+$"))
             {
-                ModelState.AddModelError("PasswordHash", "La contraseña debe contener al menos una letra y un número.");
+                ModelState.AddModelError(string.Empty, "La contraseña debe contener al menos una letra y un número.");
+            }
+            else if (password != confirmPassword)
+            {
+                ModelState.AddModelError(string.Empty, "Las contraseñas no coinciden.");
             }
 
             model.Correo = model.Correo.Trim().ToLower();
