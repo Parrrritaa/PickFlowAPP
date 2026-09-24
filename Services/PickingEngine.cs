@@ -13,8 +13,13 @@ namespace PickingApp.Services
             _context = context;
         }
 
-        // Tiempo estándar = Σ (unidades × minutos por unidad de la categoría del producto) + ubicaciones × minutos de recorrido.
-        // Los productos sin categoría usan la predeterminada.
+        // Tiempo estándar = Σ (unidades × minutos por unidad de la categoría del producto ÷ unidades por caja del producto)
+        // + ubicaciones × minutos de recorrido. Los productos sin categoría usan la predeterminada.
+        //
+        // UnidadesPorCaja modela que tomar una caja completa (o una fracción de ella) no cuesta tiempo lineal por
+        // unidad: si un producto trae 12 por caja, recoger 12 unidades cuesta 1 "toma" (los mismos minutos que 1
+        // unidad suelta), y recoger 25 cuesta 25/12 tomas. Productos con caja de 1 unidad (p. ej. un monitor) no
+        // cambian de comportamiento.
         public async Task<double> CalcularTiempoEstandarAsync(int pedidoId)
         {
             var tiempos = await CalcularTiemposEstandarAsync(new[] { pedidoId });
@@ -33,7 +38,8 @@ namespace PickingApp.Services
                     d.PedidoId,
                     d.Cantidad,
                     d.UbicacionId,
-                    MinutosPorUnidad = (double?)d.Ubicacion!.Producto!.Categoria!.MinutosPorUnidad
+                    MinutosPorUnidad = (double?)d.Ubicacion!.Producto!.Categoria!.MinutosPorUnidad,
+                    UnidadesPorCaja = (int?)d.Ubicacion!.Producto!.UnidadesPorCaja
                 })
                 .ToListAsync();
 
@@ -44,7 +50,8 @@ namespace PickingApp.Services
                 .GroupBy(l => l.PedidoId)
                 .ToDictionary(g => g.Key, g =>
                 {
-                    var tiempoUnidades = g.Sum(l => l.Cantidad * (l.MinutosPorUnidad ?? minutosPredeterminados));
+                    var tiempoUnidades = g.Sum(l =>
+                        l.Cantidad * (l.MinutosPorUnidad ?? minutosPredeterminados) / Math.Max(1, l.UnidadesPorCaja ?? 1));
                     var tiempoRecorrido = g.Select(l => l.UbicacionId).Distinct().Count() * minutosPorUbicacion;
                     return Math.Round(Math.Max(1.0, tiempoUnidades + tiempoRecorrido), 1);
                 });

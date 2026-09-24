@@ -235,6 +235,12 @@ namespace PickingApp.Controllers
                                         }
                                         productoUbi.CategoriaProductoId = categoriaId;
                                     }
+
+                                    // Solicitudes anteriores a esta funcionalidad no traen el campo: se conserva el valor actual (1 por defecto)
+                                    if (nuevosDatosUbiEl.TryGetProperty("UnidadesPorCaja", out var unidadesPorCajaProp) && unidadesPorCajaProp.ValueKind == JsonValueKind.Number)
+                                    {
+                                        productoUbi.UnidadesPorCaja = Math.Max(1, unidadesPorCajaProp.GetInt32());
+                                    }
                                 }
                             }
                         }

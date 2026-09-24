@@ -11,6 +11,8 @@ namespace PickingApp.Controllers
     [Authorize]
     public class BodegasController : Controller
     {
+        private const int MaxUnidadesPorCaja = 10000;
+
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
 
@@ -232,7 +234,7 @@ namespace PickingApp.Controllers
         [Authorize(Roles = "Administrador,Supervisor")]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CrearUbicacion(Ubicacion model, string numeroProducto, string nombreProducto, string? categoriaProductoId)
+        public async Task<IActionResult> CrearUbicacion(Ubicacion model, string numeroProducto, string nombreProducto, string? categoriaProductoId, string? unidadesPorCaja)
         {
             var bodega = await _context.Bodegas.FindAsync(model.BodegaId);
             if (bodega == null) return NotFound();
@@ -256,11 +258,16 @@ namespace PickingApp.Controllers
             {
                 ModelState.AddModelError(string.Empty, "El nombre de producto es obligatorio.");
             }
+            if (!int.TryParse(unidadesPorCaja, out var unidadesPorCajaValor) || unidadesPorCajaValor < 1 || unidadesPorCajaValor > MaxUnidadesPorCaja)
+            {
+                ModelState.AddModelError(string.Empty, $"La cantidad máxima por caja debe ser un número entero entre 1 y {MaxUnidadesPorCaja}.");
+            }
 
             if (!ModelState.IsValid)
             {
                 ViewBag.NumeroProducto = numeroProducto;
                 ViewBag.NombreProducto = nombreProducto;
+                ViewBag.UnidadesPorCaja = unidadesPorCaja;
                 return View(model);
             }
 
@@ -286,7 +293,7 @@ namespace PickingApp.Controllers
                 .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == codigoProducto.ToUpper());
             if (producto == null)
             {
-                producto = new Producto { Codigo = codigoProducto, Nombre = nombreProducto, CategoriaProductoId = categoriaId };
+                producto = new Producto { Codigo = codigoProducto, Nombre = nombreProducto, CategoriaProductoId = categoriaId, UnidadesPorCaja = unidadesPorCajaValor };
                 _context.Productos.Add(producto);
             }
             else
@@ -294,6 +301,7 @@ namespace PickingApp.Controllers
                 producto.Nombre = nombreProducto;
                 // Un producto existente conserva su categoría salvo que se elija otra
                 if (categoriaId.HasValue) producto.CategoriaProductoId = categoriaId;
+                producto.UnidadesPorCaja = unidadesPorCajaValor;
             }
 
             model.Producto = producto;
@@ -322,6 +330,7 @@ namespace PickingApp.Controllers
             if (ubicacion == null) return NotFound();
 
             ViewBag.Bodega = ubicacion.Bodega;
+            ViewBag.UnidadesPorCaja = ubicacion.Producto?.UnidadesPorCaja ?? 1;
             await CargarCategoriasAsync(ubicacion.Producto?.CategoriaProductoId);
             return View(ubicacion);
         }
@@ -329,7 +338,7 @@ namespace PickingApp.Controllers
         [Authorize(Roles = "Administrador,Supervisor")]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, string numeroProducto, string nombreProducto, string? motivo, string? categoriaProductoId)
+        public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, string numeroProducto, string nombreProducto, string? motivo, string? categoriaProductoId, string? unidadesPorCaja)
         {
             var ubicacionExistente = await _context.Ubicaciones
                 .Include(u => u.Bodega)
@@ -366,6 +375,10 @@ namespace PickingApp.Controllers
             {
                 ModelState.AddModelError(string.Empty, "Debe indicar el motivo de la edición.");
             }
+            if (!int.TryParse(unidadesPorCaja, out var unidadesPorCajaValor) || unidadesPorCajaValor < 1 || unidadesPorCajaValor > MaxUnidadesPorCaja)
+            {
+                ModelState.AddModelError(string.Empty, $"La cantidad máxima por caja debe ser un número entero entre 1 y {MaxUnidadesPorCaja}.");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -376,6 +389,7 @@ namespace PickingApp.Controllers
                 ViewBag.NumeroProducto = numeroProducto;
                 ViewBag.NombreProducto = nombreProducto;
                 ViewBag.Motivo = motivo;
+                ViewBag.UnidadesPorCaja = unidadesPorCaja;
                 return View(ubicacionExistente);
             }
 
@@ -396,6 +410,7 @@ namespace PickingApp.Controllers
                 ViewBag.NumeroProducto = numeroProducto;
                 ViewBag.NombreProducto = nombreProducto;
                 ViewBag.Motivo = motivo;
+                ViewBag.UnidadesPorCaja = unidadesPorCaja;
                 return View(ubicacionExistente);
             }
 
@@ -425,6 +440,7 @@ namespace PickingApp.Controllers
                 ubicacionExistente.Activa = model.Activa;
                 ubicacionExistente.Producto = producto;
                 producto.CategoriaProductoId = categoriaId;
+                producto.UnidadesPorCaja = unidadesPorCajaValor;
 
                 await _context.SaveChangesAsync();
 
@@ -453,6 +469,7 @@ namespace PickingApp.Controllers
                     ? (await _context.CategoriasProducto.FindAsync(categoriaId.Value))?.Nombre ?? "Sin clasificar"
                     : "Sin clasificar";
                 AgregarCambio("Categoría", ubicacionExistente.Producto?.Categoria?.Nombre ?? "Sin clasificar", nombreCategoriaNueva);
+                AgregarCambio("Cantidad máx. por caja", (ubicacionExistente.Producto?.UnidadesPorCaja ?? 1).ToString(), unidadesPorCajaValor.ToString());
 
                 var datosSolicitud = new
                 {
@@ -470,7 +487,8 @@ namespace PickingApp.Controllers
                         Activa = model.Activa,
                         CodigoProducto = codigoProductoNuevo,
                         NombreProducto = nombreProducto,
-                        CategoriaProductoId = categoriaId
+                        CategoriaProductoId = categoriaId,
+                        UnidadesPorCaja = unidadesPorCajaValor
                     }
                 };
 

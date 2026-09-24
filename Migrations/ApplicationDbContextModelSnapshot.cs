@@ -488,6 +488,9 @@ namespace PickingApp.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)");
 
+                    b.Property<int>("UnidadesPorCaja")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoriaProductoId");

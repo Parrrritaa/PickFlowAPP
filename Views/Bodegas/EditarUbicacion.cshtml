@@ -6,6 +6,7 @@
     var motivo = ViewBag.Motivo as string;
     var categorias = ViewBag.Categorias as List<PickingApp.Models.CategoriaProducto> ?? new List<PickingApp.Models.CategoriaProducto>();
     var categoriaSeleccionada = ViewBag.CategoriaSeleccionada as string ?? "";
+    var unidadesPorCaja = (ViewBag.UnidadesPorCaja as string) ?? ViewBag.UnidadesPorCaja?.ToString() ?? (Model.Producto?.UnidadesPorCaja ?? 1).ToString();
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
     var esAdministrador = userRole == "Administrador";
 
@@ -93,6 +94,11 @@
                     }
                 </select>
                 <div class="form-text small">Define cuánto se tarda en recoger una unidad; aplica al producto en todas sus ubicaciones.</div>
+            </div>
+            <div class="col-md-6 mockup-form-group">
+                <label class="mockup-label" for="unidadesPorCaja">Cantidad máx. de producto por caja</label>
+                <input type="number" name="unidadesPorCaja" id="unidadesPorCaja" class="mockup-input" min="1" step="1" value="@unidadesPorCaja" required />
+                <div class="form-text small">Unidades que trae la caja/empaque de este producto. Si vienen varias unidades por caja, el tiempo de picking no se multiplica por cada una. Usa 1 si el producto se recoge de a una unidad (ej. un monitor).</div>
             </div>
         </div>
 
