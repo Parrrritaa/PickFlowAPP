@@ -683,7 +683,6 @@ namespace PickingApp.Controllers
         }
     
 
-        private const int MaxPartes = 20;
 
         // Dividir un pedido grande en partes que se asignan por separado (p. ej. cuando supera una jornada)
         [Authorize(Roles = "Administrador,Supervisor")]
@@ -709,15 +708,12 @@ namespace PickingApp.Controllers
 
             var tiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
             var jornadaMinutos = await ObtenerMaxHorasJornadaAsync() * 60;
-            var maxPartes = Math.Min(MaxPartes, pedido.Detalles.Sum(d => d.Cantidad));
-
             ViewBag.TiempoEstandar = tiempoEstandar;
             ViewBag.JornadaMinutos = jornadaMinutos;
-            ViewBag.MinutosPredeterminados = await _pickingEngine.ObtenerMinutosPredeterminadosAsync();
+            ViewBag.MinutosPorLinea = await _pickingEngine.CalcularMinutosPorLineaAsync(id);
             ViewBag.MinutosPorUbicacion = await _pickingEngine.ObtenerMinutosPorUbicacionAsync();
-            ViewBag.MaxPartes = maxPartes;
-            // Sugerencia: las partes necesarias para que cada una quepa en una jornada a ritmo estándar
-            ViewBag.PartesSugeridas = Math.Clamp((int)Math.Ceiling(tiempoEstandar / jornadaMinutos), 2, maxPartes);
+            ViewBag.MaxPartes = pedido.MaxPartesPermitidas;
+            ViewBag.PartesSugeridas = pedido.PartesSugeridas(tiempoEstandar, jornadaMinutos);
             return View(pedido);
         }
 
@@ -740,7 +736,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var maxPartes = Math.Min(MaxPartes, pedido.Detalles.Sum(d => d.Cantidad));
+            var maxPartes = pedido.MaxPartesPermitidas;
             if (partes < 2 || partes > maxPartes)
             {
                 return ErrorDivision(pedidoId, $"El número de partes debe estar entre 2 y {maxPartes}.");

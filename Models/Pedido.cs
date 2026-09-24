@@ -88,6 +88,16 @@ namespace PickingApp.Models
             return null;
         }
 
+        public const int MaxPartes = 20;
+
+        // Nunca más partes que unidades. Requiere Detalles cargados.
+        [NotMapped]
+        public int MaxPartesPermitidas => Math.Min(MaxPartes, Detalles.Sum(d => d.Cantidad));
+
+        // Partes necesarias para que cada una quepa en una jornada a ritmo estándar. Requiere Detalles cargados.
+        public int PartesSugeridas(double tiempoEstandar, double jornadaMinutos) =>
+            Math.Clamp((int)Math.Ceiling(tiempoEstandar / jornadaMinutos), 2, Math.Max(2, MaxPartesPermitidas));
+
         // Las partes se vuelven a unir mientras ninguna se haya asignado ni tenga novedades.
         // Requiere Partes con sus Novedades cargadas.
         [NotMapped]

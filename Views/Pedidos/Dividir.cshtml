@@ -4,7 +4,7 @@
     ViewData["Title"] = $"Dividir pedido {Model.CodigoPedido}";
     var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
     var jornadaMinutos = ViewBag.JornadaMinutos as double? ?? 540;
-    var minutosPredeterminados = ViewBag.MinutosPredeterminados as double? ?? 1.5;
+    var minutosPorLinea = ViewBag.MinutosPorLinea as Dictionary<int, double> ?? new Dictionary<int, double>();
     var minutosPorUbicacion = ViewBag.MinutosPorUbicacion as double? ?? 1.0;
     var maxPartes = ViewBag.MaxPartes as int? ?? 2;
     var partesSugeridas = ViewBag.PartesSugeridas as int? ?? 2;
@@ -24,9 +24,8 @@
         id = d.Id,
         cantidad = d.Cantidad,
         ubicacion = d.UbicacionId,
-        // Minutos por unidad ya ajustados por caja: recoger 1 caja de N unidades cuesta lo mismo que 1 unidad suelta.
-        minutos = (d.Ubicacion?.Producto?.Categoria?.MinutosPorUnidad ?? minutosPredeterminados)
-            / Math.Max(1, d.Ubicacion?.Producto?.UnidadesPorCaja ?? 1)
+        // Minutos por unidad ya ajustados por caja, calculados por PickingEngine
+        minutos = minutosPorLinea.GetValueOrDefault(d.Id)
     });
     var config = new
     {

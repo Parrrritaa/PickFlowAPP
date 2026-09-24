@@ -31,30 +31,51 @@ namespace PickingApp.Services
         {
             if (pedidoIds.Count == 0) return new Dictionary<int, double>();
 
-            var lineas = await _context.DetallesPedido
-                .Where(d => pedidoIds.Contains(d.PedidoId))
-                .Select(d => new
-                {
-                    d.PedidoId,
-                    d.Cantidad,
-                    d.UbicacionId,
-                    MinutosPorUnidad = (double?)d.Ubicacion!.Producto!.Categoria!.MinutosPorUnidad,
-                    UnidadesPorCaja = (int?)d.Ubicacion!.Producto!.UnidadesPorCaja
-                })
-                .ToListAsync();
-
-            var minutosPredeterminados = await ObtenerMinutosPredeterminadosAsync();
+            var lineas = await ObtenerLineasAsync(pedidoIds);
             var minutosPorUbicacion = await ObtenerMinutosPorUbicacionAsync();
 
             return lineas
                 .GroupBy(l => l.PedidoId)
                 .ToDictionary(g => g.Key, g =>
                 {
-                    var tiempoUnidades = g.Sum(l =>
-                        l.Cantidad * (l.MinutosPorUnidad ?? minutosPredeterminados) / Math.Max(1, l.UnidadesPorCaja ?? 1));
+                    var tiempoUnidades = g.Sum(l => l.Cantidad * l.MinutosPorUnidad);
                     var tiempoRecorrido = g.Select(l => l.UbicacionId).Distinct().Count() * minutosPorUbicacion;
                     return Math.Round(Math.Max(1.0, tiempoUnidades + tiempoRecorrido), 1);
                 });
+        }
+
+        // Minutos por unidad de cada línea del pedido, ya ajustados por caja. Los usa el reparto interactivo
+        // de Pedidos/Dividir para no repetir la fórmula en la vista.
+        public async Task<Dictionary<int, double>> CalcularMinutosPorLineaAsync(int pedidoId)
+        {
+            var lineas = await ObtenerLineasAsync(new[] { pedidoId });
+            return lineas.ToDictionary(l => l.DetalleId, l => l.MinutosPorUnidad);
+        }
+
+        private sealed record LineaTiempo(int DetalleId, int PedidoId, int Cantidad, int UbicacionId, double MinutosPorUnidad);
+
+        private async Task<List<LineaTiempo>> ObtenerLineasAsync(IReadOnlyCollection<int> pedidoIds)
+        {
+            var lineas = await _context.DetallesPedido
+                .Where(d => pedidoIds.Contains(d.PedidoId))
+                .Select(d => new
+                {
+                    d.Id,
+                    d.PedidoId,
+                    d.Cantidad,
+                    d.UbicacionId,
+                    MinutosCategoria = (double?)d.Ubicacion!.Producto!.Categoria!.MinutosPorUnidad,
+                    UnidadesPorCaja = (int?)d.Ubicacion!.Producto!.UnidadesPorCaja
+                })
+                .ToListAsync();
+
+            var minutosPredeterminados = await ObtenerMinutosPredeterminadosAsync();
+
+            // Recoger una caja de N unidades cuesta lo mismo que 1 unidad suelta
+            return lineas
+                .Select(l => new LineaTiempo(l.Id, l.PedidoId, l.Cantidad, l.UbicacionId,
+                    (l.MinutosCategoria ?? minutosPredeterminados) / Math.Max(1, l.UnidadesPorCaja ?? 1)))
+                .ToList();
         }
 
         public async Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds)
@@ -118,7 +139,7 @@ namespace PickingApp.Services
             return cfg != null && int.TryParse(cfg.Valor, out var valor) && valor >= 1 ? valor : 3;
         }
 
-        public async Task<double> ObtenerMinutosPredeterminadosAsync()
+        private async Task<double> ObtenerMinutosPredeterminadosAsync()
         {
             var minutos = await _context.CategoriasProducto
                 .Where(c => c.EsPredeterminada)

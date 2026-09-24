@@ -7,7 +7,7 @@
     var maxHorasJornada = ViewBag.MaxHorasJornada as double? ?? 9.0;
     var categoriaPredeterminada = ViewBag.CategoriaPredeterminada as string ?? "Predeterminada";
     var superaJornada = tiempoEstandar > maxHorasJornada * 60;
-    var partesSugeridas = Math.Max(2, (int)Math.Ceiling(tiempoEstandar / (maxHorasJornada * 60)));
+    var partesSugeridas = Model.PartesSugeridas(tiempoEstandar, maxHorasJornada * 60);
     var esDividido = Model.EstaDividido;
     var partes = Model.Partes.OrderBy(pa => pa.NumeroParte).ToList();
     var tiemposPartes = ViewBag.TiemposPartes as Dictionary<int, double> ?? new Dictionary<int, double>();
