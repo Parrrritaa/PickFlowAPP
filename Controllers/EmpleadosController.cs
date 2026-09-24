@@ -53,10 +53,9 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Crear(Empleado model)
+        public async Task<IActionResult> Crear([Bind(nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto), nameof(Empleado.Correo),
+            nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso))] Empleado model)
         {
-            model.JornadaLaboral = ReglasEmpleado.DescribirJornada(model.HorarioEntrada, model.HorarioSalida);
-
             if (!ModelState.IsValid)
             {
                 return View(model);
@@ -126,9 +125,10 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Editar(Empleado model, string? motivo)
+        public async Task<IActionResult> Editar([Bind(nameof(Empleado.Id), nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto),
+            nameof(Empleado.Correo), nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso))] Empleado model,
+            string? motivo)
         {
-            model.JornadaLaboral = ReglasEmpleado.DescribirJornada(model.HorarioEntrada, model.HorarioSalida);
             motivo = (motivo ?? string.Empty).Trim();
 
             if (!ModelState.IsValid)
@@ -158,7 +158,6 @@ namespace PickingApp.Controllers
             {
                 empleadoExistente.NombreCompleto = model.NombreCompleto;
                 empleadoExistente.Correo = model.Correo;
-                empleadoExistente.JornadaLaboral = model.JornadaLaboral;
                 empleadoExistente.HorarioEntrada = model.HorarioEntrada;
                 empleadoExistente.HorarioSalida = model.HorarioSalida;
                 empleadoExistente.FechaIngreso = model.FechaIngreso;

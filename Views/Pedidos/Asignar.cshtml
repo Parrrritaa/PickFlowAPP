@@ -63,7 +63,7 @@
                             <td class="fw-semibold">@emp.NombreCompleto</td>
                             <td>@estadoText</td>
                             <td>@emp.MesesExperiencia meses</td>
-                            <td>@(string.IsNullOrEmpty(emp.JornadaLaboral) ? "Sin turno asignado" : emp.JornadaLaboral)</td>
+                            <td>@emp.JornadaLaboral</td>
                             <td>
                                 @if (rendimiento != null)
                                 {

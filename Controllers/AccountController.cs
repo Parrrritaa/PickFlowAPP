@@ -99,7 +99,7 @@ namespace PickingApp.Controllers
             }
 
             var usuario = await _context.Usuarios
-                .FirstOrDefaultAsync(u => u.Correo.ToLower() == model.Correo.Trim().ToLower());
+                .FirstOrDefaultAsync(u => u.Correo == model.Correo.Trim().ToLower());
 
             if (usuario == null)
             {
@@ -272,9 +272,10 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var correo = model.Correo.Trim();
+            // Los correos se guardan en minúsculas y sin espacios
+            var correo = model.Correo.Trim().ToLower();
             var usuario = await _context.Usuarios
-                .FirstOrDefaultAsync(u => u.Correo.ToLower() == correo.ToLower());
+                .FirstOrDefaultAsync(u => u.Correo == correo);
 
             // El mensaje y el redireccionamiento son idénticos exista o no la cuenta, para no filtrar
             // qué correos están registrados (evita enumeración de usuarios).
@@ -322,7 +323,7 @@ namespace PickingApp.Controllers
             }
 
             var usuario = await _context.Usuarios
-                .FirstOrDefaultAsync(u => u.Correo.ToLower() == model.Correo.Trim().ToLower());
+                .FirstOrDefaultAsync(u => u.Correo == model.Correo.Trim().ToLower());
 
             if (usuario == null || !CodigoCoincide(usuario, model.Codigo))
             {

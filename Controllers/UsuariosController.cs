@@ -40,7 +40,8 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Crear(Usuario model, string password, string confirmPassword)
+        public async Task<IActionResult> Crear([Bind(nameof(Usuario.NombreCompleto), nameof(Usuario.Identificacion), nameof(Usuario.Correo),
+            nameof(Usuario.Rol), nameof(Usuario.Estado))] Usuario model, string password, string confirmPassword)
         {
             // El formulario envía la contraseña en "password", no en "PasswordHash": el binding automático
             // la deja vacía y dispara el [Required] del modelo antes de llegar aquí. Se valida a mano abajo.

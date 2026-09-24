@@ -112,7 +112,6 @@ namespace PickingApp.Data
                         Identificacion = "1001",
                         NombreCompleto = "Carlos Andrés Mendoza",
                         Correo = "carlos.mendoza@empresa.com",
-                        JornadaLaboral = "Diurna (8:00 - 17:00)",
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddYears(-2), // 24 meses experiencia (> 6 meses)
@@ -123,7 +122,6 @@ namespace PickingApp.Data
                         Identificacion = "1002",
                         NombreCompleto = "Laura Vanessa Gómez",
                         Correo = "laura.gomez@empresa.com",
-                        JornadaLaboral = "Diurna (8:00 - 17:00)",
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-3), // 3 meses experiencia (< 6 meses -> generará advertencia si pedido > 10 ubicaciones)
@@ -134,7 +132,6 @@ namespace PickingApp.Data
                         Identificacion = "1003",
                         NombreCompleto = "Mateo Silva Castro",
                         Correo = "mateo.silva@empresa.com",
-                        JornadaLaboral = "Tarde (14:00 - 22:00)",
                         HorarioEntrada = new TimeSpan(14, 0, 0),
                         HorarioSalida = new TimeSpan(22, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-10), // 10 meses experiencia

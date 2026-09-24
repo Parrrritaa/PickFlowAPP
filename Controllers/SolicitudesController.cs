@@ -250,7 +250,6 @@ namespace PickingApp.Controllers
                 Correo = correo,
                 HorarioEntrada = datos.HorarioEntrada,
                 HorarioSalida = datos.HorarioSalida,
-                JornadaLaboral = ReglasEmpleado.DescribirJornada(datos.HorarioEntrada, datos.HorarioSalida),
                 FechaIngreso = datos.FechaIngreso
             });
         }
@@ -267,7 +266,6 @@ namespace PickingApp.Controllers
             empleado.Correo = correo;
             empleado.HorarioEntrada = datos.HorarioEntrada;
             empleado.HorarioSalida = datos.HorarioSalida;
-            empleado.JornadaLaboral = ReglasEmpleado.DescribirJornada(datos.HorarioEntrada, datos.HorarioSalida);
             empleado.FechaIngreso = datos.FechaIngreso;
         }
 

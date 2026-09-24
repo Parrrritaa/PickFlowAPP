@@ -217,11 +217,6 @@ namespace PickingApp.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)");
 
-                    b.Property<string>("JornadaLaboral")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
                     b.Property<string>("NombreCompleto")
                         .IsRequired()
                         .HasMaxLength(100)

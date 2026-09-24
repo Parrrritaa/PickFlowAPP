@@ -10,9 +10,6 @@ namespace PickingApp.Services
     {
         public sealed record Error(string Campo, string Mensaje);
 
-        public static string DescribirJornada(TimeSpan entrada, TimeSpan salida) =>
-            $"{entrada:hh\\:mm} - {salida:hh\\:mm}";
-
         // Un turno que termina antes de empezar cruza la medianoche
         public static double DuracionJornadaHoras(TimeSpan entrada, TimeSpan salida)
         {

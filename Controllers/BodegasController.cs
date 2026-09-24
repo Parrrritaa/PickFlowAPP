@@ -118,7 +118,7 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Crear(Bodega model)
+        public async Task<IActionResult> Crear([Bind(nameof(Bodega.Nombre), nameof(Bodega.Descripcion), nameof(Bodega.Activa))] Bodega model)
         {
             if (!ModelState.IsValid)
             {
@@ -229,7 +229,8 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CrearUbicacion(Ubicacion model, string numeroProducto, string nombreProducto, string? categoriaProductoId, string? unidadesPorCaja)
+        public async Task<IActionResult> CrearUbicacion([Bind(nameof(Ubicacion.BodegaId), nameof(Ubicacion.Pasillo), nameof(Ubicacion.Estante),
+            nameof(Ubicacion.Nivel), nameof(Ubicacion.Activa))] Ubicacion model, string numeroProducto, string nombreProducto, string? categoriaProductoId, string? unidadesPorCaja)
         {
             var bodega = await _context.Bodegas.FindAsync(model.BodegaId);
             if (bodega == null) return NotFound();

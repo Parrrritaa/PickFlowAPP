@@ -21,9 +21,6 @@ namespace PickingApp.Models
         [StringLength(100)]
         public string? Correo { get; set; }
 
-        // Se calcula automáticamente a partir de HorarioEntrada/HorarioSalida (ver EmpleadosController).
-        [StringLength(50)]
-        public string JornadaLaboral { get; set; } = "Diurna";
 
         [Required]
         public TimeSpan HorarioEntrada { get; set; } = new TimeSpan(8, 0, 0);
@@ -46,6 +43,10 @@ namespace PickingApp.Models
         // Pedidos completados antes de esta fecha se ignoran al calcular el tiempo promedio del empleado.
         // Permite "reiniciar" su historial de tiempos sin borrar los pedidos.
         public DateTime? FechaReinicioPromedio { get; set; }
+
+        // Derivada del horario: no se guarda para que no pueda quedar distinta de él
+        [NotMapped]
+        public string JornadaLaboral => $"{HorarioEntrada:hh\\:mm} - {HorarioSalida:hh\\:mm}";
 
         [NotMapped]
         public int MesesExperiencia
