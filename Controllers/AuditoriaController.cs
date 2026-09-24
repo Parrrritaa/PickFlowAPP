@@ -42,8 +42,6 @@ namespace PickingApp.Controllers
             ViewBag.FechaDesdeFiltro = fechaDesde?.ToString("yyyy-MM-dd");
             ViewBag.FechaHastaFiltro = fechaHasta?.ToString("yyyy-MM-dd");
             ViewBag.MaxRegistros = MaxRegistrosPantalla;
-            ViewBag.Modulos = await _context.LogsSistema.Select(l => l.Modulo).Distinct().ToListAsync();
-            ViewBag.LogHabilitado = await _auditService.IsLogEnabledAsync();
 
             return View(logs);
         }

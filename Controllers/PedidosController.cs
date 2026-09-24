@@ -151,12 +151,6 @@ namespace PickingApp.Controllers
             ViewBag.MaxHorasJornada = await ObtenerMaxHorasJornadaAsync();
             ViewBag.TiemposPartes = await _pickingEngine.CalcularTiemposEstandarAsync(pedido.Partes.Select(pa => pa.Id).ToList());
 
-            // Cargar empleados disponibles para posible asignación
-            ViewBag.EmpleadosDisponibles = await _context.Empleados
-                .Where(e => e.Activo)
-                .OrderBy(e => e.NombreCompleto)
-                .ToListAsync();
-
             return View(pedido);
         }
 

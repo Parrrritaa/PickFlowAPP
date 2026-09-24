@@ -7,14 +7,11 @@ namespace PickingApp.Services
 {
     public class AuditService : IAuditService
     {
-        private readonly ApplicationDbContext _context;
         private readonly DbContextOptions<ApplicationDbContext> _options;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AuditService(ApplicationDbContext context, DbContextOptions<ApplicationDbContext> options,
-            IHttpContextAccessor httpContextAccessor)
+        public AuditService(DbContextOptions<ApplicationDbContext> options, IHttpContextAccessor httpContextAccessor)
         {
-            _context = context;
             _options = options;
             _httpContextAccessor = httpContextAccessor;
         }
@@ -26,8 +23,6 @@ namespace PickingApp.Services
             return LogAsync(user?.FindFirstValue(ClaimTypes.Email) ?? string.Empty,
                 user?.FindFirstValue(ClaimTypes.Role) ?? string.Empty, accion, modulo, detalle);
         }
-
-        public Task<bool> IsLogEnabledAsync() => ParametrosSistema.LogHabilitadoAsync(_context);
 
         // El LOG usa su propio contexto: guardarlo nunca debe confirmar los cambios que el
         // controlador todavía tiene pendientes en el contexto de la petición (quedarían a medias).
