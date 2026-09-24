@@ -76,6 +76,7 @@
                         {
                             <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="Index">
                                 Solicitudes
+                                @await Component.InvokeAsync("MenuBadges", new { tipo = "solicitudes" })
                             </a>
                         }
                     </li>
@@ -87,6 +88,7 @@
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Notificaciones" ? "active" : "")" asp-controller="Notificaciones" asp-action="Index">
                             Notificaciones
+                            @await Component.InvokeAsync("MenuBadges", new { tipo = "notificaciones" })
                         </a>
                     </li>
 

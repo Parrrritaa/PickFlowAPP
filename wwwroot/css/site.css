@@ -186,6 +186,25 @@ body {
     font-weight: 600;
 }
 
+/* Contador de notificaciones/solicitudes sin atender en el menú lateral */
+.pf-nav-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: var(--pf-blue-hover);
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    animation: pf-icon-pop 0.3s var(--pf-ease-out) backwards;
+}
+
 .pf-sidebar-bottom {
     padding-top: 20px;
 }
