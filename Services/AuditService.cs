@@ -7,15 +7,19 @@ namespace PickingApp.Services
     public class AuditService : IAuditService
     {
         private readonly ApplicationDbContext _context;
+        private readonly DbContextOptions<ApplicationDbContext> _options;
 
-        public AuditService(ApplicationDbContext context)
+        public AuditService(ApplicationDbContext context, DbContextOptions<ApplicationDbContext> options)
         {
             _context = context;
+            _options = options;
         }
 
-        public async Task<bool> IsLogEnabledAsync()
+        public Task<bool> IsLogEnabledAsync() => LogHabilitadoAsync(_context);
+
+        private static async Task<bool> LogHabilitadoAsync(ApplicationDbContext context)
         {
-            var config = await _context.ConfiguracionesSistema
+            var config = await context.ConfiguracionesSistema
                 .FirstOrDefaultAsync(c => c.Clave == "LogHabilitado");
             
             return config == null || config.Valor.Equals("true", StringComparison.OrdinalIgnoreCase);
@@ -42,16 +46,19 @@ namespace PickingApp.Services
             await _context.SaveChangesAsync();
         }
 
+        // El LOG usa su propio contexto: guardarlo nunca debe confirmar los cambios que el
+        // controlador todavía tiene pendientes en el contexto de la petición (quedarían a medias).
         public async Task LogAsync(string usuario, string rol, string accion, string modulo, string detalle, string? ip = null)
         {
             try
             {
-                if (!await IsLogEnabledAsync()) return;
+                await using var db = new ApplicationDbContext(_options);
+                if (!await LogHabilitadoAsync(db)) return;
 
                 int? usuarioId = null;
                 if (!string.IsNullOrWhiteSpace(usuario))
                 {
-                    usuarioId = await _context.Usuarios
+                    usuarioId = await db.Usuarios
                         .Where(u => u.Correo == usuario)
                         .Select(u => (int?)u.Id)
                         .FirstOrDefaultAsync();
@@ -69,8 +76,8 @@ namespace PickingApp.Services
                     DireccionIp = ip
                 };
 
-                _context.LogsSistema.Add(log);
-                await _context.SaveChangesAsync();
+                db.LogsSistema.Add(log);
+                await db.SaveChangesAsync();
             }
             catch
             {

@@ -370,7 +370,7 @@ namespace PickingApp.Controllers
             // Si genera advertencia de experiencia (umbrales de Configuración)
             if (validacion.GeneraAdvertencia)
             {
-                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, empleado, esReasignacion: false, userEmail, userRole);
+                NotificarAdvertenciaAsignacion(validacion, pedido, empleado, esReasignacion: false);
             }
 
             pedido.EmpleadoId = empleadoId;
@@ -384,6 +384,10 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
+            if (validacion.GeneraAdvertencia)
+            {
+                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: false, userEmail, userRole);
+            }
             await _auditService.LogAsync(userEmail, userRole, "Asignar Pedido", "Pedidos", 
                 $"Pedido {pedido.CodigoPedido} asignado al empleado {empleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)} (estándar {Formato.Duracion(validacion.TiempoEstandarMinutos)} × rendimiento {validacion.Rendimiento?.Factor ?? 1:0.00})");
 
@@ -451,7 +455,7 @@ namespace PickingApp.Controllers
 
             if (validacion.GeneraAdvertencia)
             {
-                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, nuevoEmpleado, esReasignacion: true, userEmail, userRole);
+                NotificarAdvertenciaAsignacion(validacion, pedido, nuevoEmpleado, esReasignacion: true);
             }
 
             pedido.EmpleadoId = nuevoEmpleadoId;
@@ -466,6 +470,10 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
+            if (validacion.GeneraAdvertencia)
+            {
+                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: true, userEmail, userRole);
+            }
             await _auditService.LogAsync(userEmail, userRole, "Reasignar Pedido", "Pedidos", 
                 $"Pedido {pedido.CodigoPedido} reasignado de {empleadoAnterior?.NombreCompleto ?? "(sin empleado)"} a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivo}");
 
@@ -483,13 +491,11 @@ namespace PickingApp.Controllers
 
         private const int MaxLongitudMotivoReasignacion = 250; // varchar(250) en Pedidos.MotivoReasignacion
 
-        // CU-26 / CU-27: advertencia de experiencia (umbrales configurables); no bloquea la asignación
-        private async Task RegistrarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido, Empleado empleado,
-            bool esReasignacion, string userEmail, string userRole)
+        // CU-26 / CU-27: advertencia de experiencia (umbrales configurables); no bloquea la asignación.
+        // La notificación se agrega antes del SaveChanges para guardarse junto con la asignación;
+        // el LOG se escribe después, solo si la asignación quedó guardada.
+        private void NotificarAdvertenciaAsignacion(AsignacionValidationResult validacion, Pedido pedido, Empleado empleado, bool esReasignacion)
         {
-            await _auditService.LogAsync(userEmail, userRole, "Advertencia de Asignación", "Pedidos",
-                $"{validacion.MensajeAdvertencia} - {(esReasignacion ? "Reasignado" : "Asignado")} por {User.FindFirstValue(ClaimTypes.Name)} ({userRole}) al pedido {pedido.CodigoPedido}");
-
             _context.Notificaciones.Add(new Notificacion
             {
                 RolDestino = "Administrador",
@@ -499,6 +505,11 @@ namespace PickingApp.Controllers
                 FechaCreacion = DateTime.Now
             });
         }
+
+        private Task RegistrarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido,
+            bool esReasignacion, string userEmail, string userRole) =>
+            _auditService.LogAsync(userEmail, userRole, "Advertencia de Asignación", "Pedidos",
+                $"{validacion.MensajeAdvertencia} - {(esReasignacion ? "Reasignado" : "Asignado")} por {User.FindFirstValue(ClaimTypes.Name)} ({userRole}) al pedido {pedido.CodigoPedido}");
 
         // CU-28: Marcar pedido como completado
         [Authorize(Roles = "Administrador,Supervisor")]
@@ -532,15 +543,8 @@ namespace PickingApp.Controllers
             pedido.FechaFinalizacion = fechaFin;
             pedido.TiempoProcesamientoMinutos = tiempoReal;
 
-            // Liberar empleado
-            if (pedido.EmpleadoId.HasValue)
-            {
-                var empleado = await _context.Empleados.FindAsync(pedido.EmpleadoId.Value);
-                if (empleado != null)
-                {
-                    empleado.EstadoDisponibilidad = "Disponible";
-                }
-            }
+            await LiberarEmpleadoAsync(pedido.EmpleadoId);
+            var padreCerrado = await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
@@ -549,8 +553,7 @@ namespace PickingApp.Controllers
 
             await _auditService.LogAsync(userEmail, userRole, "Completar Pedido", "Pedidos",
                 $"Pedido {pedido.CodigoPedido} marcado como completado con entrega física. Tiempo real calculado: {tiempoReal} min");
-
-            await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
+            await RegistrarCierrePedidoDivididoAsync(padreCerrado, userEmail, userRole);
 
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' completado exitosamente. Tiempo de procesamiento: {tiempoReal} minutos.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
@@ -608,6 +611,8 @@ namespace PickingApp.Controllers
             pedido.MotivoCancelacion = motivoCancelacion.Trim();
             pedido.FechaFinalizacion = DateTime.Now;
 
+            var padreCerrado = await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
+
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
 
@@ -615,8 +620,7 @@ namespace PickingApp.Controllers
 
             await _auditService.LogAsync(userEmail, userRole, "Cancelar Pedido", "Pedidos",
                 $"Pedido {pedido.CodigoPedido} cancelado{(partesCanceladas > 0 ? $" junto con {partesCanceladas} parte(s) sin terminar" : "")}. Motivo: {motivoCancelacion}");
-
-            await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
+            await RegistrarCierrePedidoDivididoAsync(padreCerrado, userEmail, userRole);
 
             TempData["SuccessMessage"] = partesCanceladas > 0
                 ? $"Pedido '{pedido.CodigoPedido}' y {partesCanceladas} parte(s) sin terminar cancelados correctamente."
@@ -927,29 +931,35 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Dividir), new { id = pedidoId });
         }
 
-        // Cuando todas las partes terminan, el pedido original se cierra: completado si al menos una parte se entregó
-        private async Task CerrarPedidoDivididoSiTerminoAsync(int? pedidoPadreId)
+        // Cuando todas las partes terminan, el pedido original se cierra: completado si al menos una parte se entregó.
+        // Solo modifica el contexto (la parte recién finalizada ya está rastreada con su nuevo estado), así el
+        // cierre se guarda en el mismo SaveChanges que la parte. Devuelve el pedido original si se cerró.
+        private async Task<Pedido?> CerrarPedidoDivididoSiTerminoAsync(int? pedidoPadreId)
         {
-            if (pedidoPadreId == null) return;
+            if (pedidoPadreId == null) return null;
 
             var padre = await _context.Pedidos
                 .Include(p => p.Partes)
                 .FirstOrDefaultAsync(p => p.Id == pedidoPadreId);
 
-            if (padre == null || padre.Estado != PedidoEstados.Dividido) return;
-            if (padre.Partes.Any(pa => !PedidoEstados.Finalizados.Contains(pa.Estado))) return;
+            if (padre == null || padre.Estado != PedidoEstados.Dividido) return null;
+            if (padre.Partes.Any(pa => !PedidoEstados.Finalizados.Contains(pa.Estado))) return null;
 
             var algunaCompletada = padre.Partes.Any(pa => pa.Estado == "Completado");
             padre.Estado = algunaCompletada ? "Completado" : "Cancelado";
             padre.ConfirmacionFisica = algunaCompletada;
             padre.FechaFinalizacion = padre.Partes.Max(pa => pa.FechaFinalizacion) ?? DateTime.Now;
             if (!algunaCompletada) padre.MotivoCancelacion = "Todas sus partes fueron canceladas.";
-            await _context.SaveChangesAsync();
+            return padre;
+        }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-            await _auditService.LogAsync(userEmail, userRole, algunaCompletada ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
-                $"Pedido {padre.CodigoPedido} {(algunaCompletada ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
+        private async Task RegistrarCierrePedidoDivididoAsync(Pedido? padre, string userEmail, string userRole)
+        {
+            if (padre == null) return;
+
+            var completado = padre.Estado == "Completado";
+            await _auditService.LogAsync(userEmail, userRole, completado ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
+                $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
         }
 
         private async Task LiberarEmpleadoAsync(int? empleadoId)
