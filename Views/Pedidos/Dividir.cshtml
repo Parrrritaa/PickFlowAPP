@@ -24,7 +24,9 @@
         id = d.Id,
         cantidad = d.Cantidad,
         ubicacion = d.UbicacionId,
-        minutos = d.Ubicacion?.Producto?.Categoria?.MinutosPorUnidad ?? minutosPredeterminados
+        // Minutos por unidad ya ajustados por caja: recoger 1 caja de N unidades cuesta lo mismo que 1 unidad suelta.
+        minutos = (d.Ubicacion?.Producto?.Categoria?.MinutosPorUnidad ?? minutosPredeterminados)
+            / Math.Max(1, d.Ubicacion?.Producto?.UnidadesPorCaja ?? 1)
     });
     var config = new
     {

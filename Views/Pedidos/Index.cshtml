@@ -191,8 +191,17 @@
                         {
                             var partesPedido = p.Partes.OrderBy(pa => pa.NumeroParte).ToList();
                             var finalizadas = partesPedido.Count(pa => PickingApp.Models.PedidoEstados.Finalizados.Contains(pa.Estado));
+                            var tienePartes = verDivididos && partesPedido.Any();
                             <tr class="@(verDivididos ? "pf-fila-dividido" : "")">
                                 <td class="fw-semibold">
+                                    @if (tienePartes)
+                                    {
+                                        <button type="button" class="pf-btn-toggle-partes" data-target="partes-@p.Id"
+                                                aria-expanded="false" aria-controls="partes-@p.Id"
+                                                aria-label="Mostrar u ocultar las partes de @p.CodigoPedido">
+                                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    }
                                     @p.CodigoPedido
                                     @if (verDivididos)
                                     {
@@ -220,7 +229,15 @@
                                     </a>
                                 </td>
                             </tr>
-                            @foreach (var pa in verDivididos ? partesPedido : new List<PickingApp.Models.Pedido>())
+                            @if (tienePartes)
+                            {
+                                <tr class="pf-fila-partes-wrap">
+                                    <td colspan="7" class="pf-partes-td">
+                                        <div class="pf-partes-colapsable" id="partes-@p.Id">
+                                            <div class="pf-partes-inner">
+                                                <table class="pf-subtabla-partes">
+                                                    <tbody>
+                            @foreach (var pa in partesPedido)
                             {
                                 <tr class="pf-fila-parte">
                                     <td>
@@ -239,6 +256,13 @@
                                         <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-gray" style="padding: 4px 20px; font-size: 14px;">
                                             Ver
                                         </a>
+                                    </td>
+                                </tr>
+                            }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             }

@@ -24,6 +24,19 @@ document.addEventListener('click', function (e) {
     btn.textContent = expandir ? btn.dataset.textoMenos : btn.dataset.textoMas;
 });
 
+// Desplegar/ocultar las partes de un pedido dividido (Pedidos > Divididos): el botón
+// [data-target] alterna .is-expanded en la fila del pedido; el CSS anima la altura
+// de la fila de partes correspondiente vía el selector de hermanos.
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.pf-btn-toggle-partes');
+    if (!btn) return;
+    var fila = btn.closest('tr');
+    if (!fila) return;
+    var expandido = !fila.classList.contains('is-expanded');
+    fila.classList.toggle('is-expanded', expandido);
+    btn.setAttribute('aria-expanded', expandido ? 'true' : 'false');
+});
+
 // Modales de confirmación sobre un registro de una tabla: el botón que abre el modal lleva
 // data-pf-id y data-pf-texto, y el modal marca dónde van con [data-pf-recibe="id"] (value)
 // y [data-pf-recibe="texto"] (textContent). Los datos se copian como texto, nunca como código,

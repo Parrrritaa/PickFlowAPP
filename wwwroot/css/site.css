@@ -1637,3 +1637,54 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 }
 
 .pf-fila-parte__codigo i { color: var(--pf-text-muted); }
+
+/* Botón para desplegar/ocultar las partes de un pedido dividido.
+   Se ve como 24px (para no romper la densidad de la tabla) pero el área de toque real
+   es de 40px vía ::after, cerca del mínimo táctil recomendado (44px) sin afectar el layout. */
+.pf-btn-toggle-partes {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-right: 4px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--pf-text-muted);
+    cursor: pointer;
+    vertical-align: -5px;
+    transition: background-color var(--pf-duration-fast) var(--pf-ease), color var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-btn-toggle-partes::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+}
+
+.pf-btn-toggle-partes:hover { background-color: var(--pf-gray-bg); color: var(--pf-text-dark); }
+.pf-btn-toggle-partes:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 2px; }
+
+.pf-btn-toggle-partes i { transition: transform var(--pf-duration-base) var(--pf-ease-out); }
+.pf-fila-dividido.is-expanded .pf-btn-toggle-partes i { transform: rotate(90deg); }
+
+/* Fila contenedora de las partes: altura animada con la técnica grid-template-rows 0fr -> 1fr,
+   así no hace falta medir el alto real del contenido en JS. */
+.pf-partes-td { padding: 0 !important; border: none !important; }
+
+.pf-partes-colapsable {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--pf-duration-base) var(--pf-ease-out);
+}
+
+.pf-fila-dividido.is-expanded + .pf-fila-partes-wrap .pf-partes-colapsable {
+    grid-template-rows: 1fr;
+}
+
+.pf-partes-inner { overflow: hidden; min-height: 0; }
+
+.pf-subtabla-partes { width: 100%; border-collapse: collapse; }
