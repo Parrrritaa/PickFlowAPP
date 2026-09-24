@@ -14,10 +14,10 @@
             <p class="text-secondary mb-4">Cargue el archivo previamente creado con los pedidos.</p>
 
             <div class="d-flex justify-content-center align-items-center mb-4">
-                <input type="file" name="archivoExcel" id="archivoExcel" class="form-control" accept=".xlsx" style="max-width: 420px;" required onchange="onFileSelected(this)" />
+                <input type="file" name="archivoExcel" id="archivoExcel" class="form-control" accept=".xlsx" style="max-width: 420px;" required />
             </div>
 
-            <button type="button" class="btn-pf-blue px-4 py-2" id="btnValidar" onclick="validarArchivoLocal()">
+            <button type="button" class="btn-pf-blue px-4 py-2" id="btnValidar">
                 Validar archivo
             </button>
         </div>
@@ -35,26 +35,18 @@
             </div>
         }
 
-        <!-- Resultado de validación (Slide 11) -->
-        <div id="sectionValidacion" style="display: none;" class="mt-4 pt-3 border-top">
+        <!-- Resultado de validación (Slide 11): lo calcula el servidor con las mismas reglas de la carga -->
+        <div id="sectionValidacion" hidden class="mt-4 pt-3 border-top" aria-live="polite">
             <h4 class="fw-bold text-dark mb-3">Resultado de validación</h4>
-            <div class="d-flex flex-column gap-2 mb-4">
-                <div class="d-flex align-items-center text-dark">
-                    <i class="bi bi-check-circle-fill text-success me-2 fs-5"></i> Estructura de archivo valida
-                </div>
-                <div class="d-flex align-items-center text-dark">
-                    <i class="bi bi-check-circle-fill text-success me-2 fs-5"></i> Tipo de archivo valido
-                </div>
-                <div class="d-flex align-items-center text-dark">
-                    <i class="bi bi-check-circle-fill text-success me-2 fs-5"></i> Bodega registrada
-                </div>
-                <div class="d-flex align-items-center text-dark">
-                    <i class="bi bi-check-circle-fill text-success me-2 fs-5"></i> Ubicaciones registradas
-                </div>
+            <ul class="list-unstyled d-flex flex-column gap-2 mb-3" id="listaVerificaciones"></ul>
+            <p class="fw-semibold mb-3" id="resumenValidacion"></p>
+            <div class="mockup-alert-warning mb-4" id="erroresValidacion" hidden>
+                <strong>Corrija estas filas y vuelva a validar:</strong>
+                <ul class="mb-0 mt-2" id="listaErroresValidacion"></ul>
             </div>
 
-            <button type="submit" class="btn-pf-blue px-4 py-2">
-                Confirmar carga de pedido
+            <button type="submit" class="btn-pf-blue px-4 py-2" id="btnConfirmarCarga" hidden>
+                Confirmar carga de pedidos
             </button>
         </div>
     </form>
@@ -62,26 +54,145 @@
 
 @section Scripts {
     <script>
-        function onFileSelected(input) {
-            if (input.files && input.files.length > 0) {
-                // When file is picked, ready for validation
-            }
-        }
+        (function () {
+            var form = document.getElementById('formExcel');
+            var input = document.getElementById('archivoExcel');
+            var btnValidar = document.getElementById('btnValidar');
+            var textoValidar = btnValidar.innerHTML;
+            var seccion = document.getElementById('sectionValidacion');
+            var lista = document.getElementById('listaVerificaciones');
+            var resumen = document.getElementById('resumenValidacion');
+            var cajaErrores = document.getElementById('erroresValidacion');
+            var listaErrores = document.getElementById('listaErroresValidacion');
+            var btnConfirmar = document.getElementById('btnConfirmarCarga');
+            var maxErroresVisibles = 20;
 
-        function validarArchivoLocal() {
-            const input = document.getElementById('archivoExcel');
-            if (!input.files || input.files.length === 0) {
-                alert('Por favor selecciona un archivo Excel (.xlsx) primero.');
-                return;
+            // Un archivo nuevo invalida el resultado anterior
+            input.addEventListener('change', function () {
+                seccion.hidden = true;
+                btnConfirmar.hidden = true;
+            });
+
+            function plural(n, singular, varios) { return n + ' ' + (n === 1 ? singular : varios); }
+
+            // estado: 'ok' | 'error' | 'pendiente'. Todo se escribe como texto: los mensajes incluyen contenido del archivo.
+            function verificacion(estado, texto, detalle) {
+                var li = document.createElement('li');
+                li.className = 'd-flex align-items-start text-dark';
+                var icono = document.createElement('i');
+                icono.setAttribute('aria-hidden', 'true');
+                icono.className = 'bi me-2 fs-5 ' + (estado === 'ok' ? 'bi-check-circle-fill text-success'
+                    : estado === 'error' ? 'bi-x-circle-fill text-danger' : 'bi-dash-circle text-secondary');
+                var cuerpo = document.createElement('span');
+                var titulo = document.createElement('span');
+                titulo.textContent = texto;
+                var estadoSr = document.createElement('span');
+                estadoSr.className = 'visually-hidden';
+                estadoSr.textContent = estado === 'ok' ? ' (correcto)' : estado === 'error' ? ' (con errores)' : ' (sin verificar)';
+                cuerpo.append(titulo, estadoSr);
+                if (detalle) {
+                    var small = document.createElement('div');
+                    small.className = 'small text-secondary';
+                    small.textContent = detalle;
+                    cuerpo.appendChild(small);
+                }
+                li.append(icono, cuerpo);
+                lista.appendChild(li);
             }
-            const fileName = input.files[0].name;
-            if (!fileName.endsWith('.xlsx')) {
-                alert('El archivo debe tener extensión .xlsx');
-                return;
+
+            function mostrar(r) {
+                lista.innerHTML = '';
+                listaErrores.innerHTML = '';
+                lista.hidden = !!r.sinVerificar;
+
+                var estructura = r.tipoValido && r.estructuraValida;
+                verificacion(r.tipoValido ? 'ok' : 'error', 'Tipo de archivo válido');
+                verificacion(!r.tipoValido ? 'pendiente' : r.estructuraValida ? 'ok' : 'error', 'Estructura de archivo válida');
+
+                // Una fila con error no pasa a las verificaciones siguientes: esas quedan pendientes hasta corregirla
+                var pasos = [
+                    ['filasConCantidadInvalida', 'Cantidades válidas'],
+                    ['filasConBodegaNoRegistrada', 'Bodegas registradas'],
+                    ['filasConUbicacionNoRegistrada', 'Ubicaciones registradas'],
+                    ['filasConProductoIncorrecto', 'Productos corresponden a su ubicación']
+                ];
+                var erroresPrevios = 0;
+                pasos.forEach(function (p) {
+                    var filas = r[p[0]] || 0;
+                    if (!estructura) {
+                        verificacion('pendiente', p[1]);
+                    } else if (filas > 0) {
+                        verificacion('error', p[1], plural(filas, 'fila con error', 'filas con error'));
+                    } else if (erroresPrevios > 0) {
+                        verificacion('pendiente', p[1], 'Se verificará en las filas con errores cuando se corrijan');
+                    } else {
+                        verificacion('ok', p[1]);
+                    }
+                    erroresPrevios += filas;
+                });
+
+                if (r.sinVerificar) {
+                    resumen.textContent = 'No fue posible validar el archivo. Revise su conexión e inténtelo de nuevo.';
+                } else if (r.valido) {
+                    resumen.textContent = plural(r.totalPedidos, 'pedido', 'pedidos') + ' (' +
+                        plural(r.totalFilas, 'línea de producto', 'líneas de producto') + ') listos para cargar.';
+                } else {
+                    resumen.textContent = 'El archivo no se puede cargar todavía.';
+                }
+
+                var errores = r.errores || [];
+                errores.slice(0, maxErroresVisibles).forEach(function (e) {
+                    var li = document.createElement('li');
+                    li.textContent = e;
+                    listaErrores.appendChild(li);
+                });
+                if (errores.length > maxErroresVisibles) {
+                    var mas = document.createElement('li');
+                    mas.textContent = 'Y ' + plural(errores.length - maxErroresVisibles, 'observación más', 'observaciones más') + '.';
+                    listaErrores.appendChild(mas);
+                }
+                cajaErrores.hidden = errores.length === 0;
+                btnConfirmar.hidden = !r.valido;
+
+                seccion.hidden = false;
+                seccion.classList.remove('pf-reveal');
+                void seccion.offsetWidth;
+                seccion.classList.add('pf-reveal');
             }
-            // Show validation result section matching Slide 11
-            document.getElementById('sectionValidacion').style.display = 'block';
-            document.getElementById('btnValidar').style.display = 'none';
-        }
+
+            btnValidar.addEventListener('click', function () {
+                if (!input.files || input.files.length === 0) {
+                    input.reportValidity();
+                    return;
+                }
+
+                var datos = new FormData();
+                datos.append('archivoExcel', input.files[0]);
+                datos.append('__RequestVerificationToken', form.querySelector('input[name="__RequestVerificationToken"]').value);
+
+                btnValidar.classList.add('is-loading');
+                btnValidar.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>Validando…';
+
+                fetch('@Url.Action("ValidarExcel")', { method: 'POST', body: datos })
+                    .then(function (resp) {
+                        if (!resp.ok) throw new Error();
+                        return resp.json();
+                    })
+                    .then(mostrar)
+                    .catch(function () {
+                        mostrar({ valido: false, sinVerificar: true });
+                    })
+                    .finally(function () {
+                        btnValidar.classList.remove('is-loading');
+                        btnValidar.innerHTML = textoValidar;
+                    });
+            });
+
+            // Evita un doble envío mientras el servidor registra los pedidos
+            form.addEventListener('submit', function () {
+                btnConfirmar.classList.add('is-loading');
+                btnConfirmar.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>Cargando pedidos…';
+            });
+        })();
     </script>
 }

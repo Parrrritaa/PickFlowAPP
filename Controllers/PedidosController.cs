@@ -215,6 +215,42 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // CU-23: validar el archivo en el servidor sin registrar nada (resultado de validación antes de confirmar la carga)
+        [Authorize(Roles = "Administrador,Supervisor")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ValidarExcel(IFormFile archivoExcel)
+        {
+            var esXlsx = archivoExcel != null && archivoExcel.Length > 0
+                && archivoExcel.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
+            if (!esXlsx)
+            {
+                return Json(new
+                {
+                    valido = false,
+                    tipoValido = false,
+                    errores = new[] { "El archivo debe ser un Excel (.xlsx) con contenido." }
+                });
+            }
+
+            using var stream = archivoExcel!.OpenReadStream();
+            var v = await _excelService.ValidarArchivoExcelAsync(stream);
+
+            return Json(new
+            {
+                valido = v.IsValid,
+                tipoValido = v.ArchivoLegible,
+                estructuraValida = v.EstructuraValida,
+                filasConCantidadInvalida = v.FilasConCantidadInvalida,
+                filasConBodegaNoRegistrada = v.FilasConBodegaNoRegistrada,
+                filasConUbicacionNoRegistrada = v.FilasConUbicacionNoRegistrada,
+                filasConProductoIncorrecto = v.FilasConProductoIncorrecto,
+                totalPedidos = v.TotalPedidos,
+                totalFilas = v.TotalFilas,
+                errores = v.Errors
+            });
+        }
+
         // Descargar Plantilla Excel
         [Authorize(Roles = "Administrador,Supervisor")]
         [HttpGet]

@@ -21,6 +21,7 @@ namespace PickingApp.Services
             try
             {
                 using var workbook = new XLWorkbook(stream);
+                result.ArchivoLegible = true;
                 var worksheet = workbook.Worksheets.FirstOrDefault();
 
                 if (worksheet == null)
@@ -46,6 +47,7 @@ namespace PickingApp.Services
                     result.Errors.Add("La hoja de cálculo está vacía.");
                     return result;
                 }
+                result.EstructuraValida = true;
 
                 var bodegasDb = await _context.Bodegas.ToDictionaryAsync(b => b.Codigo.ToUpper(), b => b.Id);
                 var ubicacionesDb = await _context.Ubicaciones.Include(u => u.Producto).ToListAsync();
@@ -76,12 +78,14 @@ namespace PickingApp.Services
 
                     if (!int.TryParse(cantidadStr, out int cantidad) || cantidad <= 0)
                     {
+                        result.FilasConCantidadInvalida++;
                         result.Errors.Add($"Fila {filaNum}: Cantidad inválida '{cantidadStr}' para producto '{codProducto}'.");
                         continue;
                     }
 
                     if (!bodegasDb.TryGetValue(codBodega, out int bodegaId))
                     {
+                        result.FilasConBodegaNoRegistrada++;
                         result.Errors.Add($"Fila {filaNum}: La bodega '{codBodega}' no está registrada en el sistema.");
                         continue;
                     }
@@ -94,12 +98,14 @@ namespace PickingApp.Services
 
                     if (ubi == null)
                     {
+                        result.FilasConUbicacionNoRegistrada++;
                         result.Errors.Add($"Fila {filaNum}: La ubicación en Bodega {codBodega} (Pasillo: {pasillo}, Estante: {estante}, Nivel: {nivel}) no está registrada.");
                         continue;
                     }
 
                     if (ubi.Producto != null && !string.Equals(ubi.Producto.Codigo, codProducto, StringComparison.OrdinalIgnoreCase))
                     {
+                        result.FilasConProductoIncorrecto++;
                         result.Errors.Add($"Fila {filaNum}: El producto '{codProducto}' no corresponde a la ubicación {ubi.CodigoUbicacion} de la Bodega {codBodega} (esa ubicación está registrada para el producto '{ubi.Producto.Codigo} - {ubi.Producto.Nombre}').");
                         continue;
                     }

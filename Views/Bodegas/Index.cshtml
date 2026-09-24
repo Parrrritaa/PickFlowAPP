@@ -22,7 +22,6 @@
             <thead>
                 <tr>
                     <th>Bodega</th>
-                    <th>Direccion</th>
                     <th>Ubicaciones</th>
                     <th>Estado</th>
                     <th class="text-center">Acción</th>
@@ -35,14 +34,12 @@
                     {
                         var ubicacionesCount = b.Ubicaciones?.Count ?? 0;
                         var estadoText = b.Activa ? "Activa" : "Inactiva";
-                        var direccion = b.Nombre.Contains("Norte") ? "Zona Norte" : (b.Nombre.Contains("Sur") ? "Zona sur" : "Zona industrial");
 
                         <tr>
                             <td class="fw-semibold">
                                 @b.Nombre
                                 <div class="text-secondary small">@b.Codigo</div>
                             </td>
-                            <td>@direccion</td>
                             <td>@ubicacionesCount</td>
                             <td>@estadoText</td>
                             <td class="text-center">
@@ -69,7 +66,7 @@
                 else
                 {
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">No hay bodegas registradas.</td>
+                        <td colspan="4" class="text-center text-muted py-4">No hay bodegas registradas.</td>
                     </tr>
                 }
             </tbody>
