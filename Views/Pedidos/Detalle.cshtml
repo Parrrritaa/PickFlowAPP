@@ -101,6 +101,12 @@
                     <span class="text-secondary small">(según el rendimiento de @Model.Empleado.NombreCompleto al asignarlo)</span>
                 </div>
             }
+            @if (!string.IsNullOrEmpty(Model.MotivoReasignacion))
+            {
+                <div class="fs-6 mt-1">
+                    <strong>Motivo de reasignación:</strong> @Model.MotivoReasignacion
+                </div>
+            }
             @if (Model.Estado == "Completado" && Model.TiempoProcesamientoMinutos.HasValue)
             {
                 <div class="fs-6 mt-1">

@@ -1,7 +1,6 @@
 ﻿@model IEnumerable<PickingApp.Models.Empleado>
 @{
     var pedido = ViewBag.Pedido as PickingApp.Models.Pedido;
-    ViewData["Title"] = "Asignar pedido";
     var totalUbicaciones = pedido?.Detalles?.Select(d => d.UbicacionId).Distinct().Count() ?? 0;
     var tieneEmpleadoPocaExp = Model.Any(e => e.TieneMenosDeSeisMeses);
     var empleadoPocaExp = Model.FirstOrDefault(e => e.TieneMenosDeSeisMeses);
@@ -11,15 +10,27 @@
     var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
     var rendimientos = ViewBag.Rendimientos as Dictionary<int, PickingApp.Services.RendimientoEmpleado> ?? new Dictionary<int, PickingApp.Services.RendimientoEmpleado>();
     var minimoPedidos = rendimientos.Values.FirstOrDefault()?.MinimoPedidos ?? 3;
+    // CU-27: con un empleado ya asignado, la vista reasigna (motivo obligatorio) en lugar de asignar
+    var empleadoActualId = ViewBag.EmpleadoActualId as int?;
+    var empleadoActualNombre = ViewBag.EmpleadoActualNombre as string;
+    var esReasignacion = empleadoActualId.HasValue;
+    ViewData["Title"] = esReasignacion ? "Reasignar pedido" : "Asignar pedido";
 }
 
-<h1 class="pf-page-title">Asignar pedido</h1>
+<h1 class="pf-page-title">@ViewData["Title"]</h1>
 
 <div class="mockup-card">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="fw-bold mb-0" style="color: #1F2937;">Empleados disponibles</h4>
         <span class="text-muted fw-semibold">Pedido: <strong>@(pedido?.CodigoPedido)</strong> &bull; Ubicaciones: <strong>@totalUbicaciones</strong> &bull; Tiempo estándar: <strong>@PickingApp.Services.Formato.Duracion(tiempoEstandar)</strong></span>
     </div>
+
+    @if (esReasignacion)
+    {
+        <p class="pf-seccion-desc mb-3">
+            Asignado actualmente a <strong>@(empleadoActualNombre ?? "un empleado")</strong>. Al reasignarlo, ese empleado queda libre y el pedido pasa a estado Reasignado.
+        </p>
+    }
 
     <div class="table-responsive mb-3">
         <table class="mockup-table">
@@ -59,15 +70,30 @@
                             </td>
                             <td>@tiempoEstimado</td>
                             <td class="text-center">
-                                <form asp-action="Asignar" method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="pedidoId" value="@pedido?.Id" />
-                                    <input type="hidden" name="empleadoId" value="@emp.Id" />
-                                    <input type="hidden" name="ignorarAdvertencia" value="true" />
-                                    <button type="submit" class="btn-pf-blue" style="padding: 4px 18px; font-size: 14px;">
-                                        Asignar
+                                @if (emp.Id == empleadoActualId)
+                                {
+                                    <span class="text-muted small fw-semibold">Actual</span>
+                                }
+                                else if (esReasignacion)
+                                {
+                                    <button type="button" class="btn-pf-orange" style="padding: 4px 18px; font-size: 14px;"
+                                            data-bs-toggle="modal" data-bs-target="#modalReasignar"
+                                            data-empleado-id="@emp.Id" data-empleado-nombre="@emp.NombreCompleto">
+                                        Reasignar
                                     </button>
-                                </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="Asignar" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="pedidoId" value="@pedido?.Id" />
+                                        <input type="hidden" name="empleadoId" value="@emp.Id" />
+                                        <input type="hidden" name="ignorarAdvertencia" value="true" />
+                                        <button type="submit" class="btn-pf-blue" style="padding: 4px 18px; font-size: 14px;">
+                                            Asignar
+                                        </button>
+                                    </form>
+                                }
                             </td>
                         </tr>
                     }
@@ -103,6 +129,57 @@
         </a>
     </div>
 </div>
+
+@if (esReasignacion)
+{
+    <!-- Modal Reasignar (CU-27): el motivo es obligatorio -->
+    <div class="modal fade" id="modalReasignar" tabindex="-1" aria-labelledby="modalReasignarTitulo" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content rounded-4 border-0 p-2">
+                <form asp-action="Reasignar" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="pedidoId" value="@pedido?.Id" />
+                    <input type="hidden" name="nuevoEmpleadoId" id="reasignarEmpleadoId" value="" />
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title fw-bold text-dark" id="modalReasignarTitulo">Reasignar a <span id="reasignarEmpleadoNombre"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">
+                            El pedido <strong>@(pedido?.CodigoPedido)</strong> dejará de estar a cargo de <strong>@(empleadoActualNombre ?? "el empleado actual")</strong>.
+                        </p>
+                        <label for="motivoReasignacion" class="form-label fw-bold">Motivo de reasignación (obligatorio):</label>
+                        <textarea name="motivoReasignacion" id="motivoReasignacion" class="form-control" rows="3" maxlength="250" required
+                                  placeholder="Especifique el motivo de la reasignación"></textarea>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn-pf-orange">Reasignar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        // El nombre viaja en un data-attribute y se escribe con textContent (nunca como código JS)
+        (function () {
+            var modal = document.getElementById('modalReasignar');
+            if (!modal) return;
+            var motivo = document.getElementById('motivoReasignacion');
+            modal.addEventListener('show.bs.modal', function (e) {
+                var boton = e.relatedTarget;
+                if (!boton) return;
+                document.getElementById('reasignarEmpleadoId').value = boton.getAttribute('data-empleado-id');
+                document.getElementById('reasignarEmpleadoNombre').textContent = boton.getAttribute('data-empleado-nombre');
+                motivo.value = '';
+            });
+            modal.addEventListener('shown.bs.modal', function () { motivo.focus(); });
+        })();
+    </script>
+}
 
 @functions {
     // Verde si tarda menos que el estándar, ámbar si tarda más, neutro sin historial o al ritmo estándar

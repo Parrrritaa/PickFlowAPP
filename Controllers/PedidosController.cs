@@ -243,6 +243,9 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id });
             }
 
+            // CU-27: si el pedido ya está en curso con un empleado, esta vista sirve para reasignarlo
+            var empleadoActualId = PedidoEstados.EnCurso.Contains(pedido.Estado) ? pedido.EmpleadoId : null;
+
             // MesesExperiencia es [NotMapped] (propiedad calculada en C#), por lo que
             // no puede ser traducida a SQL por EF Core. Se trae primero a memoria
             // y luego se ordena en el lado del cliente.
@@ -262,6 +265,12 @@ namespace PickingApp.Controllers
             foreach (var emp in empleados)
             {
                 tiemposEstimados[emp.Id] = rendimientos[emp.Id].Estimar(tiempoEstandar);
+
+                if (emp.Id == empleadoActualId)
+                {
+                    motivosNoAsignable[emp.Id] = "Asignado actualmente";
+                    continue;
+                }
 
                 // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante)
                 var validacion = await _pickingEngine.ValidarAsignacionAsync(id, emp.Id);
@@ -284,6 +293,9 @@ namespace PickingApp.Controllers
             ViewBag.Rendimientos = rendimientos;
             ViewBag.MotivosNoAsignable = motivosNoAsignable;
             ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(e => !motivosNoAsignable.ContainsKey(e.Id))?.Id;
+            ViewBag.EmpleadoActualId = empleadoActualId;
+            ViewBag.EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
+                ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null);
             return View(empleados);
         }
 
@@ -293,6 +305,16 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Asignar(int pedidoId, int empleadoId, bool ignorarAdvertencia = false)
         {
+            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            if (pedido == null) return NotFound();
+
+            // Un pedido en curso solo cambia de empleado por CU-27 (motivo obligatorio y liberación del anterior)
+            if (PedidoEstados.EnCurso.Contains(pedido.Estado))
+            {
+                TempData["ErrorMessage"] = "El pedido ya tiene un empleado asignado. Use la opción Reasignar e indique el motivo.";
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
             var validacion = await _pickingEngine.ValidarAsignacionAsync(pedidoId, empleadoId);
 
             if (!validacion.PuedeAsignar)
@@ -301,10 +323,8 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
             var empleado = await _context.Empleados.FindAsync(empleadoId);
-
-            if (pedido == null || empleado == null) return NotFound();
+            if (empleado == null) return NotFound();
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
@@ -312,17 +332,7 @@ namespace PickingApp.Controllers
             // Si genera advertencia de experiencia (< 6 meses y > 10 ubicaciones)
             if (validacion.GeneraAdvertencia)
             {
-                await _auditService.LogAsync(userEmail, userRole, "Advertencia de Asignación", "Pedidos", 
-                    $"{validacion.MensajeAdvertencia} - Asignado por {User.FindFirstValue(ClaimTypes.Name)} ({userRole}) al pedido {pedido.CodigoPedido}");
-
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    RolDestino = "Administrador",
-                    Titulo = "Alerta de Asignación de Picking",
-                    Mensaje = $"El {User.DescripcionParaNotificacion()} asignó el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} (menos de 6 meses de experiencia con más de 10 ubicaciones).",
-                    Tipo = "Warning",
-                    FechaCreacion = DateTime.Now
-                });
+                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, empleado, esReasignacion: false, userEmail, userRole);
             }
 
             pedido.EmpleadoId = empleadoId;
@@ -354,41 +364,61 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Reasignar(int pedidoId, int nuevoEmpleadoId, string motivoReasignacion)
         {
-            if (string.IsNullOrWhiteSpace(motivoReasignacion))
+            var motivo = motivoReasignacion?.Trim() ?? "";
+            if (motivo.Length == 0)
             {
                 TempData["ErrorMessage"] = "El motivo de reasignación es estrictamente obligatorio.";
-                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+                return RedirectToAction(nameof(Asignar), new { id = pedidoId });
+            }
+            if (motivo.Length > MaxLongitudMotivoReasignacion)
+            {
+                TempData["ErrorMessage"] = $"El motivo de reasignación no puede superar {MaxLongitudMotivoReasignacion} caracteres.";
+                return RedirectToAction(nameof(Asignar), new { id = pedidoId });
             }
 
             var pedido = await _context.Pedidos.FindAsync(pedidoId);
             if (pedido == null) return NotFound();
 
+            if (!PedidoEstados.EnCurso.Contains(pedido.Estado) || !pedido.EmpleadoId.HasValue)
+            {
+                TempData["ErrorMessage"] = "Solo se puede reasignar un pedido que esté asignado a un empleado.";
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
+            if (pedido.EmpleadoId == nuevoEmpleadoId)
+            {
+                TempData["ErrorMessage"] = "El pedido ya está asignado a ese empleado. Seleccione un empleado distinto.";
+                return RedirectToAction(nameof(Asignar), new { id = pedidoId });
+            }
+
             var validacion = await _pickingEngine.ValidarAsignacionAsync(pedidoId, nuevoEmpleadoId);
             if (!validacion.PuedeAsignar)
             {
                 TempData["ErrorMessage"] = validacion.MensajeError;
-                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
-            }
-
-            // Liberar empleado anterior si había uno
-            if (pedido.EmpleadoId.HasValue)
-            {
-                var empleadoAnterior = await _context.Empleados.FindAsync(pedido.EmpleadoId.Value);
-                if (empleadoAnterior != null)
-                {
-                    empleadoAnterior.EstadoDisponibilidad = "Disponible";
-                }
+                return RedirectToAction(nameof(Asignar), new { id = pedidoId });
             }
 
             var nuevoEmpleado = await _context.Empleados.FindAsync(nuevoEmpleadoId);
             if (nuevoEmpleado == null) return NotFound();
 
+            // Liberar al empleado anterior
+            var empleadoAnterior = await _context.Empleados.FindAsync(pedido.EmpleadoId.Value);
+            if (empleadoAnterior != null)
+            {
+                empleadoAnterior.EstadoDisponibilidad = "Disponible";
+            }
+
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
 
+            if (validacion.GeneraAdvertencia)
+            {
+                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, nuevoEmpleado, esReasignacion: true, userEmail, userRole);
+            }
+
             pedido.EmpleadoId = nuevoEmpleadoId;
             pedido.Estado = "Reasignado";
-            pedido.MotivoReasignacion = motivoReasignacion.Trim();
+            pedido.MotivoReasignacion = motivo;
             pedido.FechaAsignacion = DateTime.Now;
             pedido.FechaInicioProceso = DateTime.Now.AddMinutes(2);
             pedido.TiempoEstimadoMinutos = validacion.TiempoEstimadoMinutos;
@@ -399,10 +429,33 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(userEmail, userRole, "Reasignar Pedido", "Pedidos", 
-                $"Pedido {pedido.CodigoPedido} reasignado a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivoReasignacion}");
+                $"Pedido {pedido.CodigoPedido} reasignado de {empleadoAnterior?.NombreCompleto ?? "(sin empleado)"} a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivo}");
 
+            if (validacion.GeneraAdvertencia)
+            {
+                TempData["WarningMessage"] = validacion.MensajeAdvertencia;
+            }
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' reasignado exitosamente a '{nuevoEmpleado.NombreCompleto}'.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+        }
+
+        private const int MaxLongitudMotivoReasignacion = 250; // varchar(250) en Pedidos.MotivoReasignacion
+
+        // CU-26 / CU-27: advertencia de experiencia (< 6 meses y > 10 ubicaciones); no bloquea la asignación
+        private async Task RegistrarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido, Empleado empleado,
+            bool esReasignacion, string userEmail, string userRole)
+        {
+            await _auditService.LogAsync(userEmail, userRole, "Advertencia de Asignación", "Pedidos",
+                $"{validacion.MensajeAdvertencia} - {(esReasignacion ? "Reasignado" : "Asignado")} por {User.FindFirstValue(ClaimTypes.Name)} ({userRole}) al pedido {pedido.CodigoPedido}");
+
+            _context.Notificaciones.Add(new Notificacion
+            {
+                RolDestino = "Administrador",
+                Titulo = "Alerta de Asignación de Picking",
+                Mensaje = $"El {User.DescripcionParaNotificacion()} {(esReasignacion ? "reasignó" : "asignó")} el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} (menos de 6 meses de experiencia con más de 10 ubicaciones).",
+                Tipo = "Warning",
+                FechaCreacion = DateTime.Now
+            });
         }
 
         // CU-28: Marcar pedido como completado
