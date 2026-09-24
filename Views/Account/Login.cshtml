@@ -1,5 +1,4 @@
 @model PickingApp.Models.ViewModels.LoginViewModel
-@inject IWebHostEnvironment Environment
 @{
     ViewData["Title"] = "Iniciar sesión";
     Layout = "_LayoutLogin";
@@ -49,11 +48,4 @@
             <a asp-action="SolicitarRecuperacion" class="pf-login-link">¿Olvidaste tu contraseña?</a>
         </div>
     </form>
-
-    @if (Environment.IsDevelopment())
-    {
-        <div class="mt-4 pt-3 border-top text-center text-muted" style="font-size: 12px;">
-            <span class="text-secondary">Pruebas: <code>admin@pickingapp.com</code> / <code>Admin123*</code></span>
-        </div>
-    }
 </div>
