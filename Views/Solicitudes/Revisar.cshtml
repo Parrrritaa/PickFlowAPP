@@ -1,85 +1,50 @@
 @model PickingApp.Models.Solicitud
 @{
     ViewData["Title"] = "Revisar solicitud";
-    var tipoDisplay = Model.TipoSolicitud switch
-    {
-        "RegistroEmpleado" => "Registro de empleado",
-        "EdicionEmpleado" => "Editar empleado",
-        "InactivacionEmpleado" => "Inactivar empleado",
-        "EdicionUbicacion" => "Editar ubicación",
-        "EliminacionUbicacion" => "Eliminar ubicación",
-        "CambioContrasena" => "Cambio/recuperación de contraseña",
-        _ => Model.TipoSolicitud
-    };
+    var tipoDisplay = TiposSolicitud.Nombre(Model.TipoSolicitud);
 
     // Datos concretos del empleado/ubicación asociados a la solicitud (CU-08 / CU-11 / CU-14 / CU-21).
     var datosEmpleado = new List<(string Etiqueta, string Valor)>();
-    var cambiosEmpleado = new List<(string Campo, string Anterior, string Nuevo)>();
-    string motivo = "No especificado";
+    var cambiosEmpleado = new List<CambioSolicitud>();
+    var motivo = "No especificado";
+    var esEdicion = Model.TipoSolicitud is TiposSolicitud.EdicionEmpleado or TiposSolicitud.EdicionUbicacion;
 
-    if (!string.IsNullOrEmpty(Model.DatosJson))
+    switch (Model.TipoSolicitud)
     {
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(Model.DatosJson);
-            var root = doc.RootElement;
-
-            if (Model.TipoSolicitud == "RegistroEmpleado")
-            {
-                if (root.TryGetProperty("Identificacion", out var ident))
-                    datosEmpleado.Add(("Número de documento", ident.GetString() ?? "-"));
-                if (root.TryGetProperty("NombreCompleto", out var nom))
-                    datosEmpleado.Add(("Nombre completo", nom.GetString() ?? "-"));
-                if (root.TryGetProperty("Correo", out var correo) && correo.ValueKind == System.Text.Json.JsonValueKind.String)
-                    datosEmpleado.Add(("Correo electrónico", correo.GetString() ?? "-"));
-                if (root.TryGetProperty("FechaIngreso", out var fIngreso) && fIngreso.TryGetDateTime(out var fechaIngresoVal))
-                    datosEmpleado.Add(("Fecha de ingreso", fechaIngresoVal.ToString("dd/MM/yyyy")));
-                if (root.TryGetProperty("HorarioEntrada", out var hEntrada))
-                    datosEmpleado.Add(("Hora de entrada", hEntrada.ToString()));
-                if (root.TryGetProperty("HorarioSalida", out var hSalida))
-                    datosEmpleado.Add(("Hora de salida", hSalida.ToString()));
-
-                motivo = "Solicitud de registro de nuevo empleado.";
-            }
-            else if (Model.TipoSolicitud == "EdicionEmpleado" || Model.TipoSolicitud == "EdicionUbicacion")
-            {
-                if (root.TryGetProperty("Motivo", out var motEd))
-                    motivo = motEd.GetString() ?? motivo;
-
-                if (root.TryGetProperty("Cambios", out var cambiosEl) && cambiosEl.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    foreach (var c in cambiosEl.EnumerateArray())
-                    {
-                        var campo = c.TryGetProperty("Campo", out var cp) ? cp.GetString() ?? "-" : "-";
-                        var anterior = c.TryGetProperty("Anterior", out var an) ? an.GetString() ?? "-" : "-";
-                        var nuevo = c.TryGetProperty("Nuevo", out var nv) ? nv.GetString() ?? "-" : "-";
-                        cambiosEmpleado.Add((campo, anterior, nuevo));
-                    }
-                }
-            }
-            else if (root.TryGetProperty("Identificacion", out var identOtro))
-            {
-                datosEmpleado.Add(("Número de documento", identOtro.GetString() ?? "-"));
-                if (root.TryGetProperty("NombreCompleto", out var nomOtro))
-                    datosEmpleado.Add(("Nombre completo", nomOtro.GetString() ?? "-"));
-                if (root.TryGetProperty("Motivo", out var motProp))
-                    motivo = motProp.GetString() ?? motivo;
-            }
-            else if (root.TryGetProperty("CodigoUbicacion", out var codUbi))
-            {
-                datosEmpleado.Add(("Ubicación", codUbi.GetString() ?? "-"));
-                if (root.TryGetProperty("BodegaCodigo", out var bodCod))
-                    datosEmpleado.Add(("Bodega", bodCod.GetString() ?? "-"));
-                if (root.TryGetProperty("Motivo", out var motProp2))
-                    motivo = motProp2.GetString() ?? motivo;
-            }
-            else if (root.TryGetProperty("Motivo", out var motGenerico))
-            {
-                motivo = motGenerico.GetString() ?? motivo;
-            }
-        }
-        catch { }
+        case TiposSolicitud.RegistroEmpleado:
+            var registro = Model.LeerDatos<DatosEmpleadoSolicitud>();
+            datosEmpleado.Add(("Número de documento", registro.Identificacion));
+            datosEmpleado.Add(("Nombre completo", registro.NombreCompleto));
+            if (registro.Correo != null) datosEmpleado.Add(("Correo electrónico", registro.Correo));
+            datosEmpleado.Add(("Fecha de ingreso", registro.FechaIngreso.ToString("dd/MM/yyyy")));
+            datosEmpleado.Add(("Hora de entrada", registro.HorarioEntrada.ToString(@"hh\:mm")));
+            datosEmpleado.Add(("Hora de salida", registro.HorarioSalida.ToString(@"hh\:mm")));
+            motivo = "Solicitud de registro de nuevo empleado.";
+            break;
+        case TiposSolicitud.EdicionEmpleado:
+            var edicionEmpleado = Model.LeerDatos<SolicitudEdicionEmpleado>();
+            cambiosEmpleado = edicionEmpleado.Cambios;
+            motivo = edicionEmpleado.Motivo;
+            break;
+        case TiposSolicitud.EdicionUbicacion:
+            var edicionUbicacion = Model.LeerDatos<SolicitudEdicionUbicacion>();
+            cambiosEmpleado = edicionUbicacion.Cambios;
+            motivo = edicionUbicacion.Motivo;
+            break;
+        case TiposSolicitud.InactivacionEmpleado:
+            var inactivacion = Model.LeerDatos<SolicitudInactivacionEmpleado>();
+            datosEmpleado.Add(("Número de documento", inactivacion.Identificacion));
+            datosEmpleado.Add(("Nombre completo", inactivacion.NombreCompleto));
+            motivo = inactivacion.Motivo;
+            break;
+        case TiposSolicitud.EliminacionUbicacion:
+            var eliminacion = Model.LeerDatos<SolicitudEliminacionUbicacion>();
+            datosEmpleado.Add(("Ubicación", eliminacion.CodigoUbicacion));
+            if (eliminacion.BodegaCodigo != null) datosEmpleado.Add(("Bodega", eliminacion.BodegaCodigo));
+            motivo = eliminacion.Motivo;
+            break;
     }
+    if (string.IsNullOrWhiteSpace(motivo)) motivo = "No especificado";
 }
 
 <h1 class="pf-page-title">Revisar solicitud</h1>
@@ -159,10 +124,10 @@
             </div>
         </div>
     }
-    else if (Model.TipoSolicitud == "EdicionEmpleado" || Model.TipoSolicitud == "EdicionUbicacion")
+    else if (esEdicion)
     {
         <div class="mockup-info-banner mb-4">
-            No se detectaron cambios en los campos @(Model.TipoSolicitud == "EdicionEmpleado" ? "del empleado" : "de la ubicación").
+            No se detectaron cambios en los campos @(Model.TipoSolicitud == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
         </div>
     }
 
@@ -173,7 +138,7 @@
         </div>
     </div>
 
-    @if (Model.Estado == "Pendiente")
+    @if (Model.Estado == EstadosSolicitud.Pendiente)
     {
         <form id="formAccionSolicitud" method="post">
             @Html.AntiForgeryToken()

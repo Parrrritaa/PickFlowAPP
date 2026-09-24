@@ -444,12 +444,12 @@ namespace PickingApp.Controllers
             else
             {
                 // Supervisor: solicitar edición de ubicación (requiere aprobación del Administrador)
-                var cambios = new List<object>();
+                var cambios = new List<CambioSolicitud>();
                 void AgregarCambio(string campo, string anterior, string nuevo)
                 {
                     if (!string.Equals(anterior, nuevo, StringComparison.Ordinal))
                     {
-                        cambios.Add(new { Campo = campo, Anterior = anterior, Nuevo = nuevo });
+                        cambios.Add(new CambioSolicitud { Campo = campo, Anterior = anterior, Nuevo = nuevo });
                     }
                 }
 
@@ -463,14 +463,14 @@ namespace PickingApp.Controllers
                 AgregarCambio("Categoría", ubicacionExistente.Producto?.Categoria?.Nombre ?? "Sin clasificar", nombreCategoriaNueva);
                 AgregarCambio("Cantidad máx. por caja", (ubicacionExistente.Producto?.UnidadesPorCaja ?? 1).ToString(), unidadesPorCajaValor.ToString());
 
-                var datosSolicitud = new
+                var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionUbicacion, userId, new SolicitudEdicionUbicacion
                 {
                     UbicacionId = ubicacionExistente.Id,
                     BodegaId = ubicacionExistente.BodegaId,
                     BodegaCodigo = ubicacionExistente.Bodega?.Codigo,
-                    Motivo = motivo,
+                    Motivo = motivo ?? string.Empty,
                     Cambios = cambios,
-                    NuevosDatos = new
+                    NuevosDatos = new DatosUbicacionSolicitud
                     {
                         Pasillo = pasillo,
                         Estante = estante,
@@ -482,16 +482,7 @@ namespace PickingApp.Controllers
                         CategoriaProductoId = categoriaId,
                         UnidadesPorCaja = unidadesPorCajaValor
                     }
-                };
-
-                var solicitud = new Solicitud
-                {
-                    TipoSolicitud = "EdicionUbicacion",
-                    UsuarioSolicitanteId = userId,
-                    Estado = "Pendiente",
-                    FechaSolicitud = DateTime.Now,
-                    DatosJson = System.Text.Json.JsonSerializer.Serialize(datosSolicitud)
-                };
+                });
 
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
@@ -551,20 +542,13 @@ namespace PickingApp.Controllers
             // Supervisor: Solicitar Eliminación (CU-20)
             else if (userRole == Roles.Supervisor)
             {
-                var solicitud = new Solicitud
+                var solicitud = Solicitud.Nueva(TiposSolicitud.EliminacionUbicacion, userId, new SolicitudEliminacionUbicacion
                 {
-                    TipoSolicitud = "EliminacionUbicacion",
-                    UsuarioSolicitanteId = userId,
-                    Estado = "Pendiente",
-                    FechaSolicitud = DateTime.Now,
-                    DatosJson = System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        UbicacionId = ubicacion.Id,
-                        CodigoUbicacion = ubicacion.CodigoUbicacion,
-                        BodegaCodigo = ubicacion.Bodega?.Codigo,
-                        Motivo = motivo ?? "Solicitud de eliminación por cambio operativo"
-                    })
-                };
+                    UbicacionId = ubicacion.Id,
+                    CodigoUbicacion = ubicacion.CodigoUbicacion,
+                    BodegaCodigo = ubicacion.Bodega?.Codigo,
+                    Motivo = motivo ?? "Solicitud de eliminación por cambio operativo"
+                });
 
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion

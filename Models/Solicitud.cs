@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace PickingApp.Models
 {
@@ -10,8 +11,7 @@ namespace PickingApp.Models
 
         [Required]
         [StringLength(50)]
-        public string TipoSolicitud { get; set; } = string.Empty; 
-        // "RegistroEmpleado", "EdicionEmpleado", "InactivacionEmpleado", "EliminacionUbicacion", "CambioContrasena"
+        public string TipoSolicitud { get; set; } = string.Empty; // Valores en TiposSolicitud
 
         [Required]
         public int UsuarioSolicitanteId { get; set; }
@@ -21,7 +21,7 @@ namespace PickingApp.Models
 
         [Required]
         [StringLength(30)]
-        public string Estado { get; set; } = "Pendiente"; // "Pendiente", "Aprobada", "Rechazada"
+        public string Estado { get; set; } = EstadosSolicitud.Pendiente; // Valores en EstadosSolicitud
 
         public DateTime FechaSolicitud { get; set; } = DateTime.Now;
 
@@ -37,5 +37,17 @@ namespace PickingApp.Models
 
         [StringLength(500)]
         public string? MotivoRechazo { get; set; }
+
+        // T es la clase de SolicitudDatos.cs que corresponde a TipoSolicitud
+        public T LeerDatos<T>() where T : new() => JsonSerializer.Deserialize<T>(DatosJson) ?? new T();
+
+        public static Solicitud Nueva(string tipo, int usuarioSolicitanteId, object datos) => new()
+        {
+            TipoSolicitud = tipo,
+            UsuarioSolicitanteId = usuarioSolicitanteId,
+            Estado = EstadosSolicitud.Pendiente,
+            FechaSolicitud = DateTime.Now,
+            DatosJson = JsonSerializer.Serialize(datos)
+        };
     }
 }

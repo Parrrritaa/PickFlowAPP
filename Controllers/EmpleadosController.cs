@@ -55,32 +55,20 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear(Empleado model)
         {
-            model.JornadaLaboral = $"{FormatHora(model.HorarioEntrada)} - {FormatHora(model.HorarioSalida)}";
+            model.JornadaLaboral = ReglasEmpleado.DescribirJornada(model.HorarioEntrada, model.HorarioSalida);
 
             if (!ModelState.IsValid)
             {
                 return View(model);
             }
 
-            var maxHoras = await ObtenerMaxHorasJornadaAsync();
-            var duracionHoras = CalcularDuracionJornadaHoras(model.HorarioEntrada, model.HorarioSalida);
-            if (duracionHoras > maxHoras)
-            {
-                ModelState.AddModelError("HorarioSalida", $"La jornada laboral no puede superar las {maxHoras:0.#} horas (duración indicada: {duracionHoras:0.#} horas).");
-                return View(model);
-            }
-
             model.Identificacion = model.Identificacion.Trim();
-            if (await _context.Empleados.AnyAsync(e => e.Identificacion == model.Identificacion))
+            model.Correo = ReglasEmpleado.NormalizarCorreo(model.Correo);
+            var error = await ReglasEmpleado.ValidarAsync(_context, model.Identificacion, model.Correo,
+                model.HorarioEntrada, model.HorarioSalida, empleadoId: null);
+            if (error != null)
             {
-                ModelState.AddModelError("Identificacion", "Ya existe un empleado registrado con esta identificación.");
-                return View(model);
-            }
-
-            model.Correo = string.IsNullOrWhiteSpace(model.Correo) ? null : model.Correo.Trim().ToLower();
-            if (model.Correo != null && !await CorreoDisponibleAsync(model.Correo))
-            {
-                ModelState.AddModelError("Correo", "Ese correo ya está en uso por otro empleado o por un usuario del sistema.");
+                ModelState.AddModelError(error.Campo, error.Mensaje);
                 return View(model);
             }
 
@@ -102,14 +90,7 @@ namespace PickingApp.Controllers
             // Auxiliar: Solicitar registro de empleado (CU-07)
             else
             {
-                var solicitud = new Solicitud
-                {
-                    TipoSolicitud = "RegistroEmpleado",
-                    UsuarioSolicitanteId = userId,
-                    Estado = "Pendiente",
-                    FechaSolicitud = DateTime.Now,
-                    DatosJson = System.Text.Json.JsonSerializer.Serialize(model)
-                };
+                var solicitud = Solicitud.Nueva(TiposSolicitud.RegistroEmpleado, userId, DatosEmpleadoSolicitud.Desde(model));
 
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
@@ -147,7 +128,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Editar(Empleado model, string? motivo)
         {
-            model.JornadaLaboral = $"{FormatHora(model.HorarioEntrada)} - {FormatHora(model.HorarioSalida)}";
+            model.JornadaLaboral = ReglasEmpleado.DescribirJornada(model.HorarioEntrada, model.HorarioSalida);
             motivo = (motivo ?? string.Empty).Trim();
 
             if (!ModelState.IsValid)
@@ -156,21 +137,15 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var maxHoras = await ObtenerMaxHorasJornadaAsync();
-            var duracionHoras = CalcularDuracionJornadaHoras(model.HorarioEntrada, model.HorarioSalida);
-            if (duracionHoras > maxHoras)
-            {
-                ModelState.AddModelError("HorarioSalida", $"La jornada laboral no puede superar las {maxHoras:0.#} horas (duración indicada: {duracionHoras:0.#} horas).");
-                return View(model);
-            }
-
             var empleadoExistente = await _context.Empleados.FindAsync(model.Id);
             if (empleadoExistente == null) return NotFound();
 
-            model.Correo = string.IsNullOrWhiteSpace(model.Correo) ? null : model.Correo.Trim().ToLower();
-            if (model.Correo != null && !await CorreoDisponibleAsync(model.Correo, model.Id))
+            model.Correo = ReglasEmpleado.NormalizarCorreo(model.Correo);
+            var error = await ReglasEmpleado.ValidarAsync(_context, empleadoExistente.Identificacion, model.Correo,
+                model.HorarioEntrada, model.HorarioSalida, empleadoExistente.Id);
+            if (error != null)
             {
-                ModelState.AddModelError("Correo", "Ese correo ya está en uso por otro empleado o por un usuario del sistema.");
+                ModelState.AddModelError(error.Campo, error.Mensaje);
                 ViewBag.Motivo = motivo;
                 return View(model);
             }
@@ -206,12 +181,12 @@ namespace PickingApp.Controllers
                     return View(model);
                 }
 
-                var cambios = new List<object>();
+                var cambios = new List<CambioSolicitud>();
                 void AgregarCambio(string campo, string anterior, string nuevo)
                 {
                     if (!string.Equals(anterior, nuevo, StringComparison.Ordinal))
                     {
-                        cambios.Add(new { Campo = campo, Anterior = anterior, Nuevo = nuevo });
+                        cambios.Add(new CambioSolicitud { Campo = campo, Anterior = anterior, Nuevo = nuevo });
                     }
                 }
 
@@ -221,21 +196,12 @@ namespace PickingApp.Controllers
                 AgregarCambio("Hora de entrada", FormatHora(empleadoExistente.HorarioEntrada), FormatHora(model.HorarioEntrada));
                 AgregarCambio("Hora de salida", FormatHora(empleadoExistente.HorarioSalida), FormatHora(model.HorarioSalida));
 
-                var datosSolicitud = new
+                var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionEmpleado, userId, new SolicitudEdicionEmpleado
                 {
                     Motivo = motivo,
                     Cambios = cambios,
-                    NuevosDatos = model
-                };
-
-                var solicitud = new Solicitud
-                {
-                    TipoSolicitud = "EdicionEmpleado",
-                    UsuarioSolicitanteId = userId,
-                    Estado = "Pendiente",
-                    FechaSolicitud = DateTime.Now,
-                    DatosJson = System.Text.Json.JsonSerializer.Serialize(datosSolicitud)
-                };
+                    NuevosDatos = DatosEmpleadoSolicitud.Desde(model)
+                });
 
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
@@ -297,20 +263,13 @@ namespace PickingApp.Controllers
             // Supervisor y Auxiliar: Solicitar Inactivación (CU-13)
             else
             {
-                var solicitud = new Solicitud
+                var solicitud = Solicitud.Nueva(TiposSolicitud.InactivacionEmpleado, userId, new SolicitudInactivacionEmpleado
                 {
-                    TipoSolicitud = "InactivacionEmpleado",
-                    UsuarioSolicitanteId = userId,
-                    Estado = "Pendiente",
-                    FechaSolicitud = DateTime.Now,
-                    DatosJson = System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        EmpleadoId = empleado.Id,
-                        Identificacion = empleado.Identificacion,
-                        NombreCompleto = empleado.NombreCompleto,
-                        Motivo = motivo ?? "Solicitud de inactivación por novedades laborales"
-                    })
-                };
+                    EmpleadoId = empleado.Id,
+                    Identificacion = empleado.Identificacion,
+                    NombreCompleto = empleado.NombreCompleto,
+                    Motivo = motivo ?? "Solicitud de inactivación por novedades laborales"
+                });
 
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
@@ -364,26 +323,5 @@ namespace PickingApp.Controllers
         }
 
         private static string FormatHora(TimeSpan t) => t.ToString(@"hh\:mm");
-
-        private static double CalcularDuracionJornadaHoras(TimeSpan entrada, TimeSpan salida)
-        {
-            var duracion = salida - entrada;
-            if (duracion <= TimeSpan.Zero)
-            {
-                duracion += TimeSpan.FromHours(24);
-            }
-            return duracion.TotalHours;
-        }
-
-        private Task<double> ObtenerMaxHorasJornadaAsync() =>
-            ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada);
-
-        // Un correo no puede repetirse entre Empleados ni con ningún Usuario del sistema, aunque sean tablas distintas.
-        private async Task<bool> CorreoDisponibleAsync(string correo, int? empleadoIdExcluir = null)
-        {
-            var enOtroEmpleado = await _context.Empleados.AnyAsync(e => e.Correo == correo && e.Id != (empleadoIdExcluir ?? 0));
-            if (enOtroEmpleado) return false;
-            return !await _context.Usuarios.AnyAsync(u => u.Correo == correo);
-        }
     }
 }

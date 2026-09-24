@@ -22,16 +22,7 @@
                 {
                     @foreach (var s in Model)
                     {
-                        var tipoDisplay = s.TipoSolicitud switch
-                        {
-                            "RegistroEmpleado" => "Registro empleado",
-                            "EdicionEmpleado" => "Editar empleado",
-                            "InactivacionEmpleado" => "Inactivar empleado",
-                            "EdicionUbicacion" => "Editar ubicación",
-                            "EliminacionUbicacion" => "Eliminar ubicación",
-                            "CambioContrasena" => "Cambio/recuperación de contraseña",
-                            _ => s.TipoSolicitud
-                        };
+                        var tipoDisplay = TiposSolicitud.Nombre(s.TipoSolicitud);
 
                         <tr>
                             <td class="fw-semibold">SOL-@s.Id</td>
