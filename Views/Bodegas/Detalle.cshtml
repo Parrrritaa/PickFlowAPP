@@ -88,7 +88,7 @@
                                                 </a>
                                                 <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
                                                         data-bs-toggle="modal" data-bs-target="#modalEliminarUbicacion"
-                                                        onclick="document.getElementById('eliminarUbicacionId').value='@u.Id'; document.getElementById('eliminarUbicacionCodigo').innerText='@u.CodigoUbicacion';">
+                                                        data-pf-id="@u.Id" data-pf-texto="@u.CodigoUbicacion">
                                                     @(userRole == "Administrador" ? "Eliminar" : "Solicitar eliminación")
                                                 </button>
                                             </div>
@@ -127,7 +127,7 @@
             <div class="modal-content rounded-4 border-0 p-2">
                 <form asp-action="EliminarUbicacion" method="post">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" id="eliminarUbicacionId" name="id" value="" />
+                    <input type="hidden" id="eliminarUbicacionId" name="id" data-pf-recibe="id" value="" />
                     <div class="modal-header border-0">
                         <h5 class="modal-title fw-bold text-danger">
                             @(userRole == "Administrador" ? "Eliminar ubicación" : "Solicitar eliminación de ubicación")
@@ -135,7 +135,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <p>Ubicación: <strong id="eliminarUbicacionCodigo"></strong></p>
+                        <p>Ubicación: <strong id="eliminarUbicacionCodigo" data-pf-recibe="texto"></strong></p>
                         @if (userRole == "Administrador")
                         {
                             <div class="mockup-alert-warning mt-0 mb-3">

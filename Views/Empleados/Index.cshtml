@@ -63,7 +63,7 @@
                                 {
                                     <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
                                             data-bs-toggle="modal" data-bs-target="#modalInactivar"
-                                            onclick="document.getElementById('inactivarEmpleadoId').value='@emp.Id'; document.getElementById('inactivarEmpleadoNombre').innerText='@emp.NombreCompleto';">
+                                            data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
                                         @(esAdmin ? "Inactivar" : "Solicitar inactivación")
                                     </button>
                                 }
@@ -79,7 +79,7 @@
                                 {
                                     <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
                                             data-bs-toggle="modal" data-bs-target="#modalReiniciarPromedio"
-                                            onclick="document.getElementById('reiniciarPromedioId').value='@emp.Id'; document.getElementById('reiniciarPromedioNombre').innerText='@emp.NombreCompleto';">
+                                            data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
                                         Reiniciar rendimiento
                                     </button>
                                 }
@@ -103,7 +103,7 @@
         <div class="modal-content rounded-4 border-0 p-2">
             <form asp-action="Inactivar" method="post">
                 @Html.AntiForgeryToken()
-                <input type="hidden" id="inactivarEmpleadoId" name="id" value="" />
+                <input type="hidden" id="inactivarEmpleadoId" name="id" data-pf-recibe="id" value="" />
                 <div class="modal-header border-0">
                     <h5 class="modal-title fw-bold text-danger">
                         @(esAdmin ? "Inactivar empleado" : "Solicitar inactivación de empleado")
@@ -111,7 +111,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Empleado: <strong id="inactivarEmpleadoNombre"></strong></p>
+                    <p>Empleado: <strong id="inactivarEmpleadoNombre" data-pf-recibe="texto"></strong></p>
                     @if (!esAdmin)
                     {
                         <label class="form-label fw-bold">Motivo (obligatorio):</label>
@@ -134,13 +134,13 @@
             <div class="modal-content rounded-4 border-0 p-2">
                 <form asp-action="ReiniciarPromedio" method="post">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" id="reiniciarPromedioId" name="id" value="" />
+                    <input type="hidden" id="reiniciarPromedioId" name="id" data-pf-recibe="id" value="" />
                     <div class="modal-header border-0">
                         <h5 class="modal-title fw-bold text-dark">Reiniciar rendimiento</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <p>Empleado: <strong id="reiniciarPromedioNombre"></strong></p>
+                        <p>Empleado: <strong id="reiniciarPromedioNombre" data-pf-recibe="texto"></strong></p>
                         <div class="mockup-alert-warning mb-0">
                             Los pedidos completados hasta ahora se conservan en el historial, pero dejarán de contar para calcular su rendimiento. Hasta que complete de nuevo el mínimo de pedidos, sus estimaciones usarán el tiempo estándar.
                         </div>

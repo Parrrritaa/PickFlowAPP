@@ -24,6 +24,21 @@ document.addEventListener('click', function (e) {
     btn.textContent = expandir ? btn.dataset.textoMenos : btn.dataset.textoMas;
 });
 
+// Modales de confirmación sobre un registro de una tabla: el botón que abre el modal lleva
+// data-pf-id y data-pf-texto, y el modal marca dónde van con [data-pf-recibe="id"] (value)
+// y [data-pf-recibe="texto"] (textContent). Los datos se copian como texto, nunca como código,
+// para que un nombre con comillas o HTML no rompa el botón ni se ejecute.
+document.addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    if (!btn || !btn.hasAttribute('data-pf-id')) return;
+    e.target.querySelectorAll('[data-pf-recibe="id"]').forEach(function (el) {
+        el.value = btn.dataset.pfId;
+    });
+    e.target.querySelectorAll('[data-pf-recibe="texto"]').forEach(function (el) {
+        el.textContent = btn.dataset.pfTexto || '';
+    });
+});
+
 // Menú lateral desplegable.
 // Escritorio: se oculta/muestra empujando el contenido y el estado se recuerda en este navegador.
 // Pantallas angostas: se superpone al contenido, arranca oculto y se cierra con Escape o tocando fuera.
