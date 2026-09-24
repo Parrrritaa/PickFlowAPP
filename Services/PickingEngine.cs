@@ -148,126 +148,131 @@ namespace PickingApp.Services
 
         public async Task<AsignacionValidationResult> ValidarAsignacionAsync(int pedidoId, int empleadoId)
         {
-            var result = new AsignacionValidationResult();
+            var validaciones = await ValidarAsignacionesAsync(pedidoId, new[] { empleadoId });
+            return validaciones[empleadoId];
+        }
 
-            var pedido = await _context.Pedidos
-                .Include(p => p.Detalles)
-                .FirstOrDefaultAsync(p => p.Id == pedidoId);
+        // Valida varios empleados contra el mismo pedido con un número fijo de consultas, sin importar
+        // cuántos sean (la vista Asignar evalúa a todos los empleados activos).
+        public async Task<Dictionary<int, AsignacionValidationResult>> ValidarAsignacionesAsync(int pedidoId, IReadOnlyCollection<int> empleadoIds)
+        {
+            var ids = empleadoIds.Distinct().ToList();
 
-            if (pedido == null)
+            var estadoPedido = await _context.Pedidos
+                .Where(p => p.Id == pedidoId)
+                .Select(p => p.Estado)
+                .FirstOrDefaultAsync();
+
+            var errorPedido = estadoPedido == null ? "El pedido no existe." : estadoPedido switch
             {
-                result.PuedeAsignar = false;
-                result.MensajeError = "El pedido no existe.";
-                return result;
+                PedidoEstados.Cancelado => "El pedido se encuentra cancelado y no puede reactivarse (RN-03-CU31).",
+                PedidoEstados.Completado => "El pedido ya se encuentra completado y no puede asignarse ni reasignarse.",
+                PedidoEstados.Dividido => "El pedido fue dividido en partes: asigne cada parte por separado.",
+                _ => null
+            };
+            if (errorPedido != null)
+            {
+                return ids.ToDictionary(id => id, _ => new AsignacionValidationResult { MensajeError = errorPedido });
             }
 
-            if (pedido.Estado == "Cancelado")
-            {
-                result.PuedeAsignar = false;
-                result.MensajeError = "El pedido se encuentra cancelado y no puede reactivarse (RN-03-CU31).";
-                return result;
-            }
+            var empleados = await _context.Empleados
+                .Where(e => ids.Contains(e.Id))
+                .ToDictionaryAsync(e => e.Id);
 
-            if (pedido.Estado == "Completado")
-            {
-                result.PuedeAsignar = false;
-                result.MensajeError = "El pedido ya se encuentra completado y no puede asignarse ni reasignarse.";
-                return result;
-            }
+            var ocupados = (await _context.Pedidos
+                .Where(p => p.EmpleadoId != null && ids.Contains(p.EmpleadoId.Value)
+                    && PedidoEstados.EnCurso.Contains(p.Estado) && p.Id != pedidoId)
+                .Select(p => p.EmpleadoId!.Value)
+                .ToListAsync())
+                .ToHashSet();
 
-            if (pedido.Estado == PedidoEstados.Dividido)
+            var contexto = new ContextoAsignacion
             {
-                result.PuedeAsignar = false;
-                result.MensajeError = "El pedido fue dividido en partes: asigne cada parte por separado.";
-                return result;
-            }
+                TiempoEstandarMinutos = await CalcularTiempoEstandarAsync(pedidoId),
+                UbicacionesPedido = await _context.DetallesPedido
+                    .Where(d => d.PedidoId == pedidoId)
+                    .Select(d => d.UbicacionId)
+                    .Distinct()
+                    .CountAsync(),
+                MesesMinimos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MesesExperienciaAdvertencia),
+                MaxUbicaciones = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxUbicacionesAdvertencia),
+                HoraActual = DateTime.Now.TimeOfDay
+            };
+            var rendimientos = await CalcularRendimientosAsync(ids);
 
-            var empleado = await _context.Empleados.FindAsync(empleadoId);
+            return ids.ToDictionary(id => id, id => empleados.TryGetValue(id, out var empleado)
+                ? EvaluarEmpleado(empleado, ocupados.Contains(id), rendimientos[id], contexto)
+                : new AsignacionValidationResult { MensajeError = "El empleado seleccionado no existe." });
+        }
 
-            if (empleado == null)
+        // Datos del pedido y de configuración comunes a todos los empleados evaluados
+        private sealed class ContextoAsignacion
+        {
+            public double TiempoEstandarMinutos { get; init; }
+            public int UbicacionesPedido { get; init; }
+            public int MesesMinimos { get; init; }
+            public int MaxUbicaciones { get; init; }
+            public TimeSpan HoraActual { get; init; }
+        }
+
+        private static AsignacionValidationResult EvaluarEmpleado(Empleado empleado, bool tienePedidoEnCurso,
+            RendimientoEmpleado rendimiento, ContextoAsignacion contexto)
+        {
+            var result = new AsignacionValidationResult
             {
-                result.PuedeAsignar = false;
-                result.MensajeError = "El empleado seleccionado no existe.";
-                return result;
-            }
+                TiempoEstandarMinutos = contexto.TiempoEstandarMinutos,
+                Rendimiento = rendimiento,
+                TiempoEstimadoMinutos = rendimiento.Estimar(contexto.TiempoEstandarMinutos)
+            };
 
             // Regla 1: Empleado Activo
             if (!empleado.Activo)
             {
-                result.PuedeAsignar = false;
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' se encuentra inactivo.";
                 result.MotivoCorto = "Inactivo";
                 return result;
             }
 
             // Regla 2: Un solo pedido simultáneo
-            var tienePedidoActivo = await _context.Pedidos
-                .AnyAsync(p => p.EmpleadoId == empleadoId && PedidoEstados.EnCurso.Contains(p.Estado) && p.Id != pedidoId);
-
-            if (tienePedidoActivo)
+            if (tienePedidoEnCurso)
             {
-                result.PuedeAsignar = false;
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' ya tiene un pedido asignado en curso (RN-01-CU26).";
                 result.MotivoCorto = "Con pedido en curso";
                 return result;
             }
 
             // Regla 3: Validar Jornada Laboral
-            var horaActual = DateTime.Now.TimeOfDay;
-            bool enHorario = true;
-
-            if (empleado.HorarioEntrada < empleado.HorarioSalida)
-            {
-                // Turno diurno normal
-                enHorario = horaActual >= empleado.HorarioEntrada && horaActual <= empleado.HorarioSalida;
-            }
-            else
-            {
+            var horaActual = contexto.HoraActual;
+            var enHorario = empleado.HorarioEntrada < empleado.HorarioSalida
+                ? horaActual >= empleado.HorarioEntrada && horaActual <= empleado.HorarioSalida
                 // Turno nocturno que cruza medianoche
-                enHorario = horaActual >= empleado.HorarioEntrada || horaActual <= empleado.HorarioSalida;
-            }
+                : horaActual >= empleado.HorarioEntrada || horaActual <= empleado.HorarioSalida;
 
             if (!enHorario)
             {
-                result.PuedeAsignar = false;
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' se encuentra fuera de su jornada laboral ({empleado.HorarioEntrada:hh\\:mm} - {empleado.HorarioSalida:hh\\:mm}).";
                 result.MotivoCorto = "Fuera de jornada";
                 return result;
             }
 
             // Regla 4: Tiempo estimado vs Tiempo restante de jornada
-            result.TiempoEstandarMinutos = await CalcularTiempoEstandarAsync(pedidoId);
-            result.Rendimiento = await CalcularRendimientoAsync(empleadoId);
-            var tiempoEstimado = result.Rendimiento.Estimar(result.TiempoEstandarMinutos);
-            result.TiempoEstimadoMinutos = tiempoEstimado;
+            var tiempoRestanteJornada = empleado.HorarioSalida > horaActual
+                ? empleado.HorarioSalida - horaActual
+                : (TimeSpan.FromHours(24) - horaActual) + empleado.HorarioSalida;
 
-            TimeSpan tiempoRestanteJornada;
-            if (empleado.HorarioSalida > horaActual)
+            if (tiempoRestanteJornada.TotalMinutes < result.TiempoEstimadoMinutos)
             {
-                tiempoRestanteJornada = empleado.HorarioSalida - horaActual;
-            }
-            else
-            {
-                tiempoRestanteJornada = (TimeSpan.FromHours(24) - horaActual) + empleado.HorarioSalida;
-            }
-
-            if (tiempoRestanteJornada.TotalMinutes < tiempoEstimado)
-            {
-                result.PuedeAsignar = false;
-                result.MensajeError = $"El tiempo estimado para el pedido ({Formato.Duracion(tiempoEstimado)}) supera el tiempo restante de la jornada del empleado ({Formato.Duracion(tiempoRestanteJornada.TotalMinutes)}).";
+                result.MensajeError = $"El tiempo estimado para el pedido ({Formato.Duracion(result.TiempoEstimadoMinutos)}) supera el tiempo restante de la jornada del empleado ({Formato.Duracion(tiempoRestanteJornada.TotalMinutes)}).";
                 result.MotivoCorto = $"Jornada insuficiente ({Formato.Duracion(tiempoRestanteJornada.TotalMinutes)} restantes)";
                 return result;
             }
 
             // Regla 5: Advertencia de Experiencia (menos meses y más ubicaciones que los configurados)
-            var mesesMinimos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MesesExperienciaAdvertencia);
-            var maxUbicaciones = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxUbicacionesAdvertencia);
-            var totalUbicacionesPedido = pedido.Detalles.Select(d => d.UbicacionId).Distinct().Count();
-            if (empleado.MesesExperiencia < mesesMinimos && totalUbicacionesPedido > maxUbicaciones)
+            if (empleado.MesesExperiencia < contexto.MesesMinimos && contexto.UbicacionesPedido > contexto.MaxUbicaciones)
             {
                 result.GeneraAdvertencia = true;
-                result.MensajeAdvertencia = $"ADVERTENCIA: El empleado '{empleado.NombreCompleto}' tiene menos de {mesesMinimos} meses de experiencia ({empleado.MesesExperiencia} meses) y el pedido contiene {totalUbicacionesPedido} ubicaciones (> {maxUbicaciones}). La asignación quedará registrada para auditoría del Administrador.";
-                result.MotivoAdvertencia = $"menos de {mesesMinimos} meses de experiencia con más de {maxUbicaciones} ubicaciones";
+                result.MensajeAdvertencia = $"ADVERTENCIA: El empleado '{empleado.NombreCompleto}' tiene menos de {contexto.MesesMinimos} meses de experiencia ({empleado.MesesExperiencia} meses) y el pedido contiene {contexto.UbicacionesPedido} ubicaciones (> {contexto.MaxUbicaciones}). La asignación quedará registrada para auditoría del Administrador.";
+                result.MotivoAdvertencia = $"menos de {contexto.MesesMinimos} meses de experiencia con más de {contexto.MaxUbicaciones} ubicaciones";
             }
 
             result.PuedeAsignar = true;

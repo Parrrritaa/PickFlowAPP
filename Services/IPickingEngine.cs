@@ -51,6 +51,7 @@ namespace PickingApp.Services
     public interface IPickingEngine
     {
         Task<AsignacionValidationResult> ValidarAsignacionAsync(int pedidoId, int empleadoId);
+        Task<Dictionary<int, AsignacionValidationResult>> ValidarAsignacionesAsync(int pedidoId, IReadOnlyCollection<int> empleadoIds);
         Task<double> CalcularTiempoEstandarAsync(int pedidoId);
         Task<Dictionary<int, double>> CalcularTiemposEstandarAsync(IReadOnlyCollection<int> pedidoIds);
         Task<double> CalcularTiempoEstimadoAsync(int pedidoId, int empleadoId);

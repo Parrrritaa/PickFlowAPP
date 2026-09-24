@@ -2,18 +2,17 @@
 @{
     var pedido = ViewBag.Pedido as PickingApp.Models.Pedido;
     var totalUbicaciones = pedido?.Detalles?.Select(d => d.UbicacionId).Distinct().Count() ?? 0;
-    var mesesExperienciaAdvertencia = ViewBag.MesesExperienciaAdvertencia as int? ?? 6;
-    var maxUbicacionesAdvertencia = ViewBag.MaxUbicacionesAdvertencia as int? ?? 10;
-    var tieneEmpleadoPocaExp = Model.Any(e => e.MesesExperiencia < mesesExperienciaAdvertencia);
-    var empleadoPocaExp = Model.FirstOrDefault(e => e.MesesExperiencia < mesesExperienciaAdvertencia);
-    var tiemposEstimados = ViewBag.TiemposEstimados as Dictionary<int, double> ?? new Dictionary<int, double>();
-    var motivosNoAsignable = ViewBag.MotivosNoAsignable as Dictionary<int, string> ?? new Dictionary<int, string>();
+    var validaciones = ViewBag.Validaciones as Dictionary<int, PickingApp.Services.AsignacionValidationResult>
+        ?? new Dictionary<int, PickingApp.Services.AsignacionValidationResult>();
     var empleadoRecomendadoId = ViewBag.EmpleadoRecomendadoId as int?;
     var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
-    var rendimientos = ViewBag.Rendimientos as Dictionary<int, PickingApp.Services.RendimientoEmpleado> ?? new Dictionary<int, PickingApp.Services.RendimientoEmpleado>();
-    var minimoPedidos = rendimientos.Values.FirstOrDefault()?.MinimoPedidos ?? 3;
+    var minimoPedidos = validaciones.Values.FirstOrDefault(v => v.Rendimiento != null)?.Rendimiento!.MinimoPedidos ?? 3;
     // CU-27: con un empleado ya asignado, la vista reasigna (motivo obligatorio) en lugar de asignar
     var empleadoActualId = ViewBag.EmpleadoActualId as int?;
+    // La advertencia de experiencia la decide el motor para cada empleado asignable
+    var conAdvertencia = Model
+        .Where(e => e.Id != empleadoActualId && validaciones.TryGetValue(e.Id, out var v) && v.PuedeAsignar && v.GeneraAdvertencia)
+        .ToList();
     var empleadoActualNombre = ViewBag.EmpleadoActualNombre as string;
     var esReasignacion = empleadoActualId.HasValue;
     ViewData["Title"] = esReasignacion ? "Reasignar pedido" : "Asignar pedido";
@@ -53,8 +52,12 @@
                     @foreach (var emp in Model)
                     {
                         var highlightClass = emp.Id == empleadoRecomendadoId ? "mockup-row-highlight" : "";
-                        var estadoText = motivosNoAsignable.TryGetValue(emp.Id, out var motivo) ? motivo : "Libre";
-                        var tiempoEstimado = tiemposEstimados.TryGetValue(emp.Id, out var minutos) ? PickingApp.Services.Formato.Duracion(minutos) : "-";
+                        validaciones.TryGetValue(emp.Id, out var validacion);
+                        var estadoText = emp.Id == empleadoActualId ? "Asignado actualmente"
+                            : validacion?.PuedeAsignar == true ? "Libre"
+                            : validacion?.MotivoCorto ?? "No disponible";
+                        var rendimiento = validacion?.Rendimiento;
+                        var tiempoEstimado = rendimiento != null ? PickingApp.Services.Formato.Duracion(validacion!.TiempoEstimadoMinutos) : "-";
 
                         <tr class="@highlightClass">
                             <td class="fw-semibold">@emp.NombreCompleto</td>
@@ -62,7 +65,7 @@
                             <td>@emp.MesesExperiencia meses</td>
                             <td>@(string.IsNullOrEmpty(emp.JornadaLaboral) ? "Sin turno asignado" : emp.JornadaLaboral)</td>
                             <td>
-                                @if (rendimientos.TryGetValue(emp.Id, out var rendimiento))
+                                @if (rendimiento != null)
                                 {
                                     <span class="pf-rendimiento @ClaseRendimiento(rendimiento)">@rendimiento.Descripcion</span>
                                     <div class="small text-muted">@rendimiento.Detalle</div>
@@ -113,10 +116,10 @@
         Con menos de @minimoPedidos pedidos completados se usa el tiempo estándar.
     </p>
 
-    @if (tieneEmpleadoPocaExp && totalUbicaciones > maxUbicacionesAdvertencia)
+    @if (conAdvertencia.Any())
     {
         <div class="mockup-alert-warning">
-            <strong>Advertencia:</strong> @(empleadoPocaExp?.NombreCompleto ?? "El empleado") tiene menos de @mesesExperienciaAdvertencia meses de experiencia y el pedido contiene más de @maxUbicacionesAdvertencia ubicaciones
+            <strong>Advertencia:</strong> @string.Join(", ", conAdvertencia.Select(e => e.NombreCompleto)): @validaciones[conAdvertencia[0].Id].MotivoAdvertencia.
         </div>
         <div class="text-muted small mt-1">
             La advertencia no bloquea la asignación.

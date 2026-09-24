@@ -263,9 +263,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> Asignar(int id)
         {
             var pedido = await _context.Pedidos
-                .Include(p => p.Bodega)
                 .Include(p => p.Detalles)
-                .ThenInclude(d => d.Ubicacion)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (pedido == null) return NotFound();
@@ -279,54 +277,25 @@ namespace PickingApp.Controllers
             // CU-27: si el pedido ya está en curso con un empleado, esta vista sirve para reasignarlo
             var empleadoActualId = pedido.EstaEnCurso ? pedido.EmpleadoId : null;
 
-            // MesesExperiencia es [NotMapped] (propiedad calculada en C#), por lo que
-            // no puede ser traducida a SQL por EF Core. Se trae primero a memoria
-            // y luego se ordena en el lado del cliente.
-            var empleados = (await _context.Empleados
-                .Where(e => e.Activo)
-                .ToListAsync())
-                .OrderByDescending(e => e.MesesExperiencia)
-                .ToList();
+            // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante),
+            // evaluadas para todos los empleados en un número fijo de consultas
+            var empleados = await _context.Empleados.Where(e => e.Activo).ToListAsync();
+            var validaciones = await _pickingEngine.ValidarAsignacionesAsync(id, empleados.Select(e => e.Id).ToList());
 
-            // Tiempo estimado de cada empleado = tiempo estándar del pedido × su factor de rendimiento
-            var tiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
-            var rendimientos = await _pickingEngine.CalcularRendimientosAsync(empleados.Select(e => e.Id).ToList());
+            bool Asignable(Empleado e) => e.Id != empleadoActualId && validaciones[e.Id].PuedeAsignar;
 
-            var tiemposEstimados = new Dictionary<int, double>();
-            var motivosNoAsignable = new Dictionary<int, string>();
-            foreach (var emp in empleados)
-            {
-                tiemposEstimados[emp.Id] = rendimientos[emp.Id].Estimar(tiempoEstandar);
-
-                if (emp.Id == empleadoActualId)
-                {
-                    motivosNoAsignable[emp.Id] = "Asignado actualmente";
-                    continue;
-                }
-
-                // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante)
-                var validacion = await _pickingEngine.ValidarAsignacionAsync(id, emp.Id);
-                if (!validacion.PuedeAsignar)
-                {
-                    motivosNoAsignable[emp.Id] = validacion.MotivoCorto ?? "No disponible";
-                }
-            }
-
-            // Primero los que pueden recibir el pedido, por menor tiempo estimado; el recomendado es el primero de ellos
+            // Primero los que pueden recibir el pedido, por menor tiempo estimado; el recomendado es el primero de ellos.
+            // MesesExperiencia es [NotMapped], por eso el orden se aplica en memoria.
             empleados = empleados
-                .OrderBy(e => motivosNoAsignable.ContainsKey(e.Id))
-                .ThenBy(e => motivosNoAsignable.ContainsKey(e.Id) ? 0 : tiemposEstimados[e.Id])
+                .OrderBy(e => !Asignable(e))
+                .ThenBy(e => Asignable(e) ? validaciones[e.Id].TiempoEstimadoMinutos : 0)
                 .ThenByDescending(e => e.MesesExperiencia)
                 .ToList();
 
             ViewBag.Pedido = pedido;
-            ViewBag.TiemposEstimados = tiemposEstimados;
-            ViewBag.TiempoEstandar = tiempoEstandar;
-            ViewBag.Rendimientos = rendimientos;
-            ViewBag.MotivosNoAsignable = motivosNoAsignable;
-            ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(e => !motivosNoAsignable.ContainsKey(e.Id))?.Id;
-            ViewBag.MesesExperienciaAdvertencia = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MesesExperienciaAdvertencia);
-            ViewBag.MaxUbicacionesAdvertencia = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxUbicacionesAdvertencia);
+            ViewBag.TiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
+            ViewBag.Validaciones = validaciones;
+            ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(Asignable)?.Id;
             ViewBag.EmpleadoActualId = empleadoActualId;
             ViewBag.EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
                 ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null);
