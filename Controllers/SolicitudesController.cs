@@ -35,7 +35,7 @@ namespace PickingApp.Controllers
             // Supervisor solo puede aprobar/rechazar solicitudes de Registro de Empleado (CU-08)
             if (userRole == "Supervisor")
             {
-                query = query.Where(s => s.TipoSolicitud == "RegistroEmpleado");
+                query = query.Where(s => s.TipoSolicitud == TipoGestionableSupervisor);
             }
 
             if (!string.IsNullOrEmpty(estado))
@@ -81,8 +81,21 @@ namespace PickingApp.Controllers
 
             if (solicitud == null) return NotFound();
 
+            if (!PuedeGestionar(solicitud))
+            {
+                TempData["ErrorMessage"] = MensajeSinPermisoSupervisor;
+                return RedirectToAction(nameof(Index));
+            }
+
             return View(solicitud);
         }
+
+        // CU-08: el Supervisor solo revisa, aprueba o rechaza registros de empleados; el resto es del Administrador
+        private const string TipoGestionableSupervisor = "RegistroEmpleado";
+        private const string MensajeSinPermisoSupervisor = "Los Supervisores solo tienen permiso para gestionar solicitudes de registro de empleados.";
+
+        private bool PuedeGestionar(Solicitud solicitud) =>
+            !User.IsInRole("Supervisor") || solicitud.TipoSolicitud == TipoGestionableSupervisor;
 
         // Aprobar Solicitud (CU-08, CU-11, CU-14, CU-21, CU-41)
         [Authorize(Roles = "Administrador,Supervisor")]
@@ -104,10 +117,9 @@ namespace PickingApp.Controllers
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-            // Supervisor solo puede aprobar registro de empleado
-            if (userRole == "Supervisor" && solicitud.TipoSolicitud != "RegistroEmpleado")
+            if (!PuedeGestionar(solicitud))
             {
-                TempData["ErrorMessage"] = "Los Supervisores solo tienen permiso para aprobar registros de empleados.";
+                TempData["ErrorMessage"] = MensajeSinPermisoSupervisor;
                 return RedirectToAction(nameof(Index));
             }
 
@@ -295,6 +307,12 @@ namespace PickingApp.Controllers
             if (solicitud == null || solicitud.Estado != "Pendiente")
             {
                 TempData["ErrorMessage"] = "La solicitud no se encuentra disponible para rechazo.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!PuedeGestionar(solicitud))
+            {
+                TempData["ErrorMessage"] = MensajeSinPermisoSupervisor;
                 return RedirectToAction(nameof(Index));
             }
 
