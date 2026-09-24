@@ -252,9 +252,25 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
+            // Con las tablas ya vacías, se reinicia el autoincremento para que los próximos
+            // registros vuelvan a empezar en 1 (evita IDs de pedidos con números muy altos).
+            var tablasAReiniciar = new List<string> { "NovedadesPedido", "DetallesPedido", "Pedidos", "Solicitudes", "Notificaciones" };
+            if (limpiarLog)
+            {
+                tablasAReiniciar.Add("LogsSistema");
+            }
+            foreach (var tabla in tablasAReiniciar)
+            {
+                // Los nombres de tabla vienen de la lista fija de arriba, no de entrada del usuario.
+#pragma warning disable EF1002
+                await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tabla}` AUTO_INCREMENT = 1");
+#pragma warning restore EF1002
+            }
+
             await _auditService.LogAsync(userEmail, "Administrador", "Limpieza de Base de Datos", "Mantenimiento",
                 "Se ejecutó una limpieza completa de datos operativos (pedidos, novedades y solicitudes)"
-                + (limpiarLog ? $" y del LOG del sistema ({logsEliminados} registros eliminados)." : "."));
+                + (limpiarLog ? $" y del LOG del sistema ({logsEliminados} registros eliminados)." : ".")
+                + " Los autoincrementos de esas tablas se reiniciaron.");
 
             TempData["SuccessMessage"] = limpiarLog
                 ? "La base de datos operativa y el LOG del sistema fueron limpiados con éxito. Los usuarios y maestros se mantuvieron protegidos."
