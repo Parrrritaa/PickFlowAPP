@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Bodegas y ubicaciones";
     var todasBodegas = ViewBag.TodasBodegas as IEnumerable<PickingApp.Models.Bodega> ?? new List<PickingApp.Models.Bodega> { Model };
+    var ubicacionesPorBodega = ViewBag.UbicacionesPorBodega as Dictionary<int, int> ?? new Dictionary<int, int>();
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
     var puedeEliminarUbicacion = userRole == "Administrador" || userRole == "Supervisor";
     const int ubicacionesVisibles = 5;
@@ -25,7 +26,7 @@
                 {
                     var isCurrent = b.Id == Model.Id;
                     var bgStyle = isCurrent ? "background-color: #DCE7FA; border: 1px solid #BFDBFE;" : "background-color: #FFFFFF;";
-                    var count = b.Ubicaciones?.Count ?? 0;
+                    var count = ubicacionesPorBodega.GetValueOrDefault(b.Id);
 
                     <a asp-action="Detalle" asp-route-id="@b.Id" class="text-decoration-none d-block p-3 rounded-4 shadow-sm" style="@bgStyle">
                         <div class="fw-bold fs-5" style="color: @(isCurrent ? "#1E40AF" : "#1F2937");">@b.Nombre</div>

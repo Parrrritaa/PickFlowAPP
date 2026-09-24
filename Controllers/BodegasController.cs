@@ -25,10 +25,7 @@ namespace PickingApp.Controllers
         // CU-22: Consultar bodegas y ubicaciones
         public async Task<IActionResult> Index(string? estado, string? busquedaProducto)
         {
-            var query = _context.Bodegas
-                .Include(b => b.Ubicaciones)
-                .Include(b => b.Pedidos)
-                .AsQueryable();
+            var query = _context.Bodegas.AsQueryable();
 
             if (estado == "Activa")
             {
@@ -40,6 +37,8 @@ namespace PickingApp.Controllers
             }
 
             var bodegas = await query.OrderBy(b => b.Codigo).ToListAsync();
+
+            ViewBag.UbicacionesPorBodega = await ContarUbicacionesPorBodegaAsync();
 
             // Búsqueda de un producto específico: en qué bodega está y qué ubicación tiene
             List<Ubicacion>? resultadosProducto = null;
@@ -62,12 +61,17 @@ namespace PickingApp.Controllers
             return View(bodegas);
         }
 
+        // Las listas de bodegas solo muestran cuántas ubicaciones tiene cada una: se cuentan en SQL en vez de cargarlas
+        private Task<Dictionary<int, int>> ContarUbicacionesPorBodegaAsync() =>
+            _context.Ubicaciones
+                .GroupBy(u => u.BodegaId)
+                .Select(g => new { BodegaId = g.Key, Total = g.Count() })
+                .ToDictionaryAsync(x => x.BodegaId, x => x.Total);
+
         // Detalle de Bodega y sus Ubicaciones (Slide 26)
         public async Task<IActionResult> Detalle(int id, string? filtroUbicacion, string? filtroProducto)
         {
-            // AsNoTracking: esta vista es de solo lectura y más abajo se reemplaza bodega.Ubicaciones
-            // con la lista filtrada; sin esto, el change tracker de EF reutilizaría la misma instancia
-            // rastreada para la consulta de ViewBag.TodasBodegas y el filtro afectaría también ese conteo.
+            // AsNoTracking: vista de solo lectura; más abajo se reemplaza bodega.Ubicaciones con la lista filtrada.
             var bodega = await _context.Bodegas
                 .Include(b => b.Ubicaciones).ThenInclude(u => u.Producto)
                 .AsNoTracking()
@@ -95,10 +99,8 @@ namespace PickingApp.Controllers
 
             bodega.Ubicaciones = ubicaciones.ToList();
 
-            ViewBag.TodasBodegas = await _context.Bodegas
-                .Include(b => b.Ubicaciones)
-                .AsNoTracking()
-                .ToListAsync();
+            ViewBag.TodasBodegas = await _context.Bodegas.AsNoTracking().ToListAsync();
+            ViewBag.UbicacionesPorBodega = await ContarUbicacionesPorBodegaAsync();
             ViewBag.FiltroUbicacion = filtroUbicacion;
             ViewBag.FiltroProducto = filtroProducto;
 
@@ -193,14 +195,10 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarBodega(int id)
         {
-            var bodega = await _context.Bodegas
-                .Include(b => b.Ubicaciones)
-                .Include(b => b.Pedidos)
-                .FirstOrDefaultAsync(b => b.Id == id);
-
+            var bodega = await _context.Bodegas.FindAsync(id);
             if (bodega == null) return NotFound();
 
-            if (bodega.Ubicaciones.Any() || bodega.Pedidos.Any())
+            if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == id) || await _context.Pedidos.AnyAsync(p => p.BodegaId == id))
             {
                 TempData["ErrorMessage"] = $"No se puede eliminar la bodega '{bodega.Nombre}' porque tiene ubicaciones y/o pedidos asociados.";
                 return RedirectToAction(nameof(Index));

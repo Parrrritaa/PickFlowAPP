@@ -5,6 +5,7 @@
     var filtroEstado = ViewBag.FiltroEstado as string;
     var busquedaProducto = ViewBag.BusquedaProducto as string;
     var resultadosProducto = ViewBag.ResultadosProducto as List<PickingApp.Models.Ubicacion>;
+    var ubicacionesPorBodega = ViewBag.UbicacionesPorBodega as Dictionary<int, int> ?? new Dictionary<int, int>();
     var activoEstado = !string.IsNullOrEmpty(filtroEstado);
     var hayBusquedaProducto = !string.IsNullOrWhiteSpace(busquedaProducto);
 }
@@ -123,7 +124,7 @@
                     {
                         @foreach (var b in Model)
                         {
-                            var ubicacionesCount = b.Ubicaciones?.Count ?? 0;
+                            var ubicacionesCount = ubicacionesPorBodega.GetValueOrDefault(b.Id);
                             var estadoText = b.Activa ? "Activa" : "Inactiva";
 
                             <tr>
