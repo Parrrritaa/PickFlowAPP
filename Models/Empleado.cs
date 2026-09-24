@@ -55,9 +55,6 @@ namespace PickingApp.Models
             }
         }
 
-        [NotMapped]
-        public bool TieneMenosDeSeisMeses => MesesExperiencia < 6;
-
         public virtual ICollection<Pedido> PedidosAsignados { get; set; } = new List<Pedido>();
     }
 }

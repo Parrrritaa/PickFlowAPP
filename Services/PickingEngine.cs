@@ -254,27 +254,30 @@ namespace PickingApp.Services
                 return result;
             }
 
-            // Regla 5: Advertencia de Experiencia (< 6 meses y > 10 ubicaciones)
+            // Regla 5: Advertencia de Experiencia (menos meses y más ubicaciones que los configurados)
+            var mesesMinimos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MesesExperienciaAdvertencia);
+            var maxUbicaciones = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxUbicacionesAdvertencia);
             var totalUbicacionesPedido = pedido.Detalles.Select(d => d.UbicacionId).Distinct().Count();
-            if (empleado.TieneMenosDeSeisMeses && totalUbicacionesPedido > 10)
+            if (empleado.MesesExperiencia < mesesMinimos && totalUbicacionesPedido > maxUbicaciones)
             {
                 result.GeneraAdvertencia = true;
-                result.MensajeAdvertencia = $"ADVERTENCIA: El empleado '{empleado.NombreCompleto}' tiene menos de 6 meses de experiencia ({empleado.MesesExperiencia} meses) y el pedido contiene {totalUbicacionesPedido} ubicaciones (> 10). La asignación quedará registrada para auditoría del Administrador.";
+                result.MensajeAdvertencia = $"ADVERTENCIA: El empleado '{empleado.NombreCompleto}' tiene menos de {mesesMinimos} meses de experiencia ({empleado.MesesExperiencia} meses) y el pedido contiene {totalUbicacionesPedido} ubicaciones (> {maxUbicaciones}). La asignación quedará registrada para auditoría del Administrador.";
+                result.MotivoAdvertencia = $"menos de {mesesMinimos} meses de experiencia con más de {maxUbicaciones} ubicaciones";
             }
 
             result.PuedeAsignar = true;
             return result;
         }
 
-        public double CalcularTiempoProcesamiento(DateTime fechaAsignacion, DateTime fechaFinalizacion, int margenMinutos = 2)
+        // Tiempo real de picking: desde el inicio efectivo (asignación + margen) hasta la finalización
+        public double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion)
         {
-            var inicioEfectivo = fechaAsignacion.AddMinutes(margenMinutos);
-            if (fechaFinalizacion <= inicioEfectivo)
+            if (fechaFinalizacion <= inicioProceso)
             {
                 return 1.0; // Mínimo 1 minuto
             }
 
-            var diferencia = (fechaFinalizacion - inicioEfectivo).TotalMinutes;
+            var diferencia = (fechaFinalizacion - inicioProceso).TotalMinutes;
             return Math.Round(diferencia, 1);
         }
     }

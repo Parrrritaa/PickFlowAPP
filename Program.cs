@@ -17,14 +17,16 @@ builder.Services.AddScoped<IPickingEngine, PickingEngine>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-// Configuración de Autenticación por Cookies (RNF-06: Sesión de 10 minutos de inactividad)
+// Configuración de Autenticación por Cookies (RNF-06: cierre por inactividad).
+// La duración real la fija el inicio de sesión con el parámetro MinutosInactividadSesion;
+// este valor solo aplica si una sesión se emite sin expiración propia.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.LoginPath = "/Account/Login";
         options.LogoutPath = "/Account/Logout";
         options.AccessDeniedPath = "/Account/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(ParametrosSistema.Enteros[ParametrosSistema.MinutosInactividadSesion].Defecto);
         options.SlidingExpiration = true;
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;

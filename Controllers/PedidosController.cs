@@ -293,6 +293,8 @@ namespace PickingApp.Controllers
             ViewBag.Rendimientos = rendimientos;
             ViewBag.MotivosNoAsignable = motivosNoAsignable;
             ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(e => !motivosNoAsignable.ContainsKey(e.Id))?.Id;
+            ViewBag.MesesExperienciaAdvertencia = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MesesExperienciaAdvertencia);
+            ViewBag.MaxUbicacionesAdvertencia = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxUbicacionesAdvertencia);
             ViewBag.EmpleadoActualId = empleadoActualId;
             ViewBag.EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
                 ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null);
@@ -329,7 +331,7 @@ namespace PickingApp.Controllers
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
 
-            // Si genera advertencia de experiencia (< 6 meses y > 10 ubicaciones)
+            // Si genera advertencia de experiencia (umbrales de Configuración)
             if (validacion.GeneraAdvertencia)
             {
                 await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, empleado, esReasignacion: false, userEmail, userRole);
@@ -338,7 +340,7 @@ namespace PickingApp.Controllers
             pedido.EmpleadoId = empleadoId;
             pedido.Estado = "Asignado";
             pedido.FechaAsignacion = DateTime.Now;
-            pedido.FechaInicioProceso = DateTime.Now.AddMinutes(2); // Margen de 2 minutos reglamentario
+            pedido.FechaInicioProceso = DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync());
             pedido.TiempoEstimadoMinutos = validacion.TiempoEstimadoMinutos;
             pedido.TiempoEstandarMinutos = validacion.TiempoEstandarMinutos;
 
@@ -420,7 +422,7 @@ namespace PickingApp.Controllers
             pedido.Estado = "Reasignado";
             pedido.MotivoReasignacion = motivo;
             pedido.FechaAsignacion = DateTime.Now;
-            pedido.FechaInicioProceso = DateTime.Now.AddMinutes(2);
+            pedido.FechaInicioProceso = DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync());
             pedido.TiempoEstimadoMinutos = validacion.TiempoEstimadoMinutos;
             pedido.TiempoEstandarMinutos = validacion.TiempoEstandarMinutos;
 
@@ -439,9 +441,13 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 
+        // Minutos entre la asignación y el inicio efectivo del picking (parámetro MargenInicioMinutos)
+        private Task<int> ObtenerMargenInicioAsync() =>
+            ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos);
+
         private const int MaxLongitudMotivoReasignacion = 250; // varchar(250) en Pedidos.MotivoReasignacion
 
-        // CU-26 / CU-27: advertencia de experiencia (< 6 meses y > 10 ubicaciones); no bloquea la asignación
+        // CU-26 / CU-27: advertencia de experiencia (umbrales configurables); no bloquea la asignación
         private async Task RegistrarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido, Empleado empleado,
             bool esReasignacion, string userEmail, string userRole)
         {
@@ -452,7 +458,7 @@ namespace PickingApp.Controllers
             {
                 RolDestino = "Administrador",
                 Titulo = "Alerta de Asignación de Picking",
-                Mensaje = $"El {User.DescripcionParaNotificacion()} {(esReasignacion ? "reasignó" : "asignó")} el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} (menos de 6 meses de experiencia con más de 10 ubicaciones).",
+                Mensaje = $"El {User.DescripcionParaNotificacion()} {(esReasignacion ? "reasignó" : "asignó")} el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} ({validacion.MotivoAdvertencia}).",
                 Tipo = "Warning",
                 FechaCreacion = DateTime.Now
             });
@@ -480,7 +486,10 @@ namespace PickingApp.Controllers
             }
 
             var fechaFin = DateTime.Now;
-            var tiempoReal = _pickingEngine.CalcularTiempoProcesamiento(pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10), fechaFin);
+            // El tiempo real cuenta desde el inicio fijado al asignar (asignación + margen de ese momento)
+            var inicioProceso = pedido.FechaInicioProceso
+                ?? (pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10)).AddMinutes(await ObtenerMargenInicioAsync());
+            var tiempoReal = _pickingEngine.CalcularTiempoProcesamiento(inicioProceso, fechaFin);
 
             pedido.Estado = "Completado";
             pedido.ConfirmacionFisica = true;

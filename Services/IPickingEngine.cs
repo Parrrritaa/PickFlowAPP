@@ -9,6 +9,7 @@ namespace PickingApp.Services
         public string? MotivoCorto { get; set; } // Etiqueta breve para mostrar en la lista de asignación
         public bool GeneraAdvertencia { get; set; }
         public string? MensajeAdvertencia { get; set; }
+        public string? MotivoAdvertencia { get; set; } // Condición breve para la notificación al Administrador
         public double TiempoEstimadoMinutos { get; set; }
         public double TiempoEstandarMinutos { get; set; }
         public RendimientoEmpleado? Rendimiento { get; set; }
@@ -57,6 +58,6 @@ namespace PickingApp.Services
         Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds);
         Task<double> ObtenerMinutosPredeterminadosAsync();
         Task<double> ObtenerMinutosPorUbicacionAsync();
-        double CalcularTiempoProcesamiento(DateTime fechaAsignacion, DateTime fechaFinalizacion, int margenMinutos = 2);
+        double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion);
     }
 }

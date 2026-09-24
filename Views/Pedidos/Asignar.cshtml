@@ -2,8 +2,10 @@
 @{
     var pedido = ViewBag.Pedido as PickingApp.Models.Pedido;
     var totalUbicaciones = pedido?.Detalles?.Select(d => d.UbicacionId).Distinct().Count() ?? 0;
-    var tieneEmpleadoPocaExp = Model.Any(e => e.TieneMenosDeSeisMeses);
-    var empleadoPocaExp = Model.FirstOrDefault(e => e.TieneMenosDeSeisMeses);
+    var mesesExperienciaAdvertencia = ViewBag.MesesExperienciaAdvertencia as int? ?? 6;
+    var maxUbicacionesAdvertencia = ViewBag.MaxUbicacionesAdvertencia as int? ?? 10;
+    var tieneEmpleadoPocaExp = Model.Any(e => e.MesesExperiencia < mesesExperienciaAdvertencia);
+    var empleadoPocaExp = Model.FirstOrDefault(e => e.MesesExperiencia < mesesExperienciaAdvertencia);
     var tiemposEstimados = ViewBag.TiemposEstimados as Dictionary<int, double> ?? new Dictionary<int, double>();
     var motivosNoAsignable = ViewBag.MotivosNoAsignable as Dictionary<int, string> ?? new Dictionary<int, string>();
     var empleadoRecomendadoId = ViewBag.EmpleadoRecomendadoId as int?;
@@ -113,10 +115,10 @@
         Con menos de @minimoPedidos pedidos completados se usa el tiempo estándar.
     </p>
 
-    @if (tieneEmpleadoPocaExp && totalUbicaciones > 10)
+    @if (tieneEmpleadoPocaExp && totalUbicaciones > maxUbicacionesAdvertencia)
     {
         <div class="mockup-alert-warning">
-            <strong>Advertencia:</strong> @(empleadoPocaExp?.NombreCompleto ?? "El empleado") tiene menos de 6 meses de experiencia y el pedido contiene mas de 10 ubicaciones
+            <strong>Advertencia:</strong> @(empleadoPocaExp?.NombreCompleto ?? "El empleado") tiene menos de @mesesExperienciaAdvertencia meses de experiencia y el pedido contiene más de @maxUbicacionesAdvertencia ubicaciones
         </div>
         <div class="text-muted small mt-1">
             La advertencia no bloquea la asignación.

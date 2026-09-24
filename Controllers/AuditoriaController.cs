@@ -144,6 +144,18 @@ namespace PickingApp.Controllers
         {
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
 
+            // Los parámetros se aplican de inmediato: un valor fuera de rango (p. ej. 0 intentos) no se guarda
+            var errores = configuraciones
+                .Where(kvp => ParametrosSistema.Enteros.TryGetValue(kvp.Key, out var p) && !ParametrosSistema.EsValido(p, kvp.Value, out _))
+                .Select(kvp => ParametrosSistema.Enteros[kvp.Key])
+                .Select(p => $"{p.Nombre}: debe ser un número entero entre {p.Minimo} y {p.Maximo}")
+                .ToList();
+            if (errores.Any())
+            {
+                TempData["ErrorMessage"] = "No se guardaron los cambios. " + string.Join(". ", errores) + ".";
+                return RedirectToAction(nameof(Configuracion));
+            }
+
             foreach (var kvp in configuraciones)
             {
                 var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == kvp.Key);

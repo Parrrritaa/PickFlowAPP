@@ -66,6 +66,8 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            var maxIntentos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxIntentosFallidos);
+
             if (usuario.Estado == "Bloqueado")
             {
                 // RN-06-CU01: el bloqueo se levanta automáticamente a las 24 horas.
@@ -82,7 +84,7 @@ namespace PickingApp.Controllers
                 else
                 {
                     ModelState.AddModelError(string.Empty,
-                        "Tu cuenta se encuentra bloqueada por superar los 5 intentos consecutivos fallidos. Contacta a un Administrador o espera 24 horas.");
+                        "Tu cuenta se encuentra bloqueada por superar el límite de intentos consecutivos fallidos. Contacta a un Administrador o espera 24 horas.");
                     await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Acceso Bloqueado", "Autenticación",
                         "Intento de acceso a cuenta bloqueada", ipAddress);
                     return View(model);
@@ -112,8 +114,8 @@ namespace PickingApp.Controllers
             {
                 usuario.IntentosFallidos++;
 
-                // RNF-06: Bloqueo a los 5 intentos consecutivos excepto Administrador
-                if (usuario.IntentosFallidos >= 5 && usuario.Rol != "Administrador")
+                // RNF-06: Bloqueo al alcanzar los intentos consecutivos configurados, excepto Administrador
+                if (usuario.IntentosFallidos >= maxIntentos && usuario.Rol != "Administrador")
                 {
                     usuario.Estado = "Bloqueado";
                     usuario.FechaBloqueo = DateTime.Now;
@@ -122,7 +124,7 @@ namespace PickingApp.Controllers
                     {
                         RolDestino = "Administrador",
                         Titulo = "Cuenta Bloqueada",
-                        Mensaje = $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.Rol)} ha sido bloqueada por 5 intentos fallidos.",
+                        Mensaje = $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.Rol)} ha sido bloqueada por {usuario.IntentosFallidos} intentos fallidos.",
                         Tipo = "Danger",
                         FechaCreacion = DateTime.Now
                     });
@@ -130,16 +132,16 @@ namespace PickingApp.Controllers
                     await _context.SaveChangesAsync();
 
                     await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Bloqueo de Cuenta", "Seguridad", 
-                        $"Cuenta bloqueada tras 5 intentos fallidos consecutivos desde IP {ipAddress}", ipAddress);
+                        $"Cuenta bloqueada tras {usuario.IntentosFallidos} intentos fallidos consecutivos desde IP {ipAddress}", ipAddress);
 
-                    ModelState.AddModelError(string.Empty, 
-                        "Has alcanzado el límite de 5 intentos fallidos. Tu cuenta ha sido bloqueada temporalmente por seguridad.");
+                    ModelState.AddModelError(string.Empty,
+                        $"Has alcanzado el límite de {maxIntentos} intentos fallidos. Tu cuenta ha sido bloqueada temporalmente por seguridad.");
                     return View(model);
                 }
 
                 await _context.SaveChangesAsync();
 
-                var intentosRestantes = Math.Max(0, 5 - usuario.IntentosFallidos);
+                var intentosRestantes = Math.Max(0, maxIntentos - usuario.IntentosFallidos);
                 var mensajeError = usuario.Rol == "Administrador"
                     ? "Credenciales de acceso inválidas."
                     : $"Credenciales inválidas. Intentos restantes antes del bloqueo: {intentosRestantes}";
@@ -166,10 +168,13 @@ namespace PickingApp.Controllers
             };
 
             var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            // RNF-06: la expiración deslizante conserva esta duración en cada renovación, así que
+            // define el cierre por inactividad de toda la sesión
+            var minutosInactividad = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MinutosInactividadSesion);
             var authProperties = new AuthenticationProperties
             {
                 IsPersistent = model.RememberMe,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(10) // 10 minutos de inactividad
+                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(minutosInactividad)
             };
 
             await HttpContext.SignInAsync(

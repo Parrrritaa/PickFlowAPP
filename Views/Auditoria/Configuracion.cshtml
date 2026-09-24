@@ -34,7 +34,7 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Cierre de Sesión por Inactividad (Minutos)</label>
                                 <input type="number" name="configuraciones[MinutosInactividadSesion]" value="@configs.GetValueOrDefault("MinutosInactividadSesion", "10")" class="form-control" min="1" max="60" />
-                                <div class="form-text small">Estándar reglamentario: 10 minutos.</div>
+                                <div class="form-text small">Estándar reglamentario: 10 minutos. Aplica desde el siguiente inicio de sesión de cada usuario.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Intentos Fallidos antes de Bloqueo</label>
