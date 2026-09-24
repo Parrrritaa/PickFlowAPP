@@ -629,6 +629,9 @@ namespace PickingApp.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)");
 
+                    b.Property<int>("IntentosCodigo")
+                        .HasColumnType("int");
+
                     b.Property<int>("IntentosFallidos")
                         .HasColumnType("int");
 

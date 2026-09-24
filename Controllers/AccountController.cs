@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
@@ -24,10 +25,55 @@ namespace PickingApp.Controllers
             _emailService = emailService;
         }
 
-        // Código numérico de 6 dígitos, no predecible, para verificación por correo.
-        private static string GenerarCodigoVerificacion()
+        // Fallos permitidos contra un mismo código antes de anularlo.
+        private const int MaxIntentosCodigo = 5;
+
+        // Asigna al usuario un código numérico de 6 dígitos, no predecible, válido 10 minutos.
+        private static string AsignarCodigoVerificacion(Usuario usuario)
         {
-            return System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
+            var codigo = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
+            usuario.CodigoVerificacion = codigo;
+            usuario.CodigoVerificacionExpira = DateTime.Now.AddMinutes(10);
+            usuario.IntentosCodigo = 0;
+            return codigo;
+        }
+
+        private static bool CodigoCoincide(Usuario usuario, string codigo)
+        {
+            return !string.IsNullOrEmpty(usuario.CodigoVerificacion) &&
+                usuario.CodigoVerificacion == codigo.Trim() &&
+                usuario.CodigoVerificacionExpira.HasValue &&
+                usuario.CodigoVerificacionExpira.Value >= DateTime.Now;
+        }
+
+        // Cuenta un fallo contra el código vigente y lo anula al llegar al límite, para que los
+        // 6 dígitos no se puedan adivinar por fuerza bruta. Devuelve true si el código quedó anulado.
+        private async Task<bool> RegistrarFalloCodigoAsync(Usuario usuario, string ipAddress)
+        {
+            if (string.IsNullOrEmpty(usuario.CodigoVerificacion))
+            {
+                return false;
+            }
+
+            usuario.IntentosCodigo++;
+            var anulado = usuario.IntentosCodigo >= MaxIntentosCodigo;
+            if (anulado)
+            {
+                usuario.CodigoVerificacion = null;
+                usuario.CodigoVerificacionExpira = null;
+                usuario.PasswordPendienteHash = null;
+                usuario.IntentosCodigo = 0;
+            }
+            await _context.SaveChangesAsync();
+
+            await _auditService.LogAsync(usuario.Correo, usuario.Rol,
+                anulado ? "Código Anulado" : "Código Incorrecto", "Seguridad",
+                anulado
+                    ? $"Código de verificación anulado tras {MaxIntentosCodigo} intentos fallidos."
+                    : $"Código de verificación incorrecto (intento #{usuario.IntentosCodigo}).",
+                ipAddress);
+
+            return anulado;
         }
 
         [HttpGet]
@@ -224,6 +270,7 @@ namespace PickingApp.Controllers
         // CU-03: paso 1 — se envía un código de verificación de 6 dígitos al correo registrado.
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("CodigoVerificacion")]
         public async Task<IActionResult> SolicitarRecuperacion(SolicitarCodigoViewModel model)
         {
             if (!ModelState.IsValid)
@@ -239,9 +286,7 @@ namespace PickingApp.Controllers
             // qué correos están registrados (evita enumeración de usuarios).
             if (usuario != null)
             {
-                var codigo = GenerarCodigoVerificacion();
-                usuario.CodigoVerificacion = codigo;
-                usuario.CodigoVerificacionExpira = DateTime.Now.AddMinutes(10);
+                var codigo = AsignarCodigoVerificacion(usuario);
                 await _context.SaveChangesAsync();
 
                 try
@@ -274,6 +319,7 @@ namespace PickingApp.Controllers
         // CU-03: paso 2 — se valida el código y, si es correcto, el propio usuario establece su nueva contraseña.
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("CodigoVerificacion")]
         public async Task<IActionResult> VerificarCodigoRecuperacion(VerificarCodigoRecuperacionViewModel model)
         {
             if (!ModelState.IsValid)
@@ -284,21 +330,21 @@ namespace PickingApp.Controllers
             var usuario = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Correo.ToLower() == model.Correo.Trim().ToLower());
 
-            var codigoValido = usuario != null &&
-                !string.IsNullOrEmpty(usuario.CodigoVerificacion) &&
-                usuario.CodigoVerificacion == model.Codigo.Trim() &&
-                usuario.CodigoVerificacionExpira.HasValue &&
-                usuario.CodigoVerificacionExpira.Value >= DateTime.Now;
-
-            if (!codigoValido)
+            if (usuario == null || !CodigoCoincide(usuario, model.Codigo))
             {
-                ModelState.AddModelError("Codigo", "El código ingresado no es válido o ha expirado. Solicita uno nuevo.");
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+                var anulado = usuario != null && await RegistrarFalloCodigoAsync(usuario, ipAddress);
+
+                ModelState.AddModelError("Codigo", anulado
+                    ? "Superaste el número de intentos permitidos. Solicita un código nuevo."
+                    : "El código ingresado no es válido o ha expirado. Solicita uno nuevo.");
                 return View(model);
             }
 
-            usuario!.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
+            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
             usuario.CodigoVerificacion = null;
             usuario.CodigoVerificacionExpira = null;
+            usuario.IntentosCodigo = 0;
             usuario.IntentosFallidos = 0;
             if (usuario.Estado == "Bloqueado")
             {
@@ -365,9 +411,7 @@ namespace PickingApp.Controllers
             // CU-42: Supervisor y Auxiliar ya demostraron conocer su contraseña actual; ahora deben confirmar
             // un código de verificación enviado a su propio correo antes de aplicar el cambio (reemplaza la
             // aprobación manual del Administrador por una verificación de identidad más fuerte y automática).
-            var codigo = GenerarCodigoVerificacion();
-            usuario.CodigoVerificacion = codigo;
-            usuario.CodigoVerificacionExpira = DateTime.Now.AddMinutes(10);
+            var codigo = AsignarCodigoVerificacion(usuario);
             usuario.PasswordPendienteHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
             await _context.SaveChangesAsync();
 
@@ -398,6 +442,7 @@ namespace PickingApp.Controllers
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("CodigoVerificacion")]
         public async Task<IActionResult> VerificarCodigoCambio(VerificarCodigoCambioViewModel model)
         {
             var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -417,22 +462,22 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var codigoValido = !string.IsNullOrEmpty(usuario.CodigoVerificacion) &&
-                usuario.CodigoVerificacion == model.Codigo.Trim() &&
-                usuario.CodigoVerificacionExpira.HasValue &&
-                usuario.CodigoVerificacionExpira.Value >= DateTime.Now &&
-                !string.IsNullOrEmpty(usuario.PasswordPendienteHash);
-
-            if (!codigoValido)
+            if (!CodigoCoincide(usuario, model.Codigo) || string.IsNullOrEmpty(usuario.PasswordPendienteHash))
             {
-                ModelState.AddModelError("Codigo", "El código ingresado no es válido o ha expirado. Vuelve a solicitar el cambio de contraseña.");
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+                var anulado = await RegistrarFalloCodigoAsync(usuario, ipAddress);
+
+                ModelState.AddModelError("Codigo", anulado
+                    ? "Superaste el número de intentos permitidos. Vuelve a solicitar el cambio de contraseña."
+                    : "El código ingresado no es válido o ha expirado. Vuelve a solicitar el cambio de contraseña.");
                 return View(model);
             }
 
-            usuario.PasswordHash = usuario.PasswordPendienteHash!;
+            usuario.PasswordHash = usuario.PasswordPendienteHash;
             usuario.PasswordPendienteHash = null;
             usuario.CodigoVerificacion = null;
             usuario.CodigoVerificacionExpira = null;
+            usuario.IntentosCodigo = 0;
             await _context.SaveChangesAsync();
 
             await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Cambio de Contraseña", "Seguridad",

@@ -46,6 +46,9 @@ namespace PickingApp.Models
 
         public DateTime? CodigoVerificacionExpira { get; set; }
 
+        // Fallos acumulados contra el código vigente; al llegar al límite el código se anula.
+        public int IntentosCodigo { get; set; } = 0;
+
         // Hash de la nueva contraseña, pendiente de confirmar el código enviado al correo (CU-42).
         public string? PasswordPendienteHash { get; set; }
     }
