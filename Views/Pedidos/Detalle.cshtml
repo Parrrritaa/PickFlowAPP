@@ -8,12 +8,12 @@
     var categoriaPredeterminada = ViewBag.CategoriaPredeterminada as string ?? "Predeterminada";
     var superaJornada = tiempoEstandar > maxHorasJornada * 60;
     var partesSugeridas = Math.Max(2, (int)Math.Ceiling(tiempoEstandar / (maxHorasJornada * 60)));
-    var esDividido = Model.Estado == PickingApp.Models.PedidoEstados.Dividido;
+    var esDividido = Model.EstaDividido;
     var partes = Model.Partes.OrderBy(pa => pa.NumeroParte).ToList();
     var tiemposPartes = ViewBag.TiemposPartes as Dictionary<int, double> ?? new Dictionary<int, double>();
-    var partesTerminadas = partes.Count(pa => PickingApp.Models.PedidoEstados.Finalizados.Contains(pa.Estado));
-    var puedeDividir = Model.Estado == "Pendiente" && Model.PedidoPadreId == null && Model.Detalles.Sum(d => d.Cantidad) >= 2;
-    var puedeDeshacerDivision = esDividido && partes.All(pa => pa.Estado == "Pendiente");
+    var partesTerminadas = partes.Count(pa => pa.EstaFinalizado);
+    var puedeDividir = Model.MotivoNoDivisible() == null;
+    var puedeDeshacerDivision = Model.PuedeDeshacerDivision;
     var esGestor = userRole == "Administrador" || userRole == "Supervisor";
     if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
     const int productosVisibles = 5;
@@ -345,7 +345,7 @@
                     </button>
                 </form>
             }
-            else if (Model.Estado == "Asignado" || Model.Estado == "EnProceso" || Model.Estado == "Reasignado")
+            else if (Model.EstaEnCurso)
             {
                 <button type="button" class="btn-pf-blue" style="background-color: #52A447;" data-bs-toggle="modal" data-bs-target="#modalCompletar">
                     Marcar Completado
@@ -355,7 +355,7 @@
                 </a>
             }
 
-            @if (Model.Estado != "Completado" && Model.Estado != "Cancelado")
+            @if (!Model.EstaFinalizado)
             {
                 <button type="button" class="btn-pf-blue" data-bs-toggle="modal" data-bs-target="#modalCancelar">
                     Cancelar pedido

@@ -67,5 +67,64 @@ namespace PickingApp.Models
 
         public virtual ICollection<DetallePedido> Detalles { get; set; } = new List<DetallePedido>();
         public virtual ICollection<NovedadPedido> Novedades { get; set; } = new List<NovedadPedido>();
+
+        // Reglas de estado: controladores y vistas preguntan aquí en vez de comparar cadenas por su cuenta.
+
+        [NotMapped]
+        public bool EstaEnCurso => PedidoEstados.EnCurso.Contains(Estado);
+
+        [NotMapped]
+        public bool EstaFinalizado => PedidoEstados.Finalizados.Contains(Estado);
+
+        [NotMapped]
+        public bool EstaDividido => Estado == PedidoEstados.Dividido;
+
+        // Requiere Detalles cargados.
+        public string? MotivoNoDivisible()
+        {
+            if (PedidoPadreId != null) return "Una parte no puede dividirse de nuevo.";
+            if (Estado != PedidoEstados.Pendiente) return "Solo se pueden dividir pedidos pendientes (sin asignar).";
+            if (Detalles.Sum(d => d.Cantidad) < 2) return "El pedido necesita al menos 2 unidades para dividirse.";
+            return null;
+        }
+
+        // Las partes se vuelven a unir mientras ninguna se haya asignado ni tenga novedades.
+        // Requiere Partes con sus Novedades cargadas.
+        [NotMapped]
+        public bool PuedeDeshacerDivision =>
+            EstaDividido && Partes.All(pa => pa.Estado == PedidoEstados.Pendiente && !pa.Novedades.Any());
+
+        public void Asignar(int empleadoId, DateTime inicioProceso, double tiempoEstimado, double tiempoEstandar) =>
+            TomarEmpleado(PedidoEstados.Asignado, empleadoId, inicioProceso, tiempoEstimado, tiempoEstandar);
+
+        public void Reasignar(int empleadoId, string motivo, DateTime inicioProceso, double tiempoEstimado, double tiempoEstandar)
+        {
+            TomarEmpleado(PedidoEstados.Reasignado, empleadoId, inicioProceso, tiempoEstimado, tiempoEstandar);
+            MotivoReasignacion = motivo;
+        }
+
+        private void TomarEmpleado(string estado, int empleadoId, DateTime inicioProceso, double tiempoEstimado, double tiempoEstandar)
+        {
+            EmpleadoId = empleadoId;
+            Estado = estado;
+            FechaAsignacion = DateTime.Now;
+            FechaInicioProceso = inicioProceso;
+            TiempoEstimadoMinutos = tiempoEstimado;
+            TiempoEstandarMinutos = tiempoEstandar;
+        }
+
+        // Cuando todas las partes terminan, el pedido original se cierra: completado si al menos una parte
+        // se entregó, cancelado si no. Requiere Partes cargadas. Devuelve true si se cerró.
+        public bool CerrarSiTerminaronLasPartes()
+        {
+            if (!EstaDividido || Partes.Any(pa => !pa.EstaFinalizado)) return false;
+
+            var algunaCompletada = Partes.Any(pa => pa.Estado == PedidoEstados.Completado);
+            Estado = algunaCompletada ? PedidoEstados.Completado : PedidoEstados.Cancelado;
+            ConfirmacionFisica = algunaCompletada;
+            FechaFinalizacion = Partes.Max(pa => pa.FechaFinalizacion) ?? DateTime.Now;
+            if (!algunaCompletada) MotivoCancelacion = "Todas sus partes fueron canceladas.";
+            return true;
+        }
     }
 }

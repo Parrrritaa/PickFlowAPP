@@ -136,6 +136,8 @@ namespace PickingApp.Controllers
                     .ThenInclude(pa => pa.Empleado)
                 .Include(p => p.Partes)
                     .ThenInclude(pa => pa.Detalles)
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Novedades)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -273,14 +275,14 @@ namespace PickingApp.Controllers
 
             if (pedido == null) return NotFound();
 
-            if (pedido.Estado == PedidoEstados.Dividido)
+            if (pedido.EstaDividido)
             {
                 TempData["ErrorMessage"] = "El pedido fue dividido en partes: asigne cada parte por separado.";
                 return RedirectToAction(nameof(Detalle), new { id });
             }
 
             // CU-27: si el pedido ya está en curso con un empleado, esta vista sirve para reasignarlo
-            var empleadoActualId = PedidoEstados.EnCurso.Contains(pedido.Estado) ? pedido.EmpleadoId : null;
+            var empleadoActualId = pedido.EstaEnCurso ? pedido.EmpleadoId : null;
 
             // MesesExperiencia es [NotMapped] (propiedad calculada en C#), por lo que
             // no puede ser traducida a SQL por EF Core. Se trae primero a memoria
@@ -347,7 +349,7 @@ namespace PickingApp.Controllers
             if (pedido == null) return NotFound();
 
             // Un pedido en curso solo cambia de empleado por CU-27 (motivo obligatorio y liberación del anterior)
-            if (PedidoEstados.EnCurso.Contains(pedido.Estado))
+            if (pedido.EstaEnCurso)
             {
                 TempData["ErrorMessage"] = "El pedido ya tiene un empleado asignado. Use la opción Reasignar e indique el motivo.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
@@ -373,12 +375,8 @@ namespace PickingApp.Controllers
                 NotificarAdvertenciaAsignacion(validacion, pedido, empleado, esReasignacion: false);
             }
 
-            pedido.EmpleadoId = empleadoId;
-            pedido.Estado = "Asignado";
-            pedido.FechaAsignacion = DateTime.Now;
-            pedido.FechaInicioProceso = DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync());
-            pedido.TiempoEstimadoMinutos = validacion.TiempoEstimadoMinutos;
-            pedido.TiempoEstandarMinutos = validacion.TiempoEstandarMinutos;
+            pedido.Asignar(empleadoId, DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync()),
+                validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
 
             empleado.EstadoDisponibilidad = "EnPicking";
 
@@ -421,7 +419,7 @@ namespace PickingApp.Controllers
             var pedido = await _context.Pedidos.FindAsync(pedidoId);
             if (pedido == null) return NotFound();
 
-            if (!PedidoEstados.EnCurso.Contains(pedido.Estado) || !pedido.EmpleadoId.HasValue)
+            if (!pedido.EstaEnCurso || !pedido.EmpleadoId.HasValue)
             {
                 TempData["ErrorMessage"] = "Solo se puede reasignar un pedido que esté asignado a un empleado.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
@@ -458,13 +456,8 @@ namespace PickingApp.Controllers
                 NotificarAdvertenciaAsignacion(validacion, pedido, nuevoEmpleado, esReasignacion: true);
             }
 
-            pedido.EmpleadoId = nuevoEmpleadoId;
-            pedido.Estado = "Reasignado";
-            pedido.MotivoReasignacion = motivo;
-            pedido.FechaAsignacion = DateTime.Now;
-            pedido.FechaInicioProceso = DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync());
-            pedido.TiempoEstimadoMinutos = validacion.TiempoEstimadoMinutos;
-            pedido.TiempoEstandarMinutos = validacion.TiempoEstandarMinutos;
+            pedido.Reasignar(nuevoEmpleadoId, motivo, DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync()),
+                validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
 
             nuevoEmpleado.EstadoDisponibilidad = "EnPicking";
 
@@ -526,7 +519,7 @@ namespace PickingApp.Controllers
             var pedido = await _context.Pedidos.FindAsync(pedidoId);
             if (pedido == null) return NotFound();
 
-            if (!PedidoEstados.EnCurso.Contains(pedido.Estado))
+            if (!pedido.EstaEnCurso)
             {
                 TempData["ErrorMessage"] = "Solo se puede completar un pedido que esté asignado a un empleado.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
@@ -538,7 +531,7 @@ namespace PickingApp.Controllers
                 ?? (pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10)).AddMinutes(await ObtenerMargenInicioAsync());
             var tiempoReal = _pickingEngine.CalcularTiempoProcesamiento(inicioProceso, fechaFin);
 
-            pedido.Estado = "Completado";
+            pedido.Estado = PedidoEstados.Completado;
             pedido.ConfirmacionFisica = true;
             pedido.FechaFinalizacion = fechaFin;
             pedido.TiempoProcesamientoMinutos = tiempoReal;
@@ -574,13 +567,13 @@ namespace PickingApp.Controllers
             var pedido = await _context.Pedidos.FindAsync(pedidoId);
             if (pedido == null) return NotFound();
 
-            if (pedido.Estado == "Cancelado")
+            if (pedido.Estado == PedidoEstados.Cancelado)
             {
                 TempData["ErrorMessage"] = "El pedido ya se encuentra cancelado y no puede reactivarse (RNF-01).";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            if (pedido.Estado == "Completado")
+            if (pedido.Estado == PedidoEstados.Completado)
             {
                 TempData["ErrorMessage"] = "El pedido ya se encuentra completado y no puede cancelarse.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
@@ -591,7 +584,7 @@ namespace PickingApp.Controllers
 
             // Pedido dividido: se cancelan también las partes que no hayan terminado; las completadas se conservan
             var partesCanceladas = 0;
-            if (pedido.Estado == PedidoEstados.Dividido)
+            if (pedido.EstaDividido)
             {
                 var partesActivas = await _context.Pedidos
                     .Where(pa => pa.PedidoPadreId == pedido.Id && !PedidoEstados.Finalizados.Contains(pa.Estado))
@@ -599,7 +592,7 @@ namespace PickingApp.Controllers
                 foreach (var parte in partesActivas)
                 {
                     await LiberarEmpleadoAsync(parte.EmpleadoId);
-                    parte.Estado = "Cancelado";
+                    parte.Estado = PedidoEstados.Cancelado;
                     parte.MotivoCancelacion = $"Cancelado junto con el pedido {pedido.CodigoPedido}: {motivoCancelacion.Trim()}";
                     if (parte.MotivoCancelacion.Length > 250) parte.MotivoCancelacion = parte.MotivoCancelacion[..250];
                     parte.FechaFinalizacion = DateTime.Now;
@@ -607,7 +600,7 @@ namespace PickingApp.Controllers
                 partesCanceladas = partesActivas.Count;
             }
 
-            pedido.Estado = "Cancelado";
+            pedido.Estado = PedidoEstados.Cancelado;
             pedido.MotivoCancelacion = motivoCancelacion.Trim();
             pedido.FechaFinalizacion = DateTime.Now;
 
@@ -719,7 +712,7 @@ namespace PickingApp.Controllers
             var prioridadAnterior = pedido.Prioridad;
             pedido.Prioridad = nuevaPrioridad;
 
-            if (pedido.Estado == PedidoEstados.Dividido)
+            if (pedido.EstaDividido)
             {
                 await _context.Pedidos
                     .Where(pa => pa.PedidoPadreId == pedido.Id && !PedidoEstados.Finalizados.Contains(pa.Estado))
@@ -755,7 +748,7 @@ namespace PickingApp.Controllers
 
             if (pedido == null) return NotFound();
 
-            var error = MotivoNoDivisible(pedido);
+            var error = pedido.MotivoNoDivisible();
             if (error != null)
             {
                 TempData["ErrorMessage"] = error;
@@ -788,7 +781,7 @@ namespace PickingApp.Controllers
 
             if (pedido == null) return NotFound();
 
-            var error = MotivoNoDivisible(pedido);
+            var error = pedido.MotivoNoDivisible();
             if (error != null)
             {
                 TempData["ErrorMessage"] = error;
@@ -847,7 +840,7 @@ namespace PickingApp.Controllers
                     CodigoPedido = codigos[k - 1],
                     BodegaId = pedido.BodegaId,
                     Prioridad = pedido.Prioridad,
-                    Estado = "Pendiente",
+                    Estado = PedidoEstados.Pendiente,
                     FechaCarga = pedido.FechaCarga,
                     PedidoPadreId = pedido.Id,
                     NumeroParte = k,
@@ -897,7 +890,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            if (pedido.Partes.Any(pa => pa.Estado != "Pendiente" || pa.Novedades.Any()))
+            if (!pedido.PuedeDeshacerDivision)
             {
                 TempData["ErrorMessage"] = "No se puede deshacer la división: alguna parte ya fue asignada, finalizada o tiene novedades.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
@@ -905,7 +898,7 @@ namespace PickingApp.Controllers
 
             var totalPartes = pedido.Partes.Count;
             _context.Pedidos.RemoveRange(pedido.Partes);
-            pedido.Estado = "Pendiente";
+            pedido.Estado = PedidoEstados.Pendiente;
             await _context.SaveChangesAsync();
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
@@ -917,21 +910,12 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 
-        private static string? MotivoNoDivisible(Pedido pedido)
-        {
-            if (pedido.PedidoPadreId != null) return "Una parte no puede dividirse de nuevo.";
-            if (pedido.Estado != "Pendiente") return "Solo se pueden dividir pedidos pendientes (sin asignar).";
-            if (pedido.Detalles.Sum(d => d.Cantidad) < 2) return "El pedido necesita al menos 2 unidades para dividirse.";
-            return null;
-        }
-
         private IActionResult ErrorDivision(int pedidoId, string mensaje)
         {
             TempData["ErrorMessage"] = mensaje;
             return RedirectToAction(nameof(Dividir), new { id = pedidoId });
         }
 
-        // Cuando todas las partes terminan, el pedido original se cierra: completado si al menos una parte se entregó.
         // Solo modifica el contexto (la parte recién finalizada ya está rastreada con su nuevo estado), así el
         // cierre se guarda en el mismo SaveChanges que la parte. Devuelve el pedido original si se cerró.
         private async Task<Pedido?> CerrarPedidoDivididoSiTerminoAsync(int? pedidoPadreId)
@@ -942,22 +926,14 @@ namespace PickingApp.Controllers
                 .Include(p => p.Partes)
                 .FirstOrDefaultAsync(p => p.Id == pedidoPadreId);
 
-            if (padre == null || padre.Estado != PedidoEstados.Dividido) return null;
-            if (padre.Partes.Any(pa => !PedidoEstados.Finalizados.Contains(pa.Estado))) return null;
-
-            var algunaCompletada = padre.Partes.Any(pa => pa.Estado == "Completado");
-            padre.Estado = algunaCompletada ? "Completado" : "Cancelado";
-            padre.ConfirmacionFisica = algunaCompletada;
-            padre.FechaFinalizacion = padre.Partes.Max(pa => pa.FechaFinalizacion) ?? DateTime.Now;
-            if (!algunaCompletada) padre.MotivoCancelacion = "Todas sus partes fueron canceladas.";
-            return padre;
+            return padre != null && padre.CerrarSiTerminaronLasPartes() ? padre : null;
         }
 
         private async Task RegistrarCierrePedidoDivididoAsync(Pedido? padre, string userEmail, string userRole)
         {
             if (padre == null) return;
 
-            var completado = padre.Estado == "Completado";
+            var completado = padre.Estado == PedidoEstados.Completado;
             await _auditService.LogAsync(userEmail, userRole, completado ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
                 $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
         }
