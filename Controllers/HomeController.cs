@@ -33,7 +33,8 @@ namespace PickingApp.Controllers
             ViewBag.TotalCancelados = cancelados;
             ViewBag.TotalReasignados = reasignados;
 
-            var ultimosPedidos = await _context.Pedidos
+            // Mismo criterio que los contadores de arriba: el padre dividido no es trabajo por sí mismo, sus partes sí
+            var ultimosPedidos = await pedidosDeTrabajo
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
                 .OrderByDescending(p => p.FechaCarga)
