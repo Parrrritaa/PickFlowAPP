@@ -25,27 +25,6 @@ namespace PickingApp.Services
             return config == null || config.Valor.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task SetLogEnabledAsync(bool enabled)
-        {
-            var config = await _context.ConfiguracionesSistema
-                .FirstOrDefaultAsync(c => c.Clave == "LogHabilitado");
-
-            if (config == null)
-            {
-                _context.ConfiguracionesSistema.Add(new ConfiguracionSistema
-                {
-                    Clave = "LogHabilitado",
-                    Valor = enabled ? "true" : "false"
-                });
-            }
-            else
-            {
-                config.Valor = enabled ? "true" : "false";
-            }
-
-            await _context.SaveChangesAsync();
-        }
-
         // El LOG usa su propio contexto: guardarlo nunca debe confirmar los cambios que el
         // controlador todavía tiene pendientes en el contexto de la petición (quedarían a medias).
         public async Task LogAsync(string usuario, string rol, string accion, string modulo, string detalle, string? ip = null)

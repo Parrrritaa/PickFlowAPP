@@ -57,19 +57,6 @@ namespace PickingApp.Services
                 });
         }
 
-        // Tiempo estimado para un empleado concreto: tiempo estándar × su factor de rendimiento
-        public async Task<double> CalcularTiempoEstimadoAsync(int pedidoId, int empleadoId)
-        {
-            var rendimiento = await CalcularRendimientoAsync(empleadoId);
-            return rendimiento.Estimar(await CalcularTiempoEstandarAsync(pedidoId));
-        }
-
-        public async Task<RendimientoEmpleado> CalcularRendimientoAsync(int empleadoId)
-        {
-            var rendimientos = await CalcularRendimientosAsync(new[] { empleadoId });
-            return rendimientos[empleadoId];
-        }
-
         public async Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds)
         {
             var minimoPedidos = await ObtenerMinimoPedidosRendimientoAsync();

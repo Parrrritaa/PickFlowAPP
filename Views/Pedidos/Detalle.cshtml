@@ -17,8 +17,8 @@
     var esGestor = userRole == "Administrador" || userRole == "Supervisor";
     if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
     const int productosVisibles = 5;
-    var productosOcultos = Math.Max(0, (Model.Detalles?.Count ?? 0) - productosVisibles);
-    var pasillosPedido = (Model.Detalles ?? new List<PickingApp.Models.DetallePedido>())
+    var productosOcultos = Math.Max(0, Model.Detalles.Count - productosVisibles);
+    var pasillosPedido = Model.Detalles
         .Where(d => d.Ubicacion != null)
         .Select(d => d.Ubicacion!.Pasillo)
         .Distinct()
@@ -174,7 +174,7 @@
     <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h5 class="fw-bold mb-0 text-dark">@(esDividido || partes.Any() ? "Productos del pedido original" : "Productos")</h5>
-            @if (Model.Detalles != null && Model.Detalles.Count > 1)
+            @if (Model.Detalles.Count > 1)
             {
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <input type="text" id="filtroProductoTexto" class="mockup-search-input" placeholder="Buscar producto, código o ubicación..." />
@@ -202,7 +202,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (Model.Detalles != null && Model.Detalles.Any())
+                    @if (Model.Detalles.Any())
                     {
                         var indice = 0;
                         @foreach (var d in Model.Detalles)

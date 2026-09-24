@@ -1,7 +1,7 @@
 ﻿@model IEnumerable<PickingApp.Models.Empleado>
 @{
     var pedido = ViewBag.Pedido as PickingApp.Models.Pedido;
-    var totalUbicaciones = pedido?.Detalles?.Select(d => d.UbicacionId).Distinct().Count() ?? 0;
+    var totalUbicaciones = pedido?.Detalles.Select(d => d.UbicacionId).Distinct().Count() ?? 0;
     var validaciones = ViewBag.Validaciones as Dictionary<int, PickingApp.Services.AsignacionValidationResult>
         ?? new Dictionary<int, PickingApp.Services.AsignacionValidationResult>();
     var empleadoRecomendadoId = ViewBag.EmpleadoRecomendadoId as int?;

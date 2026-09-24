@@ -563,20 +563,6 @@ body {
     margin-bottom: 12px;
 }
 
-/* Notification Pill */
-.mockup-notification-item {
-    background-color: var(--pf-warning-bg);
-    border-radius: 12px;
-    padding: 16px 20px;
-    margin-bottom: 14px;
-    font-size: 16px;
-    font-weight: 500;
-    color: #1F2937;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
 /* Upload Dropzone */
 .mockup-upload-box {
     border: 2px dashed var(--pf-blue);

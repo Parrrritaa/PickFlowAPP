@@ -54,8 +54,6 @@ namespace PickingApp.Services
         Task<Dictionary<int, AsignacionValidationResult>> ValidarAsignacionesAsync(int pedidoId, IReadOnlyCollection<int> empleadoIds);
         Task<double> CalcularTiempoEstandarAsync(int pedidoId);
         Task<Dictionary<int, double>> CalcularTiemposEstandarAsync(IReadOnlyCollection<int> pedidoIds);
-        Task<double> CalcularTiempoEstimadoAsync(int pedidoId, int empleadoId);
-        Task<RendimientoEmpleado> CalcularRendimientoAsync(int empleadoId);
         Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds);
         Task<double> ObtenerMinutosPredeterminadosAsync();
         Task<double> ObtenerMinutosPorUbicacionAsync();
