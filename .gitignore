@@ -60,3 +60,8 @@ appsettings.Development.json
 
 # Config local de Claude Code
 .claude/
+.agents/
+graphify-out/
+CLAUDE.md
+skills-lock.json
+.gitattributes
