@@ -160,14 +160,14 @@ namespace PickingApp.Controllers
         }
 
         // CU-23: Cargar archivo Excel de pedidos
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public IActionResult CargarExcel()
         {
             return View();
         }
 
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CargarExcel(IFormFile archivoExcel)
@@ -195,8 +195,6 @@ namespace PickingApp.Controllers
             }
 
             // Registrar pedidos válidos en base de datos (Paso 8 del CU-23)
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
 
             // Los códigos de pedido duplicados ya se rechazaron en ValidarArchivoExcelAsync: un código
             // repetido no se renombra ni se reabre, porque duplicaría el trabajo de alistamiento.
@@ -204,7 +202,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, userRole, "Carga Excel Pedidos", "Pedidos", 
+            await _auditService.RegistrarAsync("Carga Excel Pedidos", "Pedidos", 
                 $"Se procesó el archivo '{archivoExcel.FileName}' registrando {validacion.TotalPedidos} pedidos ({validacion.TotalFilas} líneas de productos).");
 
             TempData["SuccessMessage"] = $"El archivo fue procesado correctamente y los {validacion.TotalPedidos} pedidos quedaron registrados en el sistema.";
@@ -212,7 +210,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-23: validar el archivo en el servidor sin registrar nada (resultado de validación antes de confirmar la carga)
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ValidarExcel(IFormFile archivoExcel)
@@ -249,7 +247,7 @@ namespace PickingApp.Controllers
         }
 
         // Descargar Plantilla Excel
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public IActionResult DescargarPlantilla()
         {
@@ -258,7 +256,7 @@ namespace PickingApp.Controllers
         }
 
         // Slide 8 / CU-26: Asignar pedido a empleado (Vista interactiva)
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> Asignar(int id)
         {
@@ -303,7 +301,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-26: Asignar pedido a empleado
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Asignar(int pedidoId, int empleadoId, bool ignorarAdvertencia = false)
@@ -329,9 +327,6 @@ namespace PickingApp.Controllers
             var empleado = await _context.Empleados.FindAsync(empleadoId);
             if (empleado == null) return NotFound();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-
             // Si genera advertencia de experiencia (umbrales de Configuración)
             if (validacion.GeneraAdvertencia)
             {
@@ -345,9 +340,9 @@ namespace PickingApp.Controllers
 
             if (validacion.GeneraAdvertencia)
             {
-                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: false, userEmail, userRole);
+                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: false);
             }
-            await _auditService.LogAsync(userEmail, userRole, "Asignar Pedido", "Pedidos", 
+            await _auditService.RegistrarAsync("Asignar Pedido", "Pedidos", 
                 $"Pedido {pedido.CodigoPedido} asignado al empleado {empleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)} (estándar {Formato.Duracion(validacion.TiempoEstandarMinutos)} × rendimiento {validacion.Rendimiento?.Factor ?? 1:0.00})");
 
             if (validacion.GeneraAdvertencia)
@@ -360,7 +355,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-27: Reasignar pedido a otro empleado
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Reasignar(int pedidoId, int nuevoEmpleadoId, string motivoReasignacion)
@@ -407,9 +402,6 @@ namespace PickingApp.Controllers
                 .Select(e => e.NombreCompleto)
                 .FirstOrDefaultAsync();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-
             if (validacion.GeneraAdvertencia)
             {
                 NotificarAdvertenciaAsignacion(validacion, pedido, nuevoEmpleado, esReasignacion: true);
@@ -422,9 +414,9 @@ namespace PickingApp.Controllers
 
             if (validacion.GeneraAdvertencia)
             {
-                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: true, userEmail, userRole);
+                await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: true);
             }
-            await _auditService.LogAsync(userEmail, userRole, "Reasignar Pedido", "Pedidos", 
+            await _auditService.RegistrarAsync("Reasignar Pedido", "Pedidos", 
                 $"Pedido {pedido.CodigoPedido} reasignado de {nombreEmpleadoAnterior ?? "(sin empleado)"} a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivo}");
 
             if (validacion.GeneraAdvertencia)
@@ -448,7 +440,7 @@ namespace PickingApp.Controllers
         {
             _context.Notificaciones.Add(new Notificacion
             {
-                RolDestino = "Administrador",
+                RolDestino = Roles.Administrador,
                 Titulo = "Alerta de Asignación de Picking",
                 Mensaje = $"El {User.DescripcionParaNotificacion()} {(esReasignacion ? "reasignó" : "asignó")} el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} ({validacion.MotivoAdvertencia}).",
                 Tipo = "Warning",
@@ -456,13 +448,12 @@ namespace PickingApp.Controllers
             });
         }
 
-        private Task RegistrarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido,
-            bool esReasignacion, string userEmail, string userRole) =>
-            _auditService.LogAsync(userEmail, userRole, "Advertencia de Asignación", "Pedidos",
-                $"{validacion.MensajeAdvertencia} - {(esReasignacion ? "Reasignado" : "Asignado")} por {User.FindFirstValue(ClaimTypes.Name)} ({userRole}) al pedido {pedido.CodigoPedido}");
+        private Task RegistrarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido, bool esReasignacion) =>
+            _auditService.RegistrarAsync("Advertencia de Asignación", "Pedidos",
+                $"{validacion.MensajeAdvertencia} - {(esReasignacion ? "Reasignado" : "Asignado")} por {User.Identity?.Name} ({User.FindFirstValue(ClaimTypes.Role)}) al pedido {pedido.CodigoPedido}");
 
         // CU-28: Marcar pedido como completado
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarcarCompletado(int pedidoId, bool confirmacionFisica)
@@ -495,21 +486,18 @@ namespace PickingApp.Controllers
 
             var padreCerrado = await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, userRole, "Completar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync("Completar Pedido", "Pedidos",
                 $"Pedido {pedido.CodigoPedido} marcado como completado con entrega física. Tiempo real calculado: {tiempoReal} min");
-            await RegistrarCierrePedidoDivididoAsync(padreCerrado, userEmail, userRole);
+            await RegistrarCierrePedidoDivididoAsync(padreCerrado);
 
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' completado exitosamente. Tiempo de procesamiento: {tiempoReal} minutos.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 
         // CU-31: Cancelar pedido
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Cancelar(int pedidoId, string motivoCancelacion)
@@ -558,14 +546,11 @@ namespace PickingApp.Controllers
 
             var padreCerrado = await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, userRole, "Cancelar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync("Cancelar Pedido", "Pedidos",
                 $"Pedido {pedido.CodigoPedido} cancelado{(partesCanceladas > 0 ? $" junto con {partesCanceladas} parte(s) sin terminar" : "")}. Motivo: {motivoCancelacion}");
-            await RegistrarCierrePedidoDivididoAsync(padreCerrado, userEmail, userRole);
+            await RegistrarCierrePedidoDivididoAsync(padreCerrado);
 
             TempData["SuccessMessage"] = partesCanceladas > 0
                 ? $"Pedido '{pedido.CodigoPedido}' y {partesCanceladas} parte(s) sin terminar cancelados correctamente."
@@ -574,7 +559,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-29: Registrar novedad al pedido
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RegistrarNovedad(int pedidoId, string tipoNovedad, string descripcion)
@@ -588,9 +573,7 @@ namespace PickingApp.Controllers
             var pedido = await _context.Pedidos.FindAsync(pedidoId);
             if (pedido == null) return NotFound();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userName = User.FindFirstValue(ClaimTypes.Name) ?? userEmail;
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
+            var userName = User.Identity?.Name ?? "Usuario";
 
             var novedad = new NovedadPedido
             {
@@ -606,7 +589,7 @@ namespace PickingApp.Controllers
 
             _context.Notificaciones.Add(new Notificacion
             {
-                RolDestino = "Administrador",
+                RolDestino = Roles.Administrador,
                 Titulo = "Novedad en Pedido",
                 Mensaje = $"Se registró una novedad de tipo '{tipoNovedad}' en el pedido {pedido.CodigoPedido}.",
                 Tipo = "Warning",
@@ -616,7 +599,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, userRole, "Registrar Novedad", "Pedidos", 
+            await _auditService.RegistrarAsync("Registrar Novedad", "Pedidos", 
                 $"Novedad registrada en pedido {pedido.CodigoPedido}: [{tipoNovedad}] {descripcion}");
 
             TempData["SuccessMessage"] = "Novedad registrada correctamente en el pedido.";
@@ -624,7 +607,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-30: Atender novedad (Solo Administrador)
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AtenderNovedad(int novedadId, string observacionesAtencion)
@@ -635,8 +618,7 @@ namespace PickingApp.Controllers
 
             if (novedad == null) return NotFound();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            var userName = User.FindFirstValue(ClaimTypes.Name) ?? userEmail;
+            var userName = User.Identity?.Name ?? "Usuario";
 
             novedad.Atendida = true;
             novedad.AtendidaPor = userName;
@@ -645,7 +627,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, "Administrador", "Atender Novedad", "Pedidos", 
+            await _auditService.RegistrarAsync("Atender Novedad", "Pedidos", 
                 $"Novedad #{novedad.Id} del pedido {novedad.Pedido?.CodigoPedido} marcada como atendida.");
 
             TempData["SuccessMessage"] = "La novedad ha sido marcada como atendida.";
@@ -653,7 +635,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-25: Cambiar prioridad del pedido (Solo Administrador)
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CambiarPrioridad(int pedidoId, string nuevaPrioridad)
@@ -671,21 +653,17 @@ namespace PickingApp.Controllers
                     .ForEachAsync(pa => pa.Prioridad = nuevaPrioridad);
             }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, "Administrador", "Cambiar Prioridad Pedido", "Pedidos", 
+            await _auditService.RegistrarAsync("Cambiar Prioridad Pedido", "Pedidos", 
                 $"Prioridad del pedido {pedido.CodigoPedido} modificada de {prioridadAnterior} a {nuevaPrioridad}");
 
             TempData["SuccessMessage"] = $"Prioridad cambiada a '{nuevaPrioridad}' para el pedido {pedido.CodigoPedido}.";
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
-    
-
 
         // Dividir un pedido grande en partes que se asignan por separado (p. ej. cuando supera una jornada)
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> Dividir(int id)
         {
@@ -718,7 +696,7 @@ namespace PickingApp.Controllers
         }
 
         // cantidades["{detalleId}_{parte}"] = unidades de esa línea que van en esa parte
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Dividir(int pedidoId, int partes, Dictionary<string, string>? cantidades)
@@ -810,9 +788,7 @@ namespace PickingApp.Controllers
             pedido.Estado = PedidoEstados.Dividido;
             await _context.SaveChangesAsync();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-            await _auditService.LogAsync(userEmail, userRole, "Dividir Pedido", "Pedidos",
+            await _auditService.RegistrarAsync("Dividir Pedido", "Pedidos",
                 $"Pedido {pedido.CodigoPedido} dividido en {partes} partes: {string.Join(", ", resumen)}.");
 
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' dividido en {partes} partes. Ahora puede asignar cada parte.";
@@ -820,7 +796,7 @@ namespace PickingApp.Controllers
         }
 
         // Volver a unir las partes mientras ninguna se haya asignado ni tenga novedades
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeshacerDivision(int pedidoId)
@@ -849,9 +825,7 @@ namespace PickingApp.Controllers
             pedido.Estado = PedidoEstados.Pendiente;
             await _context.SaveChangesAsync();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-            await _auditService.LogAsync(userEmail, userRole, "Deshacer División", "Pedidos",
+            await _auditService.RegistrarAsync("Deshacer División", "Pedidos",
                 $"Se unieron de nuevo las {totalPartes} partes del pedido {pedido.CodigoPedido}.");
 
             TempData["SuccessMessage"] = $"Se deshizo la división: el pedido '{pedido.CodigoPedido}' vuelve a estar pendiente como un solo pedido.";
@@ -877,12 +851,12 @@ namespace PickingApp.Controllers
             return padre != null && padre.CerrarSiTerminaronLasPartes() ? padre : null;
         }
 
-        private async Task RegistrarCierrePedidoDivididoAsync(Pedido? padre, string userEmail, string userRole)
+        private async Task RegistrarCierrePedidoDivididoAsync(Pedido? padre)
         {
             if (padre == null) return;
 
             var completado = padre.Estado == PedidoEstados.Completado;
-            await _auditService.LogAsync(userEmail, userRole, completado ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(completado ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
                 $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
         }
 

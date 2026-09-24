@@ -237,9 +237,7 @@ namespace PickingApp.Controllers
 
         private async Task RegistrarExportacionAsync(string accion, string detalle)
         {
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-            await _auditService.LogAsync(userEmail, userRole, accion, "Reportes", detalle);
+            await _auditService.RegistrarAsync(accion, "Reportes", detalle);
         }
     }
 }

@@ -7,8 +7,8 @@
     var categorias = ViewBag.Categorias as List<PickingApp.Models.CategoriaProducto> ?? new List<PickingApp.Models.CategoriaProducto>();
     var categoriaSeleccionada = ViewBag.CategoriaSeleccionada as string ?? "";
     var unidadesPorCaja = (ViewBag.UnidadesPorCaja as string) ?? ViewBag.UnidadesPorCaja?.ToString() ?? (Model.Producto?.UnidadesPorCaja ?? 1).ToString();
-    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
-    var esAdministrador = userRole == "Administrador";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
+    var esAdministrador = userRole == Roles.Administrador;
 
     var numeroProductoDefault = numeroProducto;
     if (string.IsNullOrEmpty(numeroProductoDefault) && Model.Producto != null)

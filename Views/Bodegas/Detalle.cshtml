@@ -3,8 +3,8 @@
     ViewData["Title"] = "Bodegas y ubicaciones";
     var todasBodegas = ViewBag.TodasBodegas as IEnumerable<PickingApp.Models.Bodega> ?? new List<PickingApp.Models.Bodega> { Model };
     var ubicacionesPorBodega = ViewBag.UbicacionesPorBodega as Dictionary<int, int> ?? new Dictionary<int, int>();
-    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
-    var puedeEliminarUbicacion = userRole == "Administrador" || userRole == "Supervisor";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
+    var puedeEliminarUbicacion = userRole == Roles.Administrador || userRole == Roles.Supervisor;
     const int ubicacionesVisibles = 5;
     var ubicacionesOcultas = Math.Max(0, (Model.Ubicaciones?.Count ?? 0) - ubicacionesVisibles);
     var filtroUbicacion = ViewBag.FiltroUbicacion as string;
@@ -133,7 +133,7 @@
                                                 <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
                                                         data-bs-toggle="modal" data-bs-target="#modalEliminarUbicacion"
                                                         data-pf-id="@u.Id" data-pf-texto="@u.CodigoUbicacion">
-                                                    @(userRole == "Administrador" ? "Eliminar" : "Solicitar eliminación")
+                                                    @(userRole == Roles.Administrador ? "Eliminar" : "Solicitar eliminación")
                                                 </button>
                                             </div>
                                         </td>
@@ -177,13 +177,13 @@
                     <input type="hidden" id="eliminarUbicacionId" name="id" data-pf-recibe="id" value="" />
                     <div class="modal-header border-0">
                         <h5 class="modal-title fw-bold text-danger">
-                            @(userRole == "Administrador" ? "Eliminar ubicación" : "Solicitar eliminación de ubicación")
+                            @(userRole == Roles.Administrador ? "Eliminar ubicación" : "Solicitar eliminación de ubicación")
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <p>Ubicación: <strong id="eliminarUbicacionCodigo" data-pf-recibe="texto"></strong></p>
-                        @if (userRole == "Administrador")
+                        @if (userRole == Roles.Administrador)
                         {
                             <div class="mockup-alert-warning mt-0 mb-3">
                                 Esta acción eliminará la ubicación directamente. Si tiene pedidos históricos asociados, no podrá eliminarse.

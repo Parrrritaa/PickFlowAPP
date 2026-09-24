@@ -26,11 +26,11 @@ namespace PickingApp.Models
 
         [Required]
         [StringLength(30)]
-        public string Rol { get; set; } = "Auxiliar"; // "Administrador", "Supervisor", "Auxiliar"
+        public string Rol { get; set; } = Roles.Auxiliar; // Valores en Roles
 
         [Required]
         [StringLength(20)]
-        public string Estado { get; set; } = "Activo"; // "Activo", "Inactivo", "Bloqueado"
+        public string Estado { get; set; } = EstadosUsuario.Activo; // Valores en EstadosUsuario
 
         public int IntentosFallidos { get; set; } = 0;
 

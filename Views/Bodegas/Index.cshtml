@@ -1,7 +1,7 @@
 @model IEnumerable<PickingApp.Models.Bodega>
 @{
     ViewData["Title"] = "Bodegas y ubicaciones";
-    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var filtroEstado = ViewBag.FiltroEstado as string;
     var busquedaProducto = ViewBag.BusquedaProducto as string;
     var resultadosProducto = ViewBag.ResultadosProducto as List<PickingApp.Models.Ubicacion>;
@@ -75,7 +75,7 @@
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <h4 class="fw-bold mb-0" style="color: #1F2937;">Bodegas registradas</h4>
-        @if (userRole == "Administrador")
+        @if (userRole == Roles.Administrador)
         {
             <a asp-action="Crear" class="btn-pf-blue">
                 + Crear bodega
@@ -139,7 +139,7 @@
                                         <a asp-action="Detalle" asp-route-id="@b.Id" class="btn-pf-blue" style="padding: 4px 18px; font-size: 14px;">
                                             Ver ubicaciones
                                         </a>
-                                        @if (userRole == "Administrador")
+                                        @if (userRole == Roles.Administrador)
                                         {
                                             <a asp-action="Editar" asp-route-id="@b.Id" class="btn-pf-gray" style="padding: 4px 18px; font-size: 14px;">
                                                 Editar
@@ -169,7 +169,7 @@
     </form>
 </div>
 
-@if (userRole == "Administrador")
+@if (userRole == Roles.Administrador)
 {
     <div class="modal fade" id="modalEliminarBodega" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">

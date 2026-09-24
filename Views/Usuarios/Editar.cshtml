@@ -32,9 +32,10 @@
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Rol <span class="text-danger">*</span></label>
                 <select name="rol" class="mockup-input" required>
-                    <option value="Administrador" selected="@(Model.Rol == "Administrador")">Administrador</option>
-                    <option value="Supervisor" selected="@(Model.Rol == "Supervisor")">Supervisor</option>
-                    <option value="Auxiliar" selected="@(Model.Rol == "Auxiliar")">Auxiliar</option>
+                    @foreach (var rol in Roles.Todos)
+                    {
+                        <option value="@rol" selected="@(Model.Rol == rol)">@rol</option>
+                    }
                 </select>
             </div>
         </div>
@@ -43,9 +44,10 @@
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Estado <span class="text-danger">*</span></label>
                 <select name="estado" class="mockup-input" required>
-                    <option value="Activo" selected="@(Model.Estado == "Activo")">Activo</option>
-                    <option value="Inactivo" selected="@(Model.Estado == "Inactivo")">Inactivo</option>
-                    <option value="Bloqueado" selected="@(Model.Estado == "Bloqueado")">Bloqueado</option>
+                    @foreach (var estado in EstadosUsuario.Todos)
+                    {
+                        <option value="@estado" selected="@(Model.Estado == estado)">@estado</option>
+                    }
                 </select>
             </div>
         </div>

@@ -9,7 +9,7 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = Roles.Administrador)]
     public class AuditoriaController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -71,8 +71,7 @@ namespace PickingApp.Controllers
 
             var pdfBytes = _reportService.GenerarReporteLogSistemaPdf(logs, modulo, usuario, fechaDesde.Value.Date, fechaHasta.Value.Date);
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(userEmail, "Administrador", "Exportar LOG a PDF", "Auditoría",
+            await _auditService.RegistrarAsync("Exportar LOG a PDF", "Auditoría",
                 $"Se exportó el LOG del sistema a PDF del {fechaDesde.Value:dd/MM/yyyy} al {fechaHasta.Value:dd/MM/yyyy} ({logs.Count} registros).");
 
             return File(pdfBytes, "application/pdf", $"Log_Sistema_{fechaDesde.Value:yyyyMMdd}_{fechaHasta.Value:yyyyMMdd}.pdf");
@@ -146,8 +145,6 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> GuardarConfiguracion(Dictionary<string, string> configuraciones)
         {
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-
             // Los parámetros se aplican de inmediato: un valor fuera de rango (p. ej. 0 intentos) no se guarda.
             // Solo se aceptan las claves definidas en ParametrosSistema.
             var valores = new Dictionary<string, string>();
@@ -191,7 +188,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, "Administrador", "Actualizar Configuración", "Sistema", 
+            await _auditService.RegistrarAsync("Actualizar Configuración", "Sistema", 
                 "Configuración general del sistema actualizada.");
 
             TempData["SuccessMessage"] = "Parámetros del sistema y auditoría guardados exitosamente.";
@@ -203,8 +200,6 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarLogs(DateTime? hastaFecha)
         {
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-
             // RN-02-CU40: no se depuran registros críticos de seguridad/auditoría, sin importar su fecha,
             // para conservar la trazabilidad de accesos, bloqueos, aprobaciones y mantenimiento del sistema.
             var modulosProtegidos = new[] { "Seguridad", "Autenticación", "Auditoría", "Mantenimiento" };
@@ -222,7 +217,7 @@ namespace PickingApp.Controllers
             _context.LogsSistema.RemoveRange(registrosAEliminar);
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, "Administrador", "Depuración de LOGs", "Auditoría", 
+            await _auditService.RegistrarAsync("Depuración de LOGs", "Auditoría", 
                 $"Se eliminaron {registrosAEliminar.Count} registros del historial de LOG.");
 
             TempData["SuccessMessage"] = $"Se han depurado {registrosAEliminar.Count} registros del LOG del sistema. Los registros de seguridad, autenticación y mantenimiento se conservaron.";
@@ -245,8 +240,6 @@ namespace PickingApp.Controllers
                 TempData["ErrorMessage"] = "Debe escribir exactamente 'LIMPIAR_SISTEMA' para confirmar la operación destructiva.";
                 return View("LimpiarBaseDatos");
             }
-
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
 
             // Eliminar dependientes: Novedades, DetallesPedido, Pedidos, Solicitudes, Notificaciones
             _context.NovedadesPedido.RemoveRange(_context.NovedadesPedido);
@@ -280,7 +273,7 @@ namespace PickingApp.Controllers
 #pragma warning restore EF1002
             }
 
-            await _auditService.LogAsync(userEmail, "Administrador", "Limpieza de Base de Datos", "Mantenimiento",
+            await _auditService.RegistrarAsync("Limpieza de Base de Datos", "Mantenimiento",
                 "Se ejecutó una limpieza completa de datos operativos (pedidos, novedades y solicitudes)"
                 + (limpiarLog ? $" y del LOG del sistema ({logsEliminados} registros eliminados)." : ".")
                 + " Los autoincrementos de esas tablas se reiniciaron.");

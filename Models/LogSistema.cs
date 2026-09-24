@@ -46,7 +46,7 @@ namespace PickingApp.Models
         {
             get
             {
-                var rol = Rol is "Administrador" or "Supervisor" or "Auxiliar" ? Rol : UsuarioAsociado?.Rol;
+                var rol = Rol is Roles.Administrador or Roles.Supervisor or Roles.Auxiliar ? Rol : UsuarioAsociado?.Rol;
 
                 if (UsuarioAsociado != null)
                     return rol != null ? $"{UsuarioAsociado.NombreCompleto} ({rol})" : UsuarioAsociado.NombreCompleto;

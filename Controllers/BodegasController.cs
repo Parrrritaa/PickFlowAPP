@@ -108,14 +108,14 @@ namespace PickingApp.Controllers
         }
 
         // CU-18: Crear bodega (Solo Administrador)
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpGet]
         public IActionResult Crear()
         {
             return View();
         }
 
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear(Bodega model)
@@ -139,8 +139,7 @@ namespace PickingApp.Controllers
             _context.Bodegas.Add(model);
             await _context.SaveChangesAsync();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(userEmail, "Administrador", "Crear Bodega", "Bodegas", 
+            await _auditService.RegistrarAsync("Crear Bodega", "Bodegas", 
                 $"Bodega creada: {model.Codigo} - {model.Nombre}");
 
             TempData["SuccessMessage"] = $"Bodega '{model.Nombre}' ({model.Codigo}) creada exitosamente.";
@@ -148,7 +147,7 @@ namespace PickingApp.Controllers
         }
 
         // Editar bodega (Solo Administrador)
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpGet]
         public async Task<IActionResult> Editar(int id)
         {
@@ -158,7 +157,7 @@ namespace PickingApp.Controllers
             return View(bodega);
         }
 
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Editar(int id, Bodega model)
@@ -181,8 +180,7 @@ namespace PickingApp.Controllers
             bodega.Activa = model.Activa;
             await _context.SaveChangesAsync();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(userEmail, "Administrador", "Editar Bodega", "Bodegas",
+            await _auditService.RegistrarAsync("Editar Bodega", "Bodegas",
                 $"Bodega {bodega.Codigo} editada: Nombre='{bodega.Nombre}', Activa={bodega.Activa}.");
 
             TempData["SuccessMessage"] = $"Bodega '{bodega.Nombre}' ({bodega.Codigo}) actualizada exitosamente.";
@@ -190,7 +188,7 @@ namespace PickingApp.Controllers
         }
 
         // Eliminar bodega (Solo Administrador)
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarBodega(int id)
@@ -207,8 +205,7 @@ namespace PickingApp.Controllers
             _context.Bodegas.Remove(bodega);
             await _context.SaveChangesAsync();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(userEmail, "Administrador", "Eliminar Bodega", "Bodegas",
+            await _auditService.RegistrarAsync("Eliminar Bodega", "Bodegas",
                 $"Bodega {bodega.Codigo} - {bodega.Nombre} eliminada.");
 
             TempData["SuccessMessage"] = $"Bodega '{bodega.Nombre}' ({bodega.Codigo}) eliminada del sistema.";
@@ -216,7 +213,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-19: Crear ubicación (Administrador y Supervisor)
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> CrearUbicacion(int bodegaId)
         {
@@ -229,7 +226,7 @@ namespace PickingApp.Controllers
             return View(model);
         }
 
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearUbicacion(Ubicacion model, string numeroProducto, string nombreProducto, string? categoriaProductoId, string? unidadesPorCaja)
@@ -306,9 +303,7 @@ namespace PickingApp.Controllers
             _context.Ubicaciones.Add(model);
             await _context.SaveChangesAsync();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-            await _auditService.LogAsync(userEmail, userRole, "Crear Ubicación", "Ubicaciones",
+            await _auditService.RegistrarAsync("Crear Ubicación", "Ubicaciones",
                 $"Ubicación creada en bodega {bodega.Codigo}: {model.CodigoUbicacion} (Producto: {producto.Codigo} - {producto.Nombre})");
 
             TempData["SuccessMessage"] = $"Ubicación '{model.CodigoUbicacion}' creada con éxito para el producto '{producto.Codigo}'.";
@@ -316,7 +311,7 @@ namespace PickingApp.Controllers
         }
 
         // Editar ubicación (Administrador: directo. Supervisor: genera solicitud que requiere aprobación)
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> EditarUbicacion(int id)
         {
@@ -333,7 +328,7 @@ namespace PickingApp.Controllers
             return View(ubicacion);
         }
 
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, string numeroProducto, string nombreProducto, string? motivo, string? categoriaProductoId, string? unidadesPorCaja)
@@ -369,7 +364,7 @@ namespace PickingApp.Controllers
             {
                 ModelState.AddModelError(string.Empty, "El nombre de producto es obligatorio.");
             }
-            if (userRole == "Supervisor" && string.IsNullOrWhiteSpace(motivo))
+            if (userRole == Roles.Supervisor && string.IsNullOrWhiteSpace(motivo))
             {
                 ModelState.AddModelError(string.Empty, "Debe indicar el motivo de la edición.");
             }
@@ -412,12 +407,11 @@ namespace PickingApp.Controllers
                 return View(ubicacionExistente);
             }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var codigoProductoAnterior = ubicacionExistente.Producto?.Codigo ?? "-";
             var nombreProductoAnterior = ubicacionExistente.Producto?.Nombre ?? "-";
 
-            if (userRole == "Administrador")
+            if (userRole == Roles.Administrador)
             {
                 var producto = await _context.Productos
                     .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == codigoProductoNuevo.ToUpper());
@@ -442,7 +436,7 @@ namespace PickingApp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Editar Ubicación", "Ubicaciones",
+                await _auditService.RegistrarAsync("Editar Ubicación", "Ubicaciones",
                     $"Ubicación editada en bodega {ubicacionExistente.Bodega!.Codigo}: {codigoUbicacionNuevo} (Producto: {producto.Codigo} - {producto.Nombre})");
 
                 TempData["SuccessMessage"] = $"Ubicación '{codigoUbicacionNuevo}' actualizada exitosamente.";
@@ -502,7 +496,7 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = "Administrador",
+                    RolDestino = Roles.Administrador,
                     Titulo = "Solicitud de Edición de Ubicación",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar la ubicación {ubicacionExistente.CodigoUbicacion}.",
                     Tipo = "Info",
@@ -512,7 +506,7 @@ namespace PickingApp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Solicitud Edición Ubicación", "Solicitudes",
+                await _auditService.RegistrarAsync("Solicitud Edición Ubicación", "Solicitudes",
                     $"Solicitud de edición enviada para ubicación {ubicacionExistente.CodigoUbicacion}. Motivo: {motivo}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud de modificación para la ubicación '{ubicacionExistente.CodigoUbicacion}'. Requiere aprobación del Administrador.";
@@ -533,7 +527,6 @@ namespace PickingApp.Controllers
 
             if (ubicacion == null) return NotFound();
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -545,18 +538,18 @@ namespace PickingApp.Controllers
             }
 
             // Administrador: Eliminación Directa
-            if (userRole == "Administrador")
+            if (userRole == Roles.Administrador)
             {
                 _context.Ubicaciones.Remove(ubicacion);
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Eliminar Ubicación", "Ubicaciones", 
+                await _auditService.RegistrarAsync("Eliminar Ubicación", "Ubicaciones", 
                     $"Ubicación {ubicacion.CodigoUbicacion} eliminada directamente por el Administrador.");
 
                 TempData["SuccessMessage"] = $"Ubicación '{ubicacion.CodigoUbicacion}' eliminada del sistema.";
             }
             // Supervisor: Solicitar Eliminación (CU-20)
-            else if (userRole == "Supervisor")
+            else if (userRole == Roles.Supervisor)
             {
                 var solicitud = new Solicitud
                 {
@@ -576,7 +569,7 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = "Administrador",
+                    RolDestino = Roles.Administrador,
                     Titulo = "Solicitud de Eliminación de Ubicación",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó eliminar la ubicación {ubicacion.CodigoUbicacion}.",
                     Tipo = "Warning",
@@ -586,7 +579,7 @@ namespace PickingApp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Solicitud Eliminación Ubicación", "Solicitudes", 
+                await _auditService.RegistrarAsync("Solicitud Eliminación Ubicación", "Solicitudes", 
                     $"Supervisor solicitó eliminación de ubicación {ubicacion.CodigoUbicacion}. Motivo: {motivo}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud de eliminación para la ubicación '{ubicacion.CodigoUbicacion}'. Requiere aprobación del Administrador.";

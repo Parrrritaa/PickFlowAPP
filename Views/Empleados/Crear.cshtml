@@ -1,7 +1,7 @@
 @model PickingApp.Models.Empleado
 @{
-    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
-    var esAuxiliar = userRole == "Auxiliar";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
+    var esAuxiliar = userRole == Roles.Auxiliar;
     ViewData["Title"] = esAuxiliar ? "Solicitar registro de empleado" : "Registrar empleado";
 }
 

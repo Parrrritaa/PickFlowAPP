@@ -48,9 +48,10 @@
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Rol <span class="text-danger">*</span></label>
                 <select asp-for="Rol" class="mockup-input" required>
-                    <option value="Administrador">Administrador</option>
-                    <option value="Supervisor">Supervisor</option>
-                    <option value="Auxiliar">Auxiliar</option>
+                    @foreach (var rol in Roles.Todos)
+                    {
+                        <option value="@rol">@rol</option>
+                    }
                 </select>
                 <span asp-validation-for="Rol" class="text-danger small"></span>
             </div>
@@ -71,9 +72,10 @@
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Estado <span class="text-danger">*</span></label>
                 <select asp-for="Estado" class="mockup-input">
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
-                    <option value="Bloqueado">Bloqueado</option>
+                    @foreach (var estado in EstadosUsuario.Todos)
+                    {
+                        <option value="@estado">@estado</option>
+                    }
                 </select>
             </div>
             <div class="col-md-6">

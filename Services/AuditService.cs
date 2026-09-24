@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
 
@@ -8,19 +9,33 @@ namespace PickingApp.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly DbContextOptions<ApplicationDbContext> _options;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AuditService(ApplicationDbContext context, DbContextOptions<ApplicationDbContext> options)
+        public AuditService(ApplicationDbContext context, DbContextOptions<ApplicationDbContext> options,
+            IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _options = options;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        // Registra una acción del usuario que tiene la sesión iniciada (correo, rol e IP salen de la petición)
+        public Task RegistrarAsync(string accion, string modulo, string detalle)
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            return LogAsync(user?.FindFirstValue(ClaimTypes.Email) ?? string.Empty,
+                user?.FindFirstValue(ClaimTypes.Role) ?? string.Empty, accion, modulo, detalle);
         }
 
         public Task<bool> IsLogEnabledAsync() => ParametrosSistema.LogHabilitadoAsync(_context);
 
         // El LOG usa su propio contexto: guardarlo nunca debe confirmar los cambios que el
         // controlador todavía tiene pendientes en el contexto de la petición (quedarían a medias).
+        // Para acciones sin sesión iniciada (login, recuperación de contraseña), donde el usuario se indica a mano
         public async Task LogAsync(string usuario, string rol, string accion, string modulo, string detalle, string? ip = null)
         {
+            // Se toma antes de cualquier await: la llamada puede no esperarse y terminar después de la petición
+            ip ??= _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
             try
             {
                 await using var db = new ApplicationDbContext(_options);

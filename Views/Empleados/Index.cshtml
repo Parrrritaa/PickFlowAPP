@@ -1,9 +1,9 @@
 ﻿@model IEnumerable<PickingApp.Models.Empleado>
 @{
     ViewData["Title"] = "Gestión de empleados";
-    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
-    var esAdmin = userRole == "Administrador";
-    var esAuxiliar = userRole == "Auxiliar";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
+    var esAdmin = userRole == Roles.Administrador;
+    var esAuxiliar = userRole == Roles.Auxiliar;
     // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
     var ocupados = ViewBag.EmpleadosOcupados as HashSet<int> ?? new HashSet<int>();

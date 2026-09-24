@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
+using PickingApp.Models;
 
 namespace PickingApp.ViewComponents
 {
@@ -34,10 +35,10 @@ namespace PickingApp.ViewComponents
                     (n.UsuarioDestinoId == userId || n.RolDestino == userRole ||
                      (n.UsuarioDestinoId == null && n.RolDestino == null))),
 
-                "solicitudes" when userRole == "Administrador" =>
+                "solicitudes" when userRole == Roles.Administrador =>
                     await _context.Solicitudes.CountAsync(s => s.Estado == "Pendiente"),
 
-                "solicitudes" when userRole == "Supervisor" =>
+                "solicitudes" when userRole == Roles.Supervisor =>
                     await _context.Solicitudes.CountAsync(s => s.Estado == "Pendiente" && s.TipoSolicitud == TipoGestionableSupervisor),
 
                 _ => 0

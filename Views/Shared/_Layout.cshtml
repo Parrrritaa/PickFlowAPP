@@ -23,7 +23,7 @@
     {
         var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
         var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
-        var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
+        var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
         var userName = User.Identity.Name ?? "Usuario";
         // Get first name or display name
         var displayName = userName.Contains("@") ? userName.Split('@')[0] : userName;
@@ -52,7 +52,7 @@
                             Pedidos
                         </a>
                     </li>
-                    @if (userRole == "Administrador" || userRole == "Supervisor")
+                    @if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Pedidos" && currentAction == "CargarExcel" ? "active" : "")" asp-controller="Pedidos" asp-action="CargarExcel">
@@ -66,7 +66,7 @@
                         </a>
                     </li>
                     <li class="pf-nav-item">
-                        @if (userRole == "Auxiliar")
+                        @if (userRole == Roles.Auxiliar)
                         {
                             <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="MisSolicitudes">
                                 Solicitudes
@@ -92,7 +92,7 @@
                         </a>
                     </li>
 
-                    @if (userRole == "Administrador")
+                    @if (userRole == Roles.Administrador)
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Usuarios" ? "active" : "")" asp-controller="Usuarios" asp-action="Index">
@@ -107,7 +107,7 @@
                         </a>
                     </li>
 
-                    @if (userRole == "Administrador")
+                    @if (userRole == Roles.Administrador)
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Productos" ? "active" : "")" asp-controller="Productos" asp-action="Index">
@@ -116,7 +116,7 @@
                         </li>
                     }
 
-                    @if (userRole == "Administrador")
+                    @if (userRole == Roles.Administrador)
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Auditoria" ? "active" : "")" asp-controller="Auditoria" asp-action="Index">

@@ -9,8 +9,8 @@
         nombres = parts[0];
         apellidos = parts.Length > 1 ? parts[1] : "";
     }
-    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
-    var esAdministrador = userRole == "Administrador";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
+    var esAdministrador = userRole == Roles.Administrador;
     var motivo = ViewBag.Motivo as string;
 }
 

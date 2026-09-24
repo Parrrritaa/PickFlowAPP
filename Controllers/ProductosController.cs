@@ -9,7 +9,7 @@ using PickingApp.Services;
 namespace PickingApp.Controllers
 {
     // Categorías de manipulación y clasificación de productos (solo Administrador): definen el tiempo estándar de picking
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = Roles.Administrador)]
     public class ProductosController : Controller
     {
         private const double MaxMinutosPorUnidad = 600;
@@ -172,8 +172,7 @@ namespace PickingApp.Controllers
 
         private async Task RegistrarAsync(string accion, string detalle)
         {
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(userEmail, "Administrador", accion, "Productos", detalle);
+            await _auditService.RegistrarAsync(accion, "Productos", detalle);
         }
     }
 }

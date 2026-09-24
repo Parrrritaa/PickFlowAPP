@@ -22,7 +22,7 @@ namespace PickingApp.Controllers
         }
 
         // Bandeja de aprobación para Administrador y Supervisor
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         public async Task<IActionResult> Index(string? estado = null)
         {
             var userRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
@@ -33,7 +33,7 @@ namespace PickingApp.Controllers
                 .AsQueryable();
 
             // Supervisor solo puede aprobar/rechazar solicitudes de Registro de Empleado (CU-08)
-            if (userRole == "Supervisor")
+            if (userRole == Roles.Supervisor)
             {
                 query = query.Where(s => s.TipoSolicitud == TipoGestionableSupervisor);
             }
@@ -70,7 +70,7 @@ namespace PickingApp.Controllers
         }
 
         // Slide 16 / CU-08: Revisar Solicitud
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> Revisar(int id)
         {
@@ -95,10 +95,10 @@ namespace PickingApp.Controllers
         private const string MensajeSinPermisoSupervisor = "Los Supervisores solo tienen permiso para gestionar solicitudes de registro de empleados.";
 
         private bool PuedeGestionar(Solicitud solicitud) =>
-            !User.IsInRole("Supervisor") || solicitud.TipoSolicitud == TipoGestionableSupervisor;
+            !User.IsInRole(Roles.Supervisor) || solicitud.TipoSolicitud == TipoGestionableSupervisor;
 
         // Aprobar Solicitud (CU-08, CU-11, CU-14, CU-21, CU-41)
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Aprobar(int id)
@@ -113,8 +113,6 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             if (!PuedeGestionar(solicitud))
@@ -283,7 +281,7 @@ namespace PickingApp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Aprobar Solicitud", "Solicitudes",
+                await _auditService.RegistrarAsync("Aprobar Solicitud", "Solicitudes",
                     $"Solicitud #{solicitud.Id} ({solicitud.TipoSolicitud}) aprobada.");
 
                 TempData["SuccessMessage"] = $"Solicitud #{solicitud.Id} aprobada correctamente.";
@@ -302,7 +300,7 @@ namespace PickingApp.Controllers
         }
 
         // Rechazar Solicitud (CU-08, CU-11, CU-14, CU-21, CU-41)
-        [Authorize(Roles = "Administrador,Supervisor")]
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Rechazar(int id, string motivoRechazo)
@@ -326,8 +324,6 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             solicitud.Estado = "Rechazada";
@@ -348,7 +344,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(userEmail, userRole, "Rechazar Solicitud", "Solicitudes", 
+            await _auditService.RegistrarAsync("Rechazar Solicitud", "Solicitudes", 
                 $"Solicitud #{solicitud.Id} rechazada. Motivo: {motivoRechazo}");
 
             TempData["SuccessMessage"] = $"Solicitud #{solicitud.Id} rechazada.";

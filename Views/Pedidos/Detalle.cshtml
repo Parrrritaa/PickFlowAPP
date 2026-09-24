@@ -1,7 +1,7 @@
 ﻿@model PickingApp.Models.Pedido
 @{
     ViewData["Title"] = $"Pedido {Model.CodigoPedido}";
-    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
+    var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var totalUbicaciones = Model.Detalles.Select(d => d.UbicacionId).Distinct().Count();
     var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
     var maxHorasJornada = ViewBag.MaxHorasJornada as double? ?? 9.0;
@@ -14,7 +14,7 @@
     var partesTerminadas = partes.Count(pa => pa.EstaFinalizado);
     var puedeDividir = Model.MotivoNoDivisible() == null;
     var puedeDeshacerDivision = Model.PuedeDeshacerDivision;
-    var esGestor = userRole == "Administrador" || userRole == "Supervisor";
+    var esGestor = userRole == Roles.Administrador || userRole == Roles.Supervisor;
     if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
     const int productosVisibles = 5;
     var productosOcultos = Math.Max(0, Model.Detalles.Count - productosVisibles);
@@ -52,7 +52,7 @@
             <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
                 <div class="text-secondary fw-semibold small mb-1">Prioridad</div>
                 <div class="fw-bold fs-3 text-dark">@Model.Prioridad</div>
-                @if (userRole == "Administrador")
+                @if (userRole == Roles.Administrador)
                 {
                     <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-bs-toggle="modal" data-bs-target="#modalPrioridad">
                         Cambiar
@@ -274,7 +274,7 @@
                             <th>Descripción</th>
                             <th>Registrado por</th>
                             <th>Estado</th>
-                            @if (userRole == "Administrador")
+                            @if (userRole == Roles.Administrador)
                             {
                                 <th class="text-center">Acción</th>
                             }
@@ -298,7 +298,7 @@
                                         <span class="badge bg-warning text-dark">Pendiente</span>
                                     }
                                 </td>
-                                @if (userRole == "Administrador")
+                                @if (userRole == Roles.Administrador)
                                 {
                                     <td class="text-center">
                                         @if (!nov.Atendida)
@@ -321,7 +321,7 @@
 
     <!-- Action Buttons matching Slide 7 -->
     <div class="d-flex flex-wrap gap-3 mt-4 pt-2 align-items-center">
-        @if (userRole == "Administrador" || userRole == "Supervisor")
+        @if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
         {
             @if (Model.Estado == PickingApp.Models.PedidoEstados.Pendiente)
             {
@@ -373,7 +373,7 @@
     </div>
 </div>
 
-@if (userRole == "Administrador")
+@if (userRole == Roles.Administrador)
 {
     <!-- Modal Cambiar Prioridad (CU-25) -->
     <div class="modal fade" id="modalPrioridad" tabindex="-1" aria-hidden="true">

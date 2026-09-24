@@ -48,7 +48,7 @@ namespace PickingApp.Controllers
 
         // Cuenta un fallo contra el código vigente y lo anula al llegar al límite, para que los
         // 6 dígitos no se puedan adivinar por fuerza bruta. Devuelve true si el código quedó anulado.
-        private async Task<bool> RegistrarFalloCodigoAsync(Usuario usuario, string ipAddress)
+        private async Task<bool> RegistrarFalloCodigoAsync(Usuario usuario)
         {
             if (string.IsNullOrEmpty(usuario.CodigoVerificacion))
             {
@@ -70,8 +70,7 @@ namespace PickingApp.Controllers
                 anulado ? "Código Anulado" : "Código Incorrecto", "Seguridad",
                 anulado
                     ? $"Código de verificación anulado tras {MaxIntentosCodigo} intentos fallidos."
-                    : $"Código de verificación incorrecto (intento #{usuario.IntentosCodigo}).",
-                ipAddress);
+                    : $"Código de verificación incorrecto (intento #{usuario.IntentosCodigo}).");
 
             return anulado;
         }
@@ -102,46 +101,44 @@ namespace PickingApp.Controllers
             var usuario = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Correo.ToLower() == model.Correo.Trim().ToLower());
 
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-
             if (usuario == null)
             {
                 ModelState.AddModelError(string.Empty, "Credenciales de acceso inválidas.");
                 await _auditService.LogAsync(model.Correo, "Desconocido", "Fallo de Autenticación", "Autenticación", 
-                    $"Intento fallido con correo no registrado: {model.Correo}", ipAddress);
+                    $"Intento fallido con correo no registrado: {model.Correo}");
                 return View(model);
             }
 
             var maxIntentos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxIntentosFallidos);
 
-            if (usuario.Estado == "Bloqueado")
+            if (usuario.Estado == EstadosUsuario.Bloqueado)
             {
                 // RN-06-CU01: el bloqueo se levanta automáticamente a las 24 horas.
                 if (usuario.FechaBloqueo.HasValue && DateTime.Now - usuario.FechaBloqueo.Value >= TimeSpan.FromHours(24))
                 {
-                    usuario.Estado = "Activo";
+                    usuario.Estado = EstadosUsuario.Activo;
                     usuario.IntentosFallidos = 0;
                     usuario.FechaBloqueo = null;
                     await _context.SaveChangesAsync();
 
                     await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Desbloqueo Automático", "Seguridad",
-                        "Cuenta desbloqueada automáticamente tras 24 horas de bloqueo.", ipAddress);
+                        "Cuenta desbloqueada automáticamente tras 24 horas de bloqueo.");
                 }
                 else
                 {
                     ModelState.AddModelError(string.Empty,
                         "Tu cuenta se encuentra bloqueada por superar el límite de intentos consecutivos fallidos. Contacta a un Administrador o espera 24 horas.");
                     await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Acceso Bloqueado", "Autenticación",
-                        "Intento de acceso a cuenta bloqueada", ipAddress);
+                        "Intento de acceso a cuenta bloqueada");
                     return View(model);
                 }
             }
 
-            if (usuario.Estado == "Inactivo")
+            if (usuario.Estado == EstadosUsuario.Inactivo)
             {
                 ModelState.AddModelError(string.Empty, "Tu cuenta se encuentra inactiva. Contacta al Administrador.");
                 await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Acceso Inactivo", "Autenticación", 
-                    "Intento de acceso a cuenta inactiva", ipAddress);
+                    "Intento de acceso a cuenta inactiva");
                 return View(model);
             }
 
@@ -161,14 +158,14 @@ namespace PickingApp.Controllers
                 usuario.IntentosFallidos++;
 
                 // RNF-06: Bloqueo al alcanzar los intentos consecutivos configurados, excepto Administrador
-                if (usuario.IntentosFallidos >= maxIntentos && usuario.Rol != "Administrador")
+                if (usuario.IntentosFallidos >= maxIntentos && usuario.Rol != Roles.Administrador)
                 {
-                    usuario.Estado = "Bloqueado";
+                    usuario.Estado = EstadosUsuario.Bloqueado;
                     usuario.FechaBloqueo = DateTime.Now;
 
                     _context.Notificaciones.Add(new Notificacion
                     {
-                        RolDestino = "Administrador",
+                        RolDestino = Roles.Administrador,
                         Titulo = "Cuenta Bloqueada",
                         Mensaje = $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.Rol)} ha sido bloqueada por {usuario.IntentosFallidos} intentos fallidos.",
                         Tipo = "Danger",
@@ -178,7 +175,7 @@ namespace PickingApp.Controllers
                     await _context.SaveChangesAsync();
 
                     await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Bloqueo de Cuenta", "Seguridad", 
-                        $"Cuenta bloqueada tras {usuario.IntentosFallidos} intentos fallidos consecutivos desde IP {ipAddress}", ipAddress);
+                        $"Cuenta bloqueada tras {usuario.IntentosFallidos} intentos fallidos consecutivos");
 
                     ModelState.AddModelError(string.Empty,
                         $"Has alcanzado el límite de {maxIntentos} intentos fallidos. Tu cuenta ha sido bloqueada temporalmente por seguridad.");
@@ -188,14 +185,14 @@ namespace PickingApp.Controllers
                 await _context.SaveChangesAsync();
 
                 var intentosRestantes = Math.Max(0, maxIntentos - usuario.IntentosFallidos);
-                var mensajeError = usuario.Rol == "Administrador"
+                var mensajeError = usuario.Rol == Roles.Administrador
                     ? "Credenciales de acceso inválidas."
                     : $"Credenciales inválidas. Intentos restantes antes del bloqueo: {intentosRestantes}";
 
                 ModelState.AddModelError(string.Empty, mensajeError);
 
                 await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Contraseña Incorrecta", "Autenticación", 
-                    $"Intento fallido #{usuario.IntentosFallidos}", ipAddress);
+                    $"Intento fallido #{usuario.IntentosFallidos}");
 
                 return View(model);
             }
@@ -229,7 +226,7 @@ namespace PickingApp.Controllers
                 authProperties);
 
             await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Inicio de Sesión", "Autenticación",
-                "Inicio de sesión correcto en el sistema", ipAddress);
+                "Inicio de sesión correcto en el sistema");
 
             // Marca la llegada como "recién logueado" para la animación de entrada del panel (solo se ve una vez).
             TempData["JustLoggedIn"] = true;
@@ -246,10 +243,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Desconocido";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Desconocido";
-
-            await _auditService.LogAsync(userEmail, userRole, "Cierre de Sesión", "Autenticación", "Cierre de sesión de usuario");
+            await _auditService.RegistrarAsync("Cierre de Sesión", "Autenticación", "Cierre de sesión de usuario");
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
             return RedirectToAction("Login", "Account");
@@ -332,8 +326,7 @@ namespace PickingApp.Controllers
 
             if (usuario == null || !CodigoCoincide(usuario, model.Codigo))
             {
-                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-                var anulado = usuario != null && await RegistrarFalloCodigoAsync(usuario, ipAddress);
+                var anulado = usuario != null && await RegistrarFalloCodigoAsync(usuario);
 
                 ModelState.AddModelError("Codigo", anulado
                     ? "Superaste el número de intentos permitidos. Solicita un código nuevo."
@@ -346,9 +339,9 @@ namespace PickingApp.Controllers
             usuario.CodigoVerificacionExpira = null;
             usuario.IntentosCodigo = 0;
             usuario.IntentosFallidos = 0;
-            if (usuario.Estado == "Bloqueado")
+            if (usuario.Estado == EstadosUsuario.Bloqueado)
             {
-                usuario.Estado = "Activo";
+                usuario.Estado = EstadosUsuario.Activo;
                 usuario.FechaBloqueo = null;
             }
             await _context.SaveChangesAsync();
@@ -396,7 +389,7 @@ namespace PickingApp.Controllers
             }
 
             // Administrador: cambio directo e inmediato.
-            if (usuario.Rol == "Administrador")
+            if (usuario.Rol == Roles.Administrador)
             {
                 usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
                 await _context.SaveChangesAsync();
@@ -464,8 +457,7 @@ namespace PickingApp.Controllers
 
             if (!CodigoCoincide(usuario, model.Codigo) || string.IsNullOrEmpty(usuario.PasswordPendienteHash))
             {
-                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-                var anulado = await RegistrarFalloCodigoAsync(usuario, ipAddress);
+                var anulado = await RegistrarFalloCodigoAsync(usuario);
 
                 ModelState.AddModelError("Codigo", anulado
                     ? "Superaste el número de intentos permitidos. Vuelve a solicitar el cambio de contraseña."

@@ -12,7 +12,7 @@ namespace PickingApp.Models
         public Usuario? UsuarioDestino { get; set; }
 
         [StringLength(50)]
-        public string? RolDestino { get; set; } // "Administrador", "Supervisor", "Auxiliar" o null
+        public string? RolDestino { get; set; } // Un valor de Roles, o null para todos
 
         [Required]
         [StringLength(150)]

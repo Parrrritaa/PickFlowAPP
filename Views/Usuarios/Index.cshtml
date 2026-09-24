@@ -38,7 +38,7 @@
                                 <a asp-action="Editar" asp-route-id="@u.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
                                     Editar
                                 </a>
-                                @if (u.Estado == "Bloqueado")
+                                @if (u.Estado == EstadosUsuario.Bloqueado)
                                 {
                                     <form asp-action="Desbloquear" method="post" class="d-inline">
                                         @Html.AntiForgeryToken()

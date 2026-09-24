@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
+using PickingApp.Models;
 
 namespace PickingApp.Controllers
 {
@@ -20,7 +21,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> Index()
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
 
             // Solo las pendientes: al marcarse como leída, la notificación se descarta de la lista
             var notificaciones = await _context.Notificaciones
@@ -38,7 +39,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> MarcarLeida(int id)
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
 
             var notificacion = await _context.Notificaciones.FindAsync(id);
 

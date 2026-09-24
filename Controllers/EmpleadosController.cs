@@ -84,18 +84,17 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Administrador y Supervisor: Creación directa (CU-06)
-            if (userRole == "Administrador" || userRole == "Supervisor")
+            if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
             {
                 _context.Empleados.Add(model);
                 await _context.SaveChangesAsync();
                 TempData["EmpleadoDestacadoId"] = model.Id;
 
-                await _auditService.LogAsync(userEmail, userRole, "Registrar Empleado", "Empleados", 
+                await _auditService.RegistrarAsync("Registrar Empleado", "Empleados", 
                     $"Empleado registrado: {model.Identificacion} - {model.NombreCompleto}");
 
                 TempData["SuccessMessage"] = $"Empleado '{model.NombreCompleto}' registrado exitosamente.";
@@ -115,7 +114,7 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = "Supervisor",
+                    RolDestino = Roles.Supervisor,
                     Titulo = "Solicitud de Nuevo Empleado",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó el registro del empleado {model.NombreCompleto}.",
                     Tipo = "Info",
@@ -125,7 +124,7 @@ namespace PickingApp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Solicitud Registro Empleado", "Solicitudes", 
+                await _auditService.RegistrarAsync("Solicitud Registro Empleado", "Solicitudes", 
                     $"Auxiliar solicitó registro de empleado: {model.NombreCompleto}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud para registrar a '{model.NombreCompleto}'. Requiere aprobación de un Supervisor o Administrador.";
@@ -176,12 +175,11 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Administrador: Edición directa (CU-09)
-            if (userRole == "Administrador")
+            if (userRole == Roles.Administrador)
             {
                 empleadoExistente.NombreCompleto = model.NombreCompleto;
                 empleadoExistente.Correo = model.Correo;
@@ -193,7 +191,7 @@ namespace PickingApp.Controllers
                 await _context.SaveChangesAsync();
                 TempData["EmpleadoDestacadoId"] = empleadoExistente.Id;
 
-                await _auditService.LogAsync(userEmail, userRole, "Editar Empleado", "Empleados", 
+                await _auditService.RegistrarAsync("Editar Empleado", "Empleados", 
                     $"Datos actualizados de empleado: {empleadoExistente.Identificacion}");
 
                 TempData["SuccessMessage"] = $"Datos de '{empleadoExistente.NombreCompleto}' actualizados exitosamente.";
@@ -242,7 +240,7 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = "Administrador",
+                    RolDestino = Roles.Administrador,
                     Titulo = "Solicitud de Edición de Empleado",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar los datos del empleado {model.NombreCompleto}.",
                     Tipo = "Info",
@@ -252,7 +250,7 @@ namespace PickingApp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Solicitud Edición Empleado", "Solicitudes",
+                await _auditService.RegistrarAsync("Solicitud Edición Empleado", "Solicitudes",
                     $"Solicitud de edición enviada para empleado {model.NombreCompleto}. Motivo: {motivo}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud de modificación para '{model.NombreCompleto}'. Requiere aprobación del Administrador.";
@@ -280,19 +278,18 @@ namespace PickingApp.Controllers
                 }
             }
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Administrador: Inactivación Directa (CU-12)
-            if (userRole == "Administrador")
+            if (userRole == Roles.Administrador)
             {
                 empleado.Activo = !empleado.Activo;
                 await _context.SaveChangesAsync();
                 TempData["EmpleadoDestacadoId"] = empleado.Id;
 
                 var accion = empleado.Activo ? "Reactivar Empleado" : "Inactivar Empleado";
-                await _auditService.LogAsync(userEmail, userRole, accion, "Empleados", 
+                await _auditService.RegistrarAsync(accion, "Empleados", 
                     $"Estado de empleado {empleado.Identificacion} cambiado a {(empleado.Activo ? "Activo" : "Inactivo")}");
 
                 TempData["SuccessMessage"] = $"El empleado '{empleado.NombreCompleto}' ahora está {(empleado.Activo ? "Activo" : "Inactivo")}.";
@@ -318,7 +315,7 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = "Administrador",
+                    RolDestino = Roles.Administrador,
                     Titulo = "Solicitud de Inactivación de Empleado",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó inactivar al empleado {empleado.NombreCompleto}.",
                     Tipo = "Warning",
@@ -328,7 +325,7 @@ namespace PickingApp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(userEmail, userRole, "Solicitud Inactivar Empleado", "Solicitudes", 
+                await _auditService.RegistrarAsync("Solicitud Inactivar Empleado", "Solicitudes", 
                     $"Solicitud de inactivación para {empleado.NombreCompleto}. Motivo: {motivo}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud de inactivación para '{empleado.NombreCompleto}'. Requiere aprobación del Administrador.";
@@ -339,7 +336,7 @@ namespace PickingApp.Controllers
 
         // Reiniciar el historial de tiempos usado para calcular el rendimiento del empleado (Solo Administrador).
         // No elimina ni desvincula los pedidos completados: solo deja de contarlos a partir de ahora.
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReiniciarPromedio(int id)
@@ -351,8 +348,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
             TempData["EmpleadoDestacadoId"] = empleado.Id;
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(userEmail, "Administrador", "Reiniciar Rendimiento", "Empleados",
+            await _auditService.RegistrarAsync("Reiniciar Rendimiento", "Empleados",
                 $"Se reinició el historial de tiempos del empleado {empleado.Identificacion} - {empleado.NombreCompleto}. Los pedidos completados antes de esta fecha ya no se contarán para su rendimiento.");
 
             TempData["SuccessMessage"] = $"El historial de tiempos de '{empleado.NombreCompleto}' fue reiniciado. Sus pedidos anteriores se conservan, pero no se contarán para su rendimiento.";

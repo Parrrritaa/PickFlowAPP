@@ -13,6 +13,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
 // Servicios de la aplicación
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IExcelService, ExcelService>();
 builder.Services.AddScoped<IPickingEngine, PickingEngine>();

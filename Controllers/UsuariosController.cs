@@ -8,7 +8,7 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = Roles.Administrador)]
     public class UsuariosController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -69,6 +69,15 @@ namespace PickingApp.Controllers
                 ModelState.AddModelError("Correo", "Ese correo ya está en uso por un empleado registrado.");
             }
 
+            if (!Roles.Todos.Contains(model.Rol))
+            {
+                ModelState.AddModelError("Rol", "Seleccione un rol válido.");
+            }
+            if (!EstadosUsuario.Todos.Contains(model.Estado))
+            {
+                ModelState.AddModelError("Estado", "Seleccione un estado válido.");
+            }
+
             model.Identificacion = (model.Identificacion ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(model.Identificacion))
             {
@@ -82,14 +91,12 @@ namespace PickingApp.Controllers
 
             model.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
             model.FechaRegistro = DateTime.Now;
-            model.Estado = "Activo";
             model.IntentosFallidos = 0;
 
             _context.Usuarios.Add(model);
             await _context.SaveChangesAsync();
 
-            var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(adminEmail, "Administrador", "Crear Usuario", "Usuarios", 
+            await _auditService.RegistrarAsync("Crear Usuario", "Usuarios", 
                 $"Usuario creado: {model.NombreCompleto} con rol {model.Rol}");
 
             TempData["SuccessMessage"] = $"Usuario '{model.NombreCompleto}' ({model.Correo}) creado con éxito.";
@@ -113,7 +120,11 @@ namespace PickingApp.Controllers
             var usuario = await _context.Usuarios.FindAsync(id);
             if (usuario == null) return NotFound();
 
-            var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
+            if (!Roles.Todos.Contains(rol) || !EstadosUsuario.Todos.Contains(estado))
+            {
+                TempData["ErrorMessage"] = "El rol o el estado seleccionado no es válido.";
+                return RedirectToAction(nameof(Editar), new { id });
+            }
 
             // RN-01-CU04: el Administrador solo puede editar nombre/identificación/rol/estado.
             // La contraseña únicamente puede ser cambiada por el propio usuario (Account/CambiarContrasena)
@@ -123,7 +134,7 @@ namespace PickingApp.Controllers
             usuario.Rol = rol;
             usuario.Estado = estado;
 
-            if (estado == "Activo")
+            if (estado == EstadosUsuario.Activo)
             {
                 usuario.IntentosFallidos = 0;
                 usuario.FechaBloqueo = null;
@@ -131,7 +142,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(adminEmail, "Administrador", "Editar Usuario/Rol", "Usuarios", 
+            await _auditService.RegistrarAsync("Editar Usuario/Rol", "Usuarios", 
                 $"Usuario {usuario.NombreCompleto} actualizado: Rol={rol}, Estado={estado}");
 
             TempData["SuccessMessage"] = $"Usuario '{usuario.Correo}' actualizado exitosamente.";
@@ -146,14 +157,13 @@ namespace PickingApp.Controllers
             var usuario = await _context.Usuarios.FindAsync(id);
             if (usuario == null) return NotFound();
 
-            usuario.Estado = "Activo";
+            usuario.Estado = EstadosUsuario.Activo;
             usuario.IntentosFallidos = 0;
             usuario.FechaBloqueo = null;
 
             await _context.SaveChangesAsync();
 
-            var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Admin";
-            await _auditService.LogAsync(adminEmail, "Administrador", "Desbloquear Usuario", "Seguridad", 
+            await _auditService.RegistrarAsync("Desbloquear Usuario", "Seguridad", 
                 $"Cuenta de usuario {usuario.NombreCompleto} desbloqueada manualmente.");
 
             TempData["SuccessMessage"] = $"La cuenta de '{usuario.Correo}' ha sido desbloqueada.";
