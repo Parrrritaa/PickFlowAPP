@@ -2,9 +2,74 @@
 @{
     ViewData["Title"] = "Bodegas y ubicaciones";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "Auxiliar";
+    var filtroEstado = ViewBag.FiltroEstado as string;
+    var busquedaProducto = ViewBag.BusquedaProducto as string;
+    var resultadosProducto = ViewBag.ResultadosProducto as List<PickingApp.Models.Ubicacion>;
+    var activoEstado = !string.IsNullOrEmpty(filtroEstado);
+    var hayBusquedaProducto = !string.IsNullOrWhiteSpace(busquedaProducto);
 }
 
 <h1 class="pf-page-title">Bodegas y ubicaciones</h1>
+
+<div class="mockup-card mb-4">
+    <h4 class="fw-bold mb-3" style="color: #1F2937;">Buscar producto</h4>
+    <p class="pf-seccion-desc small mb-3">Busca un producto por código o nombre para saber en qué bodega está y qué ubicación tiene.</p>
+    <form method="get" asp-action="Index" class="d-flex gap-2 flex-wrap">
+        @if (activoEstado)
+        {
+            <input type="hidden" name="estado" value="@filtroEstado" />
+        }
+        <input type="text" name="busquedaProducto" value="@busquedaProducto" class="form-control" style="max-width: 320px;" placeholder="Código o nombre del producto..." />
+        <button type="submit" class="btn-pf-blue">Buscar</button>
+        @if (hayBusquedaProducto)
+        {
+            <a asp-action="Index" asp-route-estado="@filtroEstado" class="btn-pf-gray">Limpiar búsqueda</a>
+        }
+    </form>
+
+    @if (hayBusquedaProducto)
+    {
+        <div class="table-responsive mt-4">
+            <table class="mockup-table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Bodega</th>
+                        <th>Ubicación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (resultadosProducto != null && resultadosProducto.Any())
+                    {
+                        @foreach (var u in resultadosProducto)
+                        {
+                            <tr>
+                                <td class="fw-semibold">
+                                    @u.Producto!.Codigo
+                                    <div class="text-secondary small">@u.Producto.Nombre</div>
+                                </td>
+                                <td>
+                                    @if (u.Bodega != null)
+                                    {
+                                        <a asp-action="Detalle" asp-route-id="@u.Bodega.Id">@u.Bodega.Nombre</a>
+                                        <div class="text-secondary small">@u.Bodega.Codigo</div>
+                                    }
+                                </td>
+                                <td>@u.CodigoUbicacion</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">Ningún producto coincide con «@busquedaProducto».</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
 
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
@@ -17,61 +82,90 @@
         }
     </div>
 
-    <div class="table-responsive">
-        <table class="mockup-table">
-            <thead>
-                <tr>
-                    <th>Bodega</th>
-                    <th>Ubicaciones</th>
-                    <th>Estado</th>
-                    <th class="text-center">Acción</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model != null && Model.Any())
-                {
-                    @foreach (var b in Model)
-                    {
-                        var ubicacionesCount = b.Ubicaciones?.Count ?? 0;
-                        var estadoText = b.Activa ? "Activa" : "Inactiva";
-
-                        <tr>
-                            <td class="fw-semibold">
-                                @b.Nombre
-                                <div class="text-secondary small">@b.Codigo</div>
-                            </td>
-                            <td>@ubicacionesCount</td>
-                            <td>@estadoText</td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-2 flex-wrap">
-                                    <a asp-action="Detalle" asp-route-id="@b.Id" class="btn-pf-blue" style="padding: 4px 18px; font-size: 14px;">
-                                        Ver ubicaciones
-                                    </a>
-                                    @if (userRole == "Administrador")
-                                    {
-                                        <a asp-action="Editar" asp-route-id="@b.Id" class="btn-pf-gray" style="padding: 4px 18px; font-size: 14px;">
-                                            Editar
-                                        </a>
-                                        <button type="button" class="btn-pf-gray btn-eliminar-bodega" style="padding: 4px 18px; font-size: 14px;"
-                                                data-bs-toggle="modal" data-bs-target="#modalEliminarBodega"
-                                                data-bodega-id="@b.Id" data-bodega-etiqueta="@($"{b.Nombre} ({b.Codigo})")">
-                                            Eliminar
-                                        </button>
-                                    }
+    <form method="get" asp-action="Index" id="formFiltrosBodegas">
+        @if (hayBusquedaProducto)
+        {
+            <input type="hidden" name="busquedaProducto" value="@busquedaProducto" />
+        }
+        <div class="table-responsive">
+            <table class="mockup-table">
+                <thead>
+                    <tr>
+                        <th>Bodega</th>
+                        <th>Ubicaciones</th>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoEstado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Estado <i class="bi @(activoEstado ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <select name="estado" class="form-select form-select-sm filtro-auto">
+                                        <option value="">Todas</option>
+                                        <option value="Activa" selected="@(filtroEstado == "Activa")">Activa</option>
+                                        <option value="Inactiva" selected="@(filtroEstado == "Inactiva")">Inactiva</option>
+                                    </select>
                                 </div>
+                            </div>
+                        </th>
+                        <th class="text-center">
+                            Acción
+                            @if (activoEstado)
+                            {
+                                <a asp-action="Index" class="d-block small fw-semibold text-decoration-none mt-1">
+                                    <i class="bi bi-x-circle"></i> Limpiar filtros
+                                </a>
+                            }
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var b in Model)
+                        {
+                            var ubicacionesCount = b.Ubicaciones?.Count ?? 0;
+                            var estadoText = b.Activa ? "Activa" : "Inactiva";
+
+                            <tr>
+                                <td class="fw-semibold">
+                                    @b.Nombre
+                                    <div class="text-secondary small">@b.Codigo</div>
+                                </td>
+                                <td>@ubicacionesCount</td>
+                                <td>@estadoText</td>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                        <a asp-action="Detalle" asp-route-id="@b.Id" class="btn-pf-blue" style="padding: 4px 18px; font-size: 14px;">
+                                            Ver ubicaciones
+                                        </a>
+                                        @if (userRole == "Administrador")
+                                        {
+                                            <a asp-action="Editar" asp-route-id="@b.Id" class="btn-pf-gray" style="padding: 4px 18px; font-size: 14px;">
+                                                Editar
+                                            </a>
+                                            <button type="button" class="btn-pf-gray btn-eliminar-bodega" style="padding: 4px 18px; font-size: 14px;"
+                                                    data-bs-toggle="modal" data-bs-target="#modalEliminarBodega"
+                                                    data-bodega-id="@b.Id" data-bodega-etiqueta="@($"{b.Nombre} ({b.Codigo})")">
+                                                Eliminar
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                @(activoEstado ? "Ninguna bodega coincide con el filtro aplicado." : "No hay bodegas registradas.")
                             </td>
                         </tr>
                     }
-                }
-                else
-                {
-                    <tr>
-                        <td colspan="4" class="text-center text-muted py-4">No hay bodegas registradas.</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
 
 @if (userRole == "Administrador")
@@ -108,5 +202,22 @@
                 document.getElementById('eliminarBodegaNombre').textContent = btn.dataset.bodegaEtiqueta;
             });
         });
+    </script>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var form = document.getElementById('formFiltrosBodegas');
+            if (!form) return;
+
+            form.querySelectorAll('.th-filtro-btn').forEach(function (btn) {
+                new bootstrap.Dropdown(btn, { autoClose: 'outside', popperConfig: { strategy: 'fixed' } });
+            });
+
+            form.querySelectorAll('.filtro-auto').forEach(function (el) {
+                el.addEventListener('change', function () { form.submit(); });
+            });
+        })();
     </script>
 }

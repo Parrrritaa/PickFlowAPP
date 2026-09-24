@@ -6,6 +6,11 @@
     var puedeEliminarUbicacion = userRole == "Administrador" || userRole == "Supervisor";
     const int ubicacionesVisibles = 5;
     var ubicacionesOcultas = Math.Max(0, (Model.Ubicaciones?.Count ?? 0) - ubicacionesVisibles);
+    var filtroUbicacion = ViewBag.FiltroUbicacion as string;
+    var filtroProducto = ViewBag.FiltroProducto as string;
+    var activoUbicacion = !string.IsNullOrWhiteSpace(filtroUbicacion);
+    var activoProducto = !string.IsNullOrWhiteSpace(filtroProducto);
+    var hayFiltros = activoUbicacion || activoProducto;
 }
 
 <h1 class="pf-page-title">Bodegas y ubicaciones</h1>
@@ -49,19 +54,57 @@
                 }
             </div>
 
-            <div class="table-responsive">
-                <table class="mockup-table" id="tablaUbicaciones">
-                    <thead>
-                        <tr>
-                            <th>Ubicación</th>
-                            <th>Producto</th>
-                            @if (puedeEliminarUbicacion)
-                            {
-                                <th class="text-center">Acción</th>
-                            }
-                        </tr>
-                    </thead>
-                    <tbody>
+            <form method="get" asp-action="Detalle" id="formFiltrosUbicaciones">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <div class="table-responsive">
+                    <table class="mockup-table" id="tablaUbicaciones">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <div class="dropdown">
+                                        <button type="button" class="th-filtro-btn @(activoUbicacion ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                            Ubicación <i class="bi @(activoUbicacion ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                        </button>
+                                        <div class="dropdown-menu th-filtro-menu">
+                                            <label class="form-label small fw-semibold mb-1">Buscar ubicación</label>
+                                            <input type="text" name="filtroUbicacion" value="@filtroUbicacion" class="form-control form-control-sm" placeholder="Código de ubicación..." />
+                                            <div class="th-filtro-acciones">
+                                                <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
+                                                <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </th>
+                                <th>
+                                    <div class="dropdown">
+                                        <button type="button" class="th-filtro-btn @(activoProducto ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                            Producto <i class="bi @(activoProducto ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                        </button>
+                                        <div class="dropdown-menu th-filtro-menu">
+                                            <label class="form-label small fw-semibold mb-1">Buscar producto</label>
+                                            <input type="text" name="filtroProducto" value="@filtroProducto" class="form-control form-control-sm" placeholder="Código o nombre del producto..." />
+                                            <div class="th-filtro-acciones">
+                                                <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
+                                                <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </th>
+                                @if (puedeEliminarUbicacion)
+                                {
+                                    <th class="text-center">
+                                        Acción
+                                        @if (hayFiltros)
+                                        {
+                                            <a asp-action="Detalle" asp-route-id="@Model.Id" class="d-block small fw-semibold text-decoration-none mt-1">
+                                                <i class="bi bi-x-circle"></i> Limpiar filtros
+                                            </a>
+                                        }
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
                         @if (Model.Ubicaciones != null && Model.Ubicaciones.Any())
                         {
                             var indice = 0;
@@ -100,22 +143,25 @@
                         else
                         {
                             <tr>
-                                <td colspan="@(puedeEliminarUbicacion ? 3 : 2)" class="text-center text-muted py-4">No hay ubicaciones registradas en esta bodega.</td>
+                                <td colspan="@(puedeEliminarUbicacion ? 3 : 2)" class="text-center text-muted py-4">
+                                    @(hayFiltros ? "Ninguna ubicación coincide con los filtros aplicados." : "No hay ubicaciones registradas en esta bodega.")
+                                </td>
                             </tr>
                         }
-                    </tbody>
-                </table>
-            </div>
-            @if (ubicacionesOcultas > 0)
-            {
-                <div class="text-center mt-2">
-                    <button type="button" class="btn btn-link fw-semibold text-decoration-none"
-                            data-ver-mas="tablaUbicaciones"
-                            data-texto-mas="Ver más (@ubicacionesOcultas ubicaciones)" data-texto-menos="Ver menos">
-                        Ver más (@ubicacionesOcultas ubicaciones)
-                    </button>
+                        </tbody>
+                    </table>
                 </div>
-            }
+                @if (ubicacionesOcultas > 0)
+                {
+                    <div class="text-center mt-2">
+                        <button type="button" class="btn btn-link fw-semibold text-decoration-none"
+                                data-ver-mas="tablaUbicaciones"
+                                data-texto-mas="Ver más (@ubicacionesOcultas ubicaciones)" data-texto-menos="Ver menos">
+                            Ver más (@ubicacionesOcultas ubicaciones)
+                        </button>
+                    </div>
+                }
+            </form>
         </div>
     </div>
 </div>
@@ -156,4 +202,28 @@
             </div>
         </div>
     </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var form = document.getElementById('formFiltrosUbicaciones');
+            if (!form) return;
+
+            form.querySelectorAll('.th-filtro-btn').forEach(function (btn) {
+                new bootstrap.Dropdown(btn, { autoClose: 'outside', popperConfig: { strategy: 'fixed' } });
+            });
+
+            form.querySelectorAll('.filtro-auto').forEach(function (el) {
+                el.addEventListener('change', function () { form.submit(); });
+            });
+
+            form.querySelectorAll('[data-limpiar-filtro]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    btn.closest('.th-filtro-menu').querySelectorAll('input').forEach(function (i) { i.value = ''; });
+                    form.submit();
+                });
+            });
+        })();
+    </script>
 }

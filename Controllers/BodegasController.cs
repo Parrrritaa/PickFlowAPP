@@ -21,22 +21,54 @@ namespace PickingApp.Controllers
         }
 
         // CU-22: Consultar bodegas y ubicaciones
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? estado, string? busquedaProducto)
         {
-            var bodegas = await _context.Bodegas
+            var query = _context.Bodegas
                 .Include(b => b.Ubicaciones)
                 .Include(b => b.Pedidos)
-                .OrderBy(b => b.Codigo)
-                .ToListAsync();
+                .AsQueryable();
+
+            if (estado == "Activa")
+            {
+                query = query.Where(b => b.Activa);
+            }
+            else if (estado == "Inactiva")
+            {
+                query = query.Where(b => !b.Activa);
+            }
+
+            var bodegas = await query.OrderBy(b => b.Codigo).ToListAsync();
+
+            // Búsqueda de un producto específico: en qué bodega está y qué ubicación tiene
+            List<Ubicacion>? resultadosProducto = null;
+            if (!string.IsNullOrWhiteSpace(busquedaProducto))
+            {
+                var texto = busquedaProducto.Trim().ToLower();
+                resultadosProducto = await _context.Ubicaciones
+                    .Include(u => u.Bodega)
+                    .Include(u => u.Producto)
+                    .Where(u => u.Producto != null &&
+                                (u.Producto.Codigo.ToLower().Contains(texto) || u.Producto.Nombre.ToLower().Contains(texto)))
+                    .OrderBy(u => u.Bodega!.Codigo).ThenBy(u => u.CodigoUbicacion)
+                    .ToListAsync();
+            }
+
+            ViewBag.FiltroEstado = estado;
+            ViewBag.BusquedaProducto = busquedaProducto;
+            ViewBag.ResultadosProducto = resultadosProducto;
 
             return View(bodegas);
         }
 
         // Detalle de Bodega y sus Ubicaciones (Slide 26)
-        public async Task<IActionResult> Detalle(int id)
+        public async Task<IActionResult> Detalle(int id, string? filtroUbicacion, string? filtroProducto)
         {
+            // AsNoTracking: esta vista es de solo lectura y más abajo se reemplaza bodega.Ubicaciones
+            // con la lista filtrada; sin esto, el change tracker de EF reutilizaría la misma instancia
+            // rastreada para la consulta de ViewBag.TodasBodegas y el filtro afectaría también ese conteo.
             var bodega = await _context.Bodegas
                 .Include(b => b.Ubicaciones).ThenInclude(u => u.Producto)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(b => b.Id == id);
 
             if (bodega == null)
@@ -44,9 +76,29 @@ namespace PickingApp.Controllers
                 return NotFound();
             }
 
+            IEnumerable<Ubicacion> ubicaciones = bodega.Ubicaciones.OrderBy(u => u.CodigoUbicacion);
+
+            if (!string.IsNullOrWhiteSpace(filtroUbicacion))
+            {
+                var texto = filtroUbicacion.Trim().ToLower();
+                ubicaciones = ubicaciones.Where(u => u.CodigoUbicacion.ToLower().Contains(texto));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtroProducto))
+            {
+                var texto = filtroProducto.Trim().ToLower();
+                ubicaciones = ubicaciones.Where(u => u.Producto != null &&
+                    (u.Producto.Codigo.ToLower().Contains(texto) || u.Producto.Nombre.ToLower().Contains(texto)));
+            }
+
+            bodega.Ubicaciones = ubicaciones.ToList();
+
             ViewBag.TodasBodegas = await _context.Bodegas
                 .Include(b => b.Ubicaciones)
+                .AsNoTracking()
                 .ToListAsync();
+            ViewBag.FiltroUbicacion = filtroUbicacion;
+            ViewBag.FiltroProducto = filtroProducto;
 
             return View(bodega);
         }
