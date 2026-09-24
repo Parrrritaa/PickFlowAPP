@@ -64,6 +64,10 @@ namespace PickingApp.Controllers
             {
                 ModelState.AddModelError("Correo", "Ya existe un usuario con este correo electrónico.");
             }
+            else if (await _context.Empleados.AnyAsync(e => e.Correo == model.Correo))
+            {
+                ModelState.AddModelError("Correo", "Ese correo ya está en uso por un empleado registrado.");
+            }
 
             model.Identificacion = (model.Identificacion ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(model.Identificacion))

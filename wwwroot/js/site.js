@@ -37,6 +37,42 @@ document.addEventListener('click', function (e) {
     btn.setAttribute('aria-expanded', expandido ? 'true' : 'false');
 });
 
+// Ojito para mostrar/ocultar contraseña: envuelve cada input[type="password"] con un botón de alternar,
+// sin necesidad de tocarlo en cada vista. Corre una sola vez por input (marca data-pf-ojito).
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('input[type="password"]').forEach(function (input) {
+        if (input.dataset.pfOjito) return;
+        input.dataset.pfOjito = 'true';
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'pf-password-field';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+        input.classList.add('pf-password-field__input');
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'pf-password-toggle';
+        btn.setAttribute('aria-label', 'Mostrar contraseña');
+        btn.innerHTML = '<i class="bi bi-eye" aria-hidden="true"></i>';
+        wrapper.appendChild(btn);
+
+        btn.addEventListener('click', function () {
+            var mostrar = input.type === 'password';
+            input.type = mostrar ? 'text' : 'password';
+            btn.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+
+            var iconoViejo = btn.querySelector('i');
+            var icono = document.createElement('i');
+            icono.className = 'bi ' + (mostrar ? 'bi-eye-slash' : 'bi-eye');
+            icono.setAttribute('aria-hidden', 'true');
+            btn.replaceChild(icono, iconoViejo);
+
+            input.focus({ preventScroll: true });
+        });
+    });
+});
+
 // Modales de confirmación sobre un registro de una tabla: el botón que abre el modal lleva
 // data-pf-id y data-pf-texto, y el modal marca dónde van con [data-pf-recibe="id"] (value)
 // y [data-pf-recibe="texto"] (textContent). Los datos se copian como texto, nunca como código,

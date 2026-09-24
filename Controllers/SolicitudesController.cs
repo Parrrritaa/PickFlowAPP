@@ -133,6 +133,11 @@ namespace PickingApp.Controllers
                         if (empleado != null)
                         {
                             empleado.Id = 0; // Para nuevo registro
+                            empleado.Correo = string.IsNullOrWhiteSpace(empleado.Correo) ? null : empleado.Correo.Trim().ToLower();
+                            if (empleado.Correo != null)
+                            {
+                                await ValidarCorreoDisponibleAsync(empleado.Correo);
+                            }
                             _context.Empleados.Add(empleado);
                         }
                         break;
@@ -153,8 +158,14 @@ namespace PickingApp.Controllers
                                             await ValidarSinPedidoEnCursoAsync(empExistente, "cambiar su estado");
                                         }
 
+                                        var correoNuevo = string.IsNullOrWhiteSpace(empData.Correo) ? null : empData.Correo.Trim().ToLower();
+                                        if (correoNuevo != null && correoNuevo != empExistente.Correo)
+                                        {
+                                            await ValidarCorreoDisponibleAsync(correoNuevo, empExistente.Id);
+                                        }
+
                                         empExistente.NombreCompleto = empData.NombreCompleto;
-                                        empExistente.Correo = empData.Correo;
+                                        empExistente.Correo = correoNuevo;
                                         empExistente.JornadaLaboral = empData.JornadaLaboral;
                                         empExistente.HorarioEntrada = empData.HorarioEntrada;
                                         empExistente.HorarioSalida = empData.HorarioSalida;
@@ -362,6 +373,20 @@ namespace PickingApp.Controllers
             if (pedidoEnCurso != null)
             {
                 throw new ReglaNegocioException($"No se puede aprobar: el empleado '{empleado.NombreCompleto}' tiene el pedido {pedidoEnCurso} en curso y no es posible {accion}. Reasigne, complete o cancele el pedido primero; la solicitud sigue pendiente.");
+            }
+        }
+
+        // El correo pudo quedar en uso (por otro empleado o por un usuario) entre la creación de la
+        // solicitud y su aprobación: un correo no puede repetirse entre Empleados ni con ningún Usuario.
+        private async Task ValidarCorreoDisponibleAsync(string correo, int? empleadoIdExcluir = null)
+        {
+            if (await _context.Empleados.AnyAsync(e => e.Correo == correo && e.Id != (empleadoIdExcluir ?? 0)))
+            {
+                throw new ReglaNegocioException($"No se puede aprobar: el correo '{correo}' ya está en uso por otro empleado. La solicitud sigue pendiente.");
+            }
+            if (await _context.Usuarios.AnyAsync(u => u.Correo == correo))
+            {
+                throw new ReglaNegocioException($"No se puede aprobar: el correo '{correo}' ya está en uso por un usuario del sistema. La solicitud sigue pendiente.");
             }
         }
 

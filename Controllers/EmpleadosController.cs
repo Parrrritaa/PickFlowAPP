@@ -75,6 +75,13 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            model.Correo = string.IsNullOrWhiteSpace(model.Correo) ? null : model.Correo.Trim().ToLower();
+            if (model.Correo != null && !await CorreoDisponibleAsync(model.Correo))
+            {
+                ModelState.AddModelError("Correo", "Ese correo ya está en uso por otro empleado o por un usuario del sistema.");
+                return View(model);
+            }
+
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "Usuario";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Auxiliar";
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -158,6 +165,14 @@ namespace PickingApp.Controllers
 
             var empleadoExistente = await _context.Empleados.FindAsync(model.Id);
             if (empleadoExistente == null) return NotFound();
+
+            model.Correo = string.IsNullOrWhiteSpace(model.Correo) ? null : model.Correo.Trim().ToLower();
+            if (model.Correo != null && !await CorreoDisponibleAsync(model.Correo, model.Id))
+            {
+                ModelState.AddModelError("Correo", "Ese correo ya está en uso por otro empleado o por un usuario del sistema.");
+                ViewBag.Motivo = motivo;
+                return View(model);
+            }
 
             // Con un pedido en curso el estado lo controla el flujo del pedido, no la edición manual
             if (model.EstadoDisponibilidad != empleadoExistente.EstadoDisponibilidad)
@@ -380,11 +395,15 @@ namespace PickingApp.Controllers
         private async Task<double> ObtenerMaxHorasJornadaAsync()
         {
             var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == "MaxHorasJornada");
-            if (cfg != null && double.TryParse(cfg.Valor, out var valor))
-            {
-                return valor;
-            }
-            return 9.0;
+            return cfg != null && Formato.TryParseDecimal(cfg.Valor, out var horas) && horas > 0 ? horas : 9.0;
+        }
+
+        // Un correo no puede repetirse entre Empleados ni con ningún Usuario del sistema, aunque sean tablas distintas.
+        private async Task<bool> CorreoDisponibleAsync(string correo, int? empleadoIdExcluir = null)
+        {
+            var enOtroEmpleado = await _context.Empleados.AnyAsync(e => e.Correo == correo && e.Id != (empleadoIdExcluir ?? 0));
+            if (enOtroEmpleado) return false;
+            return !await _context.Usuarios.AnyAsync(u => u.Correo == correo);
         }
     }
 }
