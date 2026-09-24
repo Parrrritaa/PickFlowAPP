@@ -49,6 +49,10 @@ document.addEventListener('DOMContentLoaded', function () {
         input.parentNode.insertBefore(wrapper, input);
         wrapper.appendChild(input);
         input.classList.add('pf-password-field__input');
+        // El margen inferior del input pasa al contenedor: si se queda en el input, el contenedor
+        // queda más alto que el campo y el ojito (centrado con top: 50%) se ve desplazado hacia abajo
+        wrapper.style.marginBottom = getComputedStyle(input).marginBottom;
+        input.style.marginBottom = '0';
 
         var btn = document.createElement('button');
         btn.type = 'button';

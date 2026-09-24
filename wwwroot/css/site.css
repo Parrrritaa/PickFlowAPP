@@ -427,6 +427,11 @@ body {
     box-shadow: 0 0 0 3px rgba(59, 113, 202, 0.2) !important;
 }
 
+/* Utilidades de Bootstrap 5.2/5.3 que las vistas usan pero no existen en la 5.1 incluida en wwwroot/lib */
+.fw-medium { font-weight: 500 !important; }
+.fw-semibold { font-weight: 600 !important; }
+.rounded-4 { border-radius: 1rem !important; }
+
 /* Ojito para mostrar/ocultar contraseña (se agrega automáticamente a todo input[type="password"], ver site.js) */
 .pf-password-field {
     position: relative;
