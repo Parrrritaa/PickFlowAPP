@@ -23,9 +23,9 @@
 
     // En la vista de divididos se filtra por el estado del pedido original
     var estados = verDivididos
-        ? new[] { ("Dividido", "En curso (dividido)"), ("Completado", "Completado"), ("Cancelado", "Cancelado") }
-        : new[] { ("Pendiente", "Pendiente"), ("Asignado", "Asignado"), ("Reasignado", "Reasignado"),
-                  ("EnProceso", "En proceso"), ("Completado", "Completado"), ("Cancelado", "Cancelado") };
+        ? new[] { (PedidoEstados.Dividido, "En curso (dividido)"), (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") }
+        : new[] { (PedidoEstados.Pendiente, "Pendiente"), (PedidoEstados.Asignado, "Asignado"), (PedidoEstados.Reasignado, "Reasignado"),
+                  (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") };
 }
 
 <h1 class="pf-page-title">Gestión de pedidos</h1>

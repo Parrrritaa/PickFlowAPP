@@ -88,7 +88,7 @@ namespace PickingApp.Services
 
             var completados = (await _context.Pedidos
                 .Where(p => p.EmpleadoId != null && empleadoIds.Contains(p.EmpleadoId.Value)
-                    && p.Estado == "Completado" && p.TiempoProcesamientoMinutos != null)
+                    && p.Estado == PedidoEstados.Completado && p.TiempoProcesamientoMinutos != null)
                 .Select(p => new
                 {
                     p.Id,

@@ -107,13 +107,13 @@
                     <strong>Motivo de reasignación:</strong> @Model.MotivoReasignacion
                 </div>
             }
-            @if (Model.Estado == "Completado" && Model.TiempoProcesamientoMinutos.HasValue)
+            @if (Model.Estado == PickingApp.Models.PedidoEstados.Completado && Model.TiempoProcesamientoMinutos.HasValue)
             {
                 <div class="fs-6 mt-1">
                     <strong>Tiempo real:</strong> @PickingApp.Services.Formato.Duracion(Model.TiempoProcesamientoMinutos.Value)
                 </div>
             }
-            @if (superaJornada && Model.Estado == "Pendiente")
+            @if (superaJornada && Model.Estado == PickingApp.Models.PedidoEstados.Pendiente)
             {
                 <div class="pf-aviso-jornada mt-2" role="note">
                     <i class="bi bi-hourglass-split" aria-hidden="true"></i>
@@ -323,7 +323,7 @@
     <div class="d-flex flex-wrap gap-3 mt-4 pt-2 align-items-center">
         @if (userRole == "Administrador" || userRole == "Supervisor")
         {
-            @if (Model.Estado == "Pendiente")
+            @if (Model.Estado == PickingApp.Models.PedidoEstados.Pendiente)
             {
                 <a asp-action="Asignar" asp-route-id="@Model.Id" class="btn-pf-blue">
                     Asignar Empleado

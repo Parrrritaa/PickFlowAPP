@@ -11,7 +11,7 @@ namespace PickingApp.Controllers
     [Authorize]
     public class ReportesController : Controller
     {
-        private static readonly string[] EstadosReporte = { "Completado", "Cancelado", "Reasignado" };
+        private static readonly string[] EstadosReporte = { PedidoEstados.Completado, PedidoEstados.Cancelado, PedidoEstados.Reasignado };
 
         private readonly ApplicationDbContext _context;
         private readonly IReportService _reportService;
@@ -184,10 +184,17 @@ namespace PickingApp.Controllers
                 return FiltroInvalido("El estado seleccionado no es válido.");
             }
 
-            var estados = string.IsNullOrEmpty(estado) ? EstadosReporte : new[] { estado };
+            // "Reasignados" incluye los que se reasignaron y después se completaron o cancelaron:
+            // el estado Reasignado solo dura mientras el pedido sigue en curso.
             var query = _context.Pedidos
                 .Include(p => p.Empleado)
-                .Where(p => estados.Contains(p.Estado) && !p.Partes.Any());
+                .Where(p => !p.Partes.Any());
+            query = estado switch
+            {
+                PedidoEstados.Reasignado => query.Where(p => p.MotivoReasignacion != null),
+                null or "" => query.Where(p => EstadosReporte.Contains(p.Estado) || p.MotivoReasignacion != null),
+                _ => query.Where(p => p.Estado == estado)
+            };
 
             if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
             if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaCarga < hasta);
@@ -206,7 +213,7 @@ namespace PickingApp.Controllers
         private IQueryable<Pedido> PedidosCompletadosEnPeriodo(PeriodoReporte periodo)
         {
             var query = _context.Pedidos
-                .Where(p => p.Estado == "Completado" && p.TiempoProcesamientoMinutos != null);
+                .Where(p => p.Estado == PedidoEstados.Completado && p.TiempoProcesamientoMinutos != null);
 
             if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaFinalizacion >= desde);
             if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaFinalizacion < hasta);
@@ -216,9 +223,9 @@ namespace PickingApp.Controllers
 
         private static string NombreEstadoPlural(string estado) => estado switch
         {
-            "Completado" => "Completados",
-            "Cancelado" => "Cancelados",
-            "Reasignado" => "Reasignados",
+            PedidoEstados.Completado => "Completados",
+            PedidoEstados.Cancelado => "Cancelados",
+            PedidoEstados.Reasignado => "Reasignados",
             _ => estado
         };
 

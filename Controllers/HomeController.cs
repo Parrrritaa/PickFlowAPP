@@ -21,11 +21,11 @@ namespace PickingApp.Controllers
         {
             // Un pedido dividido se cuenta por sus partes, no como un pedido más
             var pedidosDeTrabajo = _context.Pedidos.Where(p => !p.Partes.Any());
-            var pendientes = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Pendiente");
-            var enProceso = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Asignado" || p.Estado == "EnProceso");
-            var completados = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Completado");
-            var cancelados = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Cancelado");
-            var reasignados = await pedidosDeTrabajo.CountAsync(p => p.Estado == "Reasignado");
+            var pendientes = await pedidosDeTrabajo.CountAsync(p => p.Estado == PedidoEstados.Pendiente);
+            var enProceso = await pedidosDeTrabajo.CountAsync(p => p.Estado == PedidoEstados.Asignado);
+            var completados = await pedidosDeTrabajo.CountAsync(p => p.Estado == PedidoEstados.Completado);
+            var cancelados = await pedidosDeTrabajo.CountAsync(p => p.Estado == PedidoEstados.Cancelado);
+            var reasignados = await pedidosDeTrabajo.CountAsync(p => p.Estado == PedidoEstados.Reasignado);
 
             ViewBag.TotalPendientes = pendientes;
             ViewBag.TotalEnProceso = enProceso;

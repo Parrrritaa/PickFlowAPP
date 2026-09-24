@@ -24,7 +24,7 @@ namespace PickingApp.Models
 
         [Required]
         [StringLength(30)]
-        public string Estado { get; set; } = "Pendiente"; // "Pendiente", "Asignado", "EnProceso", "Completado", "Cancelado", "Reasignado", "Dividido"
+        public string Estado { get; set; } = PedidoEstados.Pendiente; // Valores en PedidoEstados
 
         public int? EmpleadoId { get; set; }
 
