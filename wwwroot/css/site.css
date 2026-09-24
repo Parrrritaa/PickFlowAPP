@@ -110,6 +110,10 @@ body {
     justify-content: space-between;
     padding: 24px 16px 20px 16px;
     overflow-y: auto;
+    /* Menú desplegable: se usa "translate" (no "transform") para no chocar con la animación de entrada
+       pf-shell-in, que anima "transform" al iniciar sesión */
+    transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
+                visibility 0s linear 0s;
 }
 
 .pf-sidebar-brand {
@@ -245,6 +249,7 @@ body {
     display: flex;
     flex-direction: column;
     background-color: #FFFFFF;
+    transition: margin-left var(--pf-duration-sidebar) var(--pf-ease-out);
 }
 
 /* Header bar */
@@ -667,18 +672,7 @@ body {
 }
 
 /* ===== Menú lateral desplegable =====
-   Se usa la propiedad "translate" (no "transform") para no chocar con la animación de entrada
-   pf-shell-in, que anima "transform" en la barra lateral al iniciar sesión.
    Con reducir movimiento activo, la regla global deja las transiciones en ~0 ms (cambio instantáneo). */
-.pf-sidebar {
-    transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
-                visibility 0s linear 0s;
-}
-
-.pf-main-wrapper {
-    transition: margin-left var(--pf-duration-sidebar) var(--pf-ease-out);
-}
-
 /* Oculto: fuera de pantalla y sin foco de teclado (visibility cambia al terminar el deslizamiento) */
 html.pf-sidebar-collapsed .pf-sidebar {
     translate: -100% 0;
