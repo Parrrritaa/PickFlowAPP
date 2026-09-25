@@ -143,7 +143,7 @@ namespace PickingApp.Controllers
                 await _context.SaveChangesAsync();
 
                 await _auditService.RegistrarAsync("Aprobar Solicitud", "Solicitudes",
-                    $"Solicitud #{solicitud.Id} ({solicitud.TipoSolicitud}) aprobada.");
+                    $"Solicitud #{solicitud.Id} ({TiposSolicitud.Nombre(solicitud.TipoSolicitud)}) aprobada.");
 
                 TempData["SuccessMessage"] = $"Solicitud #{solicitud.Id} aprobada correctamente.";
             }
