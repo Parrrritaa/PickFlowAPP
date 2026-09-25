@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
+using PickingApp.Middleware;
 using PickingApp.Models;
 using PickingApp.Services;
 
@@ -151,7 +152,8 @@ namespace PickingApp.Controllers
                 // La solicitud queda Pendiente: se puede aprobar cuando se resuelva el impedimento, o rechazar.
                 TempData["ErrorMessage"] = ex.Message;
             }
-            catch (Exception ex)
+            // Los errores de base de datos siguen hasta ErrorBaseDatosMiddleware, que muestra el aviso comprensible
+            catch (Exception ex) when (!ErroresBaseDatos.EsErrorDeBaseDatos(ex))
             {
                 TempData["ErrorMessage"] = $"Error al procesar la aprobación: {ex.Message}";
             }
