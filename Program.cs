@@ -2,15 +2,29 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
 using PickingApp.Data;
+using PickingApp.Middleware;
 using PickingApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuración de MySQL con Entity Framework Core
+// La versión del servidor se detecta una sola vez al arrancar: detectarla dentro de AddDbContext abría una
+// conexión cada vez que se creaba el contexto y fallaba antes de llegar al controlador si MySQL estaba apagado.
+// Si MySQL no responde al arrancar se asume MySQL 8, y cada petición muestra el aviso de base de datos no disponible.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+ServerVersion serverVersion;
+try
+{
+    serverVersion = ServerVersion.AutoDetect(connectionString);
+}
+catch (MySqlException)
+{
+    serverVersion = new MySqlServerVersion(new Version(8, 0, 0));
+}
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, serverVersion));
 
 // Servicios de la aplicación
 builder.Services.AddHttpContextAccessor();
@@ -87,6 +101,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// Antes de UseRouting para que la página de aviso pase de nuevo por el enrutamiento
+app.UseMiddleware<ErrorBaseDatosMiddleware>();
 
 app.UseRouting();
 app.UseRateLimiter();

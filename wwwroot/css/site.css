@@ -1722,3 +1722,37 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 .pf-partes-inner { overflow: hidden; min-height: 0; }
 
 .pf-subtabla-partes { width: 100%; border-collapse: collapse; }
+
+/* Aviso de base de datos no disponible (Views/Home/ErrorBaseDatos.cshtml) */
+.pf-aviso-bd-icono {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background-color: var(--pf-warning-bg);
+    color: var(--pf-warning-text);
+    font-size: 34px;
+}
+
+.pf-aviso-bd-titulo {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--pf-navy);
+    margin-bottom: 12px;
+}
+
+.pf-aviso-bd-texto {
+    font-size: 1rem;
+    color: var(--pf-text-dark);
+    margin-bottom: 8px;
+}
+
+.pf-aviso-bd-ayuda {
+    font-size: 0.9375rem;
+    color: var(--pf-text-muted);
+    margin-bottom: 24px;
+}
+
+.pf-aviso-bd .btn-pf-login { margin-bottom: 0; }
