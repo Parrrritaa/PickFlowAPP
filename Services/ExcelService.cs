@@ -99,11 +99,11 @@ namespace PickingApp.Services
                         continue;
                     }
 
-                    var ubi = ubicacionesDb.FirstOrDefault(u => 
-                        u.BodegaId == bodegaId && 
-                        u.Pasillo.Equals(pasillo, StringComparison.OrdinalIgnoreCase) &&
-                        u.Estante.Equals(estante, StringComparison.OrdinalIgnoreCase) &&
-                        u.Nivel.Equals(nivel, StringComparison.OrdinalIgnoreCase));
+                    var ubi = ubicacionesDb.FirstOrDefault(u =>
+                        u.BodegaId == bodegaId &&
+                        MismoValor(u.Pasillo, pasillo) &&
+                        MismoValor(u.Estante, estante) &&
+                        MismoValor(u.Nivel, nivel));
 
                     if (ubi == null)
                     {
@@ -178,5 +178,12 @@ namespace PickingApp.Services
 
             return result;
         }
+
+        // Pasillo, estante y nivel se comparan como números: "01" en el Excel es la misma ubicación que "1",
+        // igual que en el código de ubicación (PAS01). Si alguno no es numérico se compara como texto.
+        private static bool MismoValor(string guardado, string delExcel) =>
+            int.TryParse(guardado, out var a) && int.TryParse(delExcel, out var b)
+                ? a == b
+                : guardado.Equals(delExcel, StringComparison.OrdinalIgnoreCase);
     }
 }

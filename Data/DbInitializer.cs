@@ -93,15 +93,16 @@ namespace PickingApp.Data
                 await context.Bodegas.AddRangeAsync(bodegaPrincipal, bodegaSecundaria);
                 await context.SaveChangesAsync();
 
-                // 4. Ubicaciones Iniciales (CU-19)
+                // 4. Ubicaciones Iniciales (CU-19). Mismas reglas que el formulario: pasillo, estante y nivel
+                // solo con números, y el código con el formato que genera BodegasController (PASXX-ESTXX-NIVXX)
                 var ubicaciones = new List<Ubicacion>
                 {
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-01-EST-01-NIV-01", Pasillo = "P01", Estante = "E01", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-01-EST-01-NIV-02", Pasillo = "P01", Estante = "E01", Nivel = "N02", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-01-EST-02-NIV-01", Pasillo = "P01", Estante = "E02", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-02-EST-01-NIV-01", Pasillo = "P02", Estante = "E01", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-02-EST-02-NIV-01", Pasillo = "P02", Estante = "E02", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaSecundaria.Id, CodigoUbicacion = "PAS-A-EST-01-NIV-01", Pasillo = "PA", Estante = "E01", Nivel = "N01", Activa = true }
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS01-EST01-NIV01", Pasillo = "1", Estante = "1", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS01-EST01-NIV02", Pasillo = "1", Estante = "1", Nivel = "2", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS01-EST02-NIV01", Pasillo = "1", Estante = "2", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS02-EST01-NIV01", Pasillo = "2", Estante = "1", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS02-EST02-NIV01", Pasillo = "2", Estante = "2", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaSecundaria.Id, CodigoUbicacion = "PAS01-EST01-NIV01", Pasillo = "1", Estante = "1", Nivel = "1", Activa = true }
                 };
                 await context.Ubicaciones.AddRangeAsync(ubicaciones);
                 await context.SaveChangesAsync();
