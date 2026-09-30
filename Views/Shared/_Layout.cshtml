@@ -30,17 +30,18 @@
         displayName = char.ToUpper(displayName[0]) + displayName.Substring(1);
 
         <aside class="pf-sidebar" id="pfSidebar" aria-label="Menú principal">
-            <div>
-                <div class="pf-sidebar-top">
-                    <a class="pf-sidebar-brand" asp-controller="Home" asp-action="Index">
-                        <span class="brand-pick">Pick</span><span class="brand-flow">Flow</span>
-                    </a>
-                    <button type="button" class="pf-menu-toggle pf-menu-toggle--sidebar" data-menu-toggle
-                            aria-controls="pfSidebar" aria-expanded="true" aria-label="Ocultar menú" title="Ocultar menú">
-                        <span class="pf-menu-toggle-lines" aria-hidden="true"><span></span><span></span><span></span></span>
-                    </button>
-                </div>
+            <div class="pf-sidebar-top">
+                <a class="pf-sidebar-brand" asp-controller="Home" asp-action="Index">
+                    <span class="brand-pick">Pick</span><span class="brand-flow">Flow</span>
+                </a>
+                <button type="button" class="pf-menu-toggle pf-menu-toggle--sidebar" data-menu-toggle
+                        aria-controls="pfSidebar" aria-expanded="true" aria-label="Ocultar menú" title="Ocultar menú">
+                    <span class="pf-menu-toggle-lines" aria-hidden="true"><span></span><span></span><span></span></span>
+                </button>
+            </div>
 
+            <!-- Solo las opciones se desplazan; el logo y Cerrar sesión quedan fijos -->
+            <div class="pf-sidebar-scroll">
                 <ul class="pf-nav">
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Home" ? "active" : "")" asp-controller="Home" asp-action="Index">
