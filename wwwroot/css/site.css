@@ -153,7 +153,8 @@ body {
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
-    overscroll-behavior: contain;
+    /* none: sin el efecto nativo del navegador al llegar al borde; lo reemplaza el rebote de site.js */
+    overscroll-behavior: none;
     margin: 0 -8px;
     padding: 0 8px;
     scrollbar-width: thin;
@@ -2061,5 +2062,24 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 
     .pf-opcion-detalle {
         padding-left: 14px;
+    }
+}
+
+/* --- Rebote elástico al llegar al inicio o al final de una zona desplazable (site.js) --- */
+/* Mientras dura, la capa recorta en vertical lo que se sale: así el alto desplazable no cambia
+   y el navegador no corrige el scroll. Sus hijos se mueven con "translate" (no chocan con "transform"). */
+.pf-rebotando {
+    overflow-y: clip;
+}
+
+.pf-rebotando > * {
+    translate: 0 var(--pf-rebote, 0px);
+}
+
+/* Con mouse o trackpad la página usa el rebote propio en vez del nativo (macOS), para que se vea igual en
+   todos los equipos. En pantallas táctiles se deja el del navegador (y deslizar hacia abajo para recargar). */
+@media (hover: hover) and (pointer: fine) {
+    html {
+        overscroll-behavior-y: none;
     }
 }

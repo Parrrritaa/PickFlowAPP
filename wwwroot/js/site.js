@@ -583,3 +583,199 @@ window.addEventListener('pageshow', function (e) {
     actualizarResumen();
     revisarCodigo();
 })();
+
+// Rebote elástico al llegar al inicio o al final de una zona desplazable (menú lateral y página),
+// como en iOS y macOS: el contenido se estira con resistencia y vuelve con un resorte suave.
+// La capa recibe .pf-rebotando y --pf-rebote; el CSS mueve sus hijos con "translate".
+(function () {
+    var ESTIRAMIENTO_MAX = 100;   // px a los que tiende el estiramiento por mucho que se empuje
+    var RESISTENCIA = 0.55;       // la misma constante del rebote de iOS
+    var FACTOR_RUEDA = 0.35;      // un paso de la rueda del mouse estira unos 18 px
+    var SOLTAR_TRAS_MS = 120;     // sin más movimiento de la rueda, el contenido vuelve
+    var PAUSA_INERCIA_MS = 180;   // la inercia del trackpad que sigue llegando al soltar no vuelve a estirar
+
+    // Cuanto más se empuja, menos se mueve: nunca pasa de ESTIRAMIENTO_MAX
+    function elastico(distancia) {
+        var d = Math.abs(distancia);
+        var x = (1 - 1 / (d * RESISTENCIA / ESTIRAMIENTO_MAX + 1)) * ESTIRAMIENTO_MAX;
+        return distancia < 0 ? -x : x;
+    }
+
+    // Inversa de elastico(): retoma el estiramiento desde donde va la animación
+    function distanciaDe(x) {
+        var r = Math.min(Math.abs(x), ESTIRAMIENTO_MAX - 1) / ESTIRAMIENTO_MAX;
+        var d = (1 / (1 - r) - 1) * ESTIRAMIENTO_MAX / RESISTENCIA;
+        return x < 0 ? -d : d;
+    }
+
+    function pasoRueda(e) {
+        return e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1);
+    }
+
+    // zona: { capa, enInicio(), enFinal(), desplazable() }. Devuelve los manejadores de rueda y toque.
+    function crearRebote(zona) {
+        var distancia = 0;        // lo que se ha empujado más allá del borde (+ arriba, − abajo)
+        var posicion = 0;         // desplazamiento que se ve
+        var velocidad = 0;
+        var objetivo = 0;
+        var soltado = true;
+        var cuadro = 0;
+        var tiempoAnterior = 0;
+        var temporizador = 0;
+        var ignorarInercia = false;
+        var ultimaRueda = 0;
+        var ultimoY = 0;
+
+        function pintar() {
+            if (posicion === 0) {
+                zona.capa.classList.remove('pf-rebotando');
+                zona.capa.style.removeProperty('--pf-rebote');
+                return;
+            }
+            zona.capa.classList.add('pf-rebotando');
+            zona.capa.style.setProperty('--pf-rebote', posicion.toFixed(2) + 'px');
+        }
+
+        // Resorte con amortiguación crítica: llega sin oscilar. Al soltar es más suave que mientras se empuja.
+        function animar(tiempo) {
+            var dt = Math.min((tiempo - tiempoAnterior) / 1000, 0.032);
+            tiempoAnterior = tiempo;
+            var rigidez = soltado ? 170 : 600;
+            var aceleracion = -rigidez * (posicion - objetivo) - 2 * Math.sqrt(rigidez) * velocidad;
+            velocidad += aceleracion * dt;
+            posicion += velocidad * dt;
+
+            if (soltado && Math.abs(posicion) < 0.3 && Math.abs(velocidad) < 5) {
+                posicion = 0;
+                velocidad = 0;
+                cuadro = 0;
+                pintar();
+                return;
+            }
+            pintar();
+            cuadro = requestAnimationFrame(animar);
+        }
+
+        function arrancar() {
+            if (cuadro) return;
+            tiempoAnterior = performance.now();
+            cuadro = requestAnimationFrame(animar);
+        }
+
+        function soltar() {
+            clearTimeout(temporizador);
+            distancia = 0;
+            objetivo = 0;
+            soltado = true;
+            if (posicion !== 0) arrancar();
+        }
+
+        function rueda(e) {
+            if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || pfReducirMovimiento()) return;
+            var dy = pasoRueda(e);
+            if (dy === 0) return;
+
+            var ahora = performance.now();
+            var pausa = ahora - ultimaRueda;
+            ultimaRueda = ahora;
+            if (ignorarInercia && pausa < PAUSA_INERCIA_MS) return;
+            ignorarInercia = false;
+
+            var empujaBorde = dy < 0 ? zona.enInicio() : zona.enFinal();
+            if (!empujaBorde || !zona.desplazable()) {
+                if (!soltado) soltar();
+                return;
+            }
+
+            if (soltado) distancia = distanciaDe(posicion);
+            soltado = false;
+            distancia = dy < 0 ? Math.max(0, distancia) - dy * FACTOR_RUEDA : Math.min(0, distancia) - dy * FACTOR_RUEDA;
+            objetivo = elastico(distancia);
+            arrancar();
+
+            clearTimeout(temporizador);
+            temporizador = setTimeout(function () {
+                soltar();
+                ignorarInercia = true;
+            }, SOLTAR_TRAS_MS);
+        }
+
+        function inicioToque(e) {
+            if (e.touches.length !== 1) return;
+            ultimoY = e.touches[0].clientY;
+            distancia = distanciaDe(posicion);
+        }
+
+        // Mientras el dedo tira más allá del borde, el contenido lo sigue con resistencia
+        // (se cancela el desplazamiento nativo); en cuanto vuelve, el navegador desplaza como siempre.
+        function moverToque(e) {
+            if (e.touches.length !== 1 || pfReducirMovimiento() || !zona.desplazable()) return;
+            var y = e.touches[0].clientY;
+            var dy = y - ultimoY;
+            ultimoY = y;
+
+            if (distancia > 0 || (distancia === 0 && dy > 0 && zona.enInicio())) {
+                distancia = Math.max(0, distancia + dy);
+            } else if (distancia < 0 || (distancia === 0 && dy < 0 && zona.enFinal())) {
+                distancia = Math.min(0, distancia + dy);
+            } else {
+                return;
+            }
+            if (e.cancelable) e.preventDefault();
+
+            cancelAnimationFrame(cuadro);
+            cuadro = 0;
+            soltado = false;
+            posicion = objetivo = elastico(distancia);
+            velocidad = 0;
+            pintar();
+        }
+
+        return { rueda: rueda, inicioToque: inicioToque, moverToque: moverToque, soltar: soltar };
+    }
+
+    // Menú lateral: se mueven sus opciones dentro de la zona desplazable (con rueda, trackpad y dedo)
+    var menu = document.querySelector('.pf-sidebar-scroll');
+    var opciones = menu && menu.querySelector('.pf-nav');
+    if (opciones) {
+        var reboteMenu = crearRebote({
+            capa: opciones,
+            enInicio: function () { return menu.scrollTop <= 0; },
+            enFinal: function () { return menu.scrollTop + menu.clientHeight >= menu.scrollHeight - 1; },
+            desplazable: function () { return menu.scrollHeight > menu.clientHeight + 1; }
+        });
+        menu.addEventListener('wheel', reboteMenu.rueda, { passive: true });
+        menu.addEventListener('touchstart', reboteMenu.inicioToque, { passive: true });
+        menu.addEventListener('touchmove', reboteMenu.moverToque, { passive: false });
+        menu.addEventListener('touchend', reboteMenu.soltar);
+        menu.addEventListener('touchcancel', reboteMenu.soltar);
+    }
+
+    // Página: solo con rueda o trackpad. En pantallas táctiles el navegador ya tiene su propio efecto
+    // (y deslizar hacia abajo para recargar), así que no se reemplaza.
+    var pagina = document.querySelector('.pf-main-wrapper');
+    if (pagina) {
+        var raiz = document.scrollingElement || document.documentElement;
+        var rebotePagina = crearRebote({
+            capa: pagina,
+            enInicio: function () { return raiz.scrollTop <= 0; },
+            enFinal: function () { return raiz.scrollTop + window.innerHeight >= raiz.scrollHeight - 1; },
+            desplazable: function () { return raiz.scrollHeight > window.innerHeight + 1; }
+        });
+
+        // La rueda sobre una zona con su propio desplazamiento (menú, textos largos...) no mueve la página
+        function dentroDeOtraZona(el) {
+            for (; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+                var overflow = getComputedStyle(el).overflowY;
+                if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight + 1) return true;
+            }
+            return false;
+        }
+
+        window.addEventListener('wheel', function (e) {
+            // Con un diálogo abierto la página no se desplaza y el diálogo se movería con ella
+            if (document.body.classList.contains('modal-open') || dentroDeOtraZona(e.target)) return;
+            rebotePagina.rueda(e);
+        }, { passive: true });
+    }
+})();
