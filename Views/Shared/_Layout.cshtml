@@ -44,11 +44,13 @@
                 <ul class="pf-nav">
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Home" ? "active" : "")" asp-controller="Home" asp-action="Index">
+                            <i class="bi bi-grid-1x2 pf-nav-icon" aria-hidden="true"></i>
                             Dashboard
                         </a>
                     </li>
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Pedidos" && currentAction != "CargarExcel" ? "active" : "")" asp-controller="Pedidos" asp-action="Index">
+                            <i class="bi bi-clipboard-check pf-nav-icon" aria-hidden="true"></i>
                             Pedidos
                         </a>
                     </li>
@@ -56,12 +58,14 @@
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Pedidos" && currentAction == "CargarExcel" ? "active" : "")" asp-controller="Pedidos" asp-action="CargarExcel">
+                                <i class="bi bi-file-earmark-spreadsheet pf-nav-icon" aria-hidden="true"></i>
                                 Cargar Excel
                             </a>
                         </li>
                     }
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Empleados" ? "active" : "")" asp-controller="Empleados" asp-action="Index">
+                            <i class="bi bi-people pf-nav-icon" aria-hidden="true"></i>
                             Empleados
                         </a>
                     </li>
@@ -69,12 +73,14 @@
                         @if (userRole == Roles.Auxiliar)
                         {
                             <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="MisSolicitudes">
+                                <i class="bi bi-inbox pf-nav-icon" aria-hidden="true"></i>
                                 Solicitudes
                             </a>
                         }
                         else
                         {
                             <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="Index">
+                                <i class="bi bi-inbox pf-nav-icon" aria-hidden="true"></i>
                                 Solicitudes
                                 @await Component.InvokeAsync("MenuBadges", new { tipo = "solicitudes" })
                             </a>
@@ -82,11 +88,13 @@
                     </li>
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Reportes" ? "active" : "")" asp-controller="Reportes" asp-action="Index">
+                            <i class="bi bi-bar-chart-line pf-nav-icon" aria-hidden="true"></i>
                             Reportes
                         </a>
                     </li>
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Notificaciones" ? "active" : "")" asp-controller="Notificaciones" asp-action="Index">
+                            <i class="bi bi-bell pf-nav-icon" aria-hidden="true"></i>
                             Notificaciones
                             @await Component.InvokeAsync("MenuBadges", new { tipo = "notificaciones" })
                         </a>
@@ -96,6 +104,7 @@
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Usuarios" ? "active" : "")" asp-controller="Usuarios" asp-action="Index">
+                                <i class="bi bi-person-gear pf-nav-icon" aria-hidden="true"></i>
                                 Usuarios y roles
                             </a>
                         </li>
@@ -103,6 +112,7 @@
 
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Bodegas" ? "active" : "")" asp-controller="Bodegas" asp-action="Index">
+                            <i class="bi bi-building pf-nav-icon" aria-hidden="true"></i>
                             Bodegas
                         </a>
                     </li>
@@ -111,6 +121,7 @@
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Productos" ? "active" : "")" asp-controller="Productos" asp-action="Index">
+                                <i class="bi bi-box-seam pf-nav-icon" aria-hidden="true"></i>
                                 Productos
                             </a>
                         </li>
@@ -120,6 +131,7 @@
                     {
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Auditoria" ? "active" : "")" asp-controller="Auditoria" asp-action="Index">
+                                <i class="bi bi-journal-text pf-nav-icon" aria-hidden="true"></i>
                                 Log del sistema
                             </a>
                         </li>

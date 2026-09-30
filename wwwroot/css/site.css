@@ -169,6 +169,16 @@ body {
                 transform var(--pf-duration-fast) var(--pf-ease);
 }
 
+/* Ícono de línea de cada módulo del menú: ancho fijo para que los textos queden alineados */
+.pf-nav-icon {
+    flex-shrink: 0;
+    width: 20px;
+    margin-right: 12px;
+    font-size: 18px;
+    line-height: 1;
+    text-align: center;
+}
+
 .pf-nav-link:hover {
     background-color: var(--pf-navy-hover);
     color: #FFFFFF;
