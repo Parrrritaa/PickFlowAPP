@@ -130,9 +130,15 @@
                     @if (userRole == Roles.Administrador)
                     {
                         <li class="pf-nav-item">
-                            <a class="pf-nav-link @(currentController == "Auditoria" ? "active" : "")" asp-controller="Auditoria" asp-action="Index">
+                            <a class="pf-nav-link @(currentController == "Auditoria" && currentAction != "Configuracion" ? "active" : "")" asp-controller="Auditoria" asp-action="Index">
                                 <i class="bi bi-journal-text pf-nav-icon" aria-hidden="true"></i>
                                 Log del sistema
+                            </a>
+                        </li>
+                        <li class="pf-nav-item">
+                            <a class="pf-nav-link @(currentController == "Auditoria" && currentAction == "Configuracion" ? "active" : "")" asp-controller="Auditoria" asp-action="Configuracion">
+                                <i class="bi bi-gear pf-nav-icon" aria-hidden="true"></i>
+                                Configuración
                             </a>
                         </li>
                     }
