@@ -1611,6 +1611,7 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 
 /* Pestañas de la sección Pedidos: navegan entre la lista principal y los pedidos divididos */
 .pf-vista-tabs {
+    position: relative;
     display: inline-flex;
     gap: 2px;
     padding: 3px;
@@ -1619,6 +1620,8 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 }
 
 .pf-vista-tabs a {
+    position: relative;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -1641,6 +1644,29 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 }
 
 .pf-vista-tabs a:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 2px; }
+
+/* Con JavaScript, el fondo blanco de la pestaña activa es una píldora que se desliza (site.js) */
+.pf-vista-tabs__indicador {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+    transition: transform 0.3s var(--pf-ease-out), width 0.3s var(--pf-ease-out);
+}
+
+.pf-vista-tabs__indicador.sin-transicion { transition: none; }
+
+.pf-vista-tabs--animada a.activo {
+    background-color: transparent;
+    box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pf-vista-tabs__indicador { transition: none; }
+}
 
 .pf-vista-tabs__contador {
     min-width: 20px;

@@ -37,6 +37,78 @@ document.addEventListener('click', function (e) {
     btn.setAttribute('aria-expanded', expandido ? 'true' : 'false');
 });
 
+// Pestañas de vista (Pedidos / Divididos): al elegir otra pestaña, la píldora blanca se desliza
+// hasta ella y al terminar se navega. Sin JavaScript siguen siendo enlaces con su propio fondo.
+(function () {
+    document.querySelectorAll('.pf-vista-tabs').forEach(function (nav) {
+        var tabs = Array.prototype.slice.call(nav.querySelectorAll('a'));
+        var inicial = nav.querySelector('a.activo');
+        if (!inicial) return;
+
+        var indicador = document.createElement('span');
+        indicador.className = 'pf-vista-tabs__indicador';
+        indicador.setAttribute('aria-hidden', 'true');
+        nav.insertBefore(indicador, nav.firstChild);
+        nav.classList.add('pf-vista-tabs--animada');
+
+        var navegando = false;
+
+        function colocar(tab, animar) {
+            indicador.classList.toggle('sin-transicion', !animar);
+            indicador.style.width = tab.offsetWidth + 'px';
+            indicador.style.transform = 'translateX(' + tab.offsetLeft + 'px)';
+        }
+
+        function marcar(tab) {
+            tabs.forEach(function (t) { t.classList.toggle('activo', t === tab); });
+        }
+
+        colocar(inicial, false);
+
+        // Si cambia el ancho de las pestañas (carga de la fuente, zoom) la píldora se reajusta sin animar
+        if (window.ResizeObserver) {
+            new ResizeObserver(function () {
+                if (!navegando) colocar(inicial, false);
+            }).observe(nav);
+        }
+
+        nav.addEventListener('click', function (e) {
+            var tab = e.target.closest('a');
+            if (!tab) return;
+            if (navegando) {
+                e.preventDefault();
+                return;
+            }
+            // Clic en la pestaña actual, con modificadores (abrir en otra pestaña) o sin animaciones: comportamiento normal
+            if (tab === inicial || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || pfReducirMovimiento()) return;
+
+            e.preventDefault();
+            navegando = true;
+            marcar(tab);
+            colocar(tab, true);
+
+            // Se llama al acabar la transición o por el temporizador de respaldo: solo navega la primera vez,
+            // y nunca si la página se restauró con "atrás" mientras tanto
+            var yaNavego = false;
+            var ir = function () {
+                if (!navegando || yaNavego) return;
+                yaNavego = true;
+                window.location.href = tab.href;
+            };
+            indicador.addEventListener('transitionend', ir, { once: true });
+            window.setTimeout(ir, 400); // por si la transición no llega a dispararse
+        });
+
+        // Al volver con "atrás" el navegador puede restaurar la página con la píldora en la otra pestaña
+        window.addEventListener('pageshow', function (e) {
+            if (!e.persisted) return;
+            navegando = false;
+            marcar(inicial);
+            colocar(inicial, false);
+        });
+    });
+})();
+
 // Ojito para mostrar/ocultar contraseña: envuelve cada input[type="password"] con un botón de alternar,
 // sin necesidad de tocarlo en cada vista. Corre una sola vez por input (marca data-pf-ojito).
 document.addEventListener('DOMContentLoaded', function () {
