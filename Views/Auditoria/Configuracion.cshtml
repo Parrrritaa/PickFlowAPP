@@ -97,6 +97,71 @@
                     </form>
                 </div>
             </div>
+
+            @* Datos de prueba: borra solo los pedidos para repetir cargas de Excel y asignaciones *@
+            <div class="card border-0 shadow-sm rounded-4 mt-4">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-trash3 me-1" aria-hidden="true"></i> Historial de pedidos</h6>
+                    <p class="text-secondary small mb-3">
+                        Borra todos los pedidos con sus productos y novedades para repetir pruebas desde cero.
+                        Se conservan usuarios, empleados, bodegas, ubicaciones, productos, solicitudes y el LOG.
+                    </p>
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <span class="fw-semibold">
+                            @(Model.TotalPedidos == 0 ? "No hay pedidos registrados." : Model.TotalPedidos == 1 ? "1 pedido registrado" : $"{Model.TotalPedidos} pedidos registrados")
+                        </span>
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalBorrarPedidos"
+                                disabled="@(Model.TotalPedidos == 0)">
+                            Borrar historial de pedidos…
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+@if (Model.TotalPedidos > 0)
+{
+    <div class="modal fade" id="modalBorrarPedidos" tabindex="-1" aria-labelledby="tituloBorrarPedidos" aria-describedby="textoBorrarPedidos" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 p-2">
+                <form asp-action="EliminarHistorialPedidos" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title fw-bold" id="tituloBorrarPedidos">¿Borrar el historial de pedidos?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body" id="textoBorrarPedidos">
+                        <p class="mb-2">
+                            Se borrarán @(Model.TotalPedidos == 1 ? "1 pedido" : $"los {Model.TotalPedidos} pedidos") con sus productos y novedades@(Model.PedidosEnCurso == 1 ? ", incluido 1 en curso" : Model.PedidosEnCurso > 1 ? $", incluidos {Model.PedidosEnCurso} en curso" : "").
+                        </p>
+                        <p class="mb-0 fw-semibold">Esta acción no se puede deshacer.</p>
+                    </div>
+                    <div class="modal-footer border-0">
+                        @* Cancelar recibe el foco al abrir: la acción destructiva nunca es la predeterminada *@
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" autofocus>Cancelar</button>
+                        <button type="submit" class="btn btn-danger" data-borrar-pedidos>
+                            Borrar @(Model.TotalPedidos == 1 ? "1 pedido" : $"{Model.TotalPedidos} pedidos")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var modal = document.getElementById('modalBorrarPedidos');
+            modal.addEventListener('shown.bs.modal', function () {
+                modal.querySelector('[autofocus]').focus();
+            });
+            // Evita un doble envío mientras se borran los pedidos
+            modal.querySelector('form').addEventListener('submit', function () {
+                var boton = modal.querySelector('[data-borrar-pedidos]');
+                boton.disabled = true;
+                boton.textContent = 'Borrando…';
+            });
+        })();
+    </script>
+}

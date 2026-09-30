@@ -136,7 +136,9 @@ namespace PickingApp.Controllers
             return View(new ConfiguracionViewModel
             {
                 LogHabilitado = await ParametrosSistema.LogHabilitadoAsync(_context),
-                Valores = await ParametrosSistema.ObtenerTodosAsync(_context)
+                Valores = await ParametrosSistema.ObtenerTodosAsync(_context),
+                TotalPedidos = await _context.Pedidos.CountAsync(),
+                PedidosEnCurso = await _context.Pedidos.CountAsync(p => PedidoEstados.EnCurso.Contains(p.Estado))
             });
         }
 
@@ -192,6 +194,43 @@ namespace PickingApp.Controllers
                 "Configuración general del sistema actualizada.");
 
             TempData["SuccessMessage"] = "Parámetros del sistema y auditoría guardados exitosamente.";
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        // Borra todos los pedidos (con sus productos y novedades) para repetir pruebas de carga y asignación.
+        // No toca usuarios, empleados, bodegas, ubicaciones, productos, solicitudes ni el LOG.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarHistorialPedidos()
+        {
+            var total = await _context.Pedidos.CountAsync();
+            if (total == 0)
+            {
+                TempData["ErrorMessage"] = "No hay pedidos para borrar.";
+                return RedirectToAction(nameof(Configuracion));
+            }
+
+            // ExecuteDeleteAsync lanza un DELETE directo en MySQL sin cargar las filas en memoria.
+            // Primero van las tablas hijas y las partes de los pedidos divididos: las claves foráneas no dejan
+            // borrar un pedido mientras algo lo referencie. La transacción hace que se borre todo o nada.
+            await using (var transaccion = await _context.Database.BeginTransactionAsync())
+            {
+                await _context.NovedadesPedido.ExecuteDeleteAsync();
+                await _context.DetallesPedido.ExecuteDeleteAsync();
+                await _context.Pedidos.Where(p => p.PedidoPadreId != null).ExecuteDeleteAsync();
+                await _context.Pedidos.ExecuteDeleteAsync();
+                // Avisos de la campana que abrirían un pedido que ya no existe
+                await _context.Notificaciones.Where(n => n.Enlace != null && n.Enlace.StartsWith("/Pedidos/Detalle/")).ExecuteDeleteAsync();
+                await transaccion.CommitAsync();
+            }
+
+            // Fuera de la transacción: en MySQL, ALTER TABLE confirma cualquier transacción abierta
+            await ReiniciarAutoincrementoAsync("NovedadesPedido", "DetallesPedido", "Pedidos");
+
+            await _auditService.RegistrarAsync("Eliminar Historial de Pedidos", "Mantenimiento",
+                $"Se eliminaron los {total} pedidos del sistema con sus productos y novedades. Los autoincrementos de esas tablas se reiniciaron.");
+
+            TempData["SuccessMessage"] = $"Se borraron {total} pedidos. Los próximos pedidos empiezan de nuevo desde el número 1.";
             return RedirectToAction(nameof(Configuracion));
         }
 
@@ -258,20 +297,12 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Con las tablas ya vacías, se reinicia el autoincremento para que los próximos
-            // registros vuelvan a empezar en 1 (evita IDs de pedidos con números muy altos).
             var tablasAReiniciar = new List<string> { "NovedadesPedido", "DetallesPedido", "Pedidos", "Solicitudes", "Notificaciones" };
             if (limpiarLog)
             {
                 tablasAReiniciar.Add("LogsSistema");
             }
-            foreach (var tabla in tablasAReiniciar)
-            {
-                // Los nombres de tabla vienen de la lista fija de arriba, no de entrada del usuario.
-#pragma warning disable EF1002
-                await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tabla}` AUTO_INCREMENT = 1");
-#pragma warning restore EF1002
-            }
+            await ReiniciarAutoincrementoAsync(tablasAReiniciar.ToArray());
 
             await _auditService.RegistrarAsync("Limpieza de Base de Datos", "Mantenimiento",
                 "Se ejecutó una limpieza completa de datos operativos (pedidos, novedades y solicitudes)"
@@ -282,6 +313,19 @@ namespace PickingApp.Controllers
                 ? "La base de datos operativa y el LOG del sistema fueron limpiados con éxito. Los usuarios y maestros se mantuvieron protegidos."
                 : "La base de datos operativa ha sido limpiada con éxito para pruebas. Los usuarios y maestros se mantuvieron protegidos.";
             return RedirectToAction("Index", "Home");
+        }
+
+        // Con las tablas ya vacías, se reinicia el autoincremento para que los próximos
+        // registros vuelvan a empezar en 1 (evita IDs de pedidos con números muy altos).
+        private async Task ReiniciarAutoincrementoAsync(params string[] tablas)
+        {
+            foreach (var tabla in tablas)
+            {
+                // Los nombres de tabla vienen de listas fijas del código, no de entrada del usuario.
+#pragma warning disable EF1002
+                await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tabla}` AUTO_INCREMENT = 1");
+#pragma warning restore EF1002
+            }
         }
     }
 }
