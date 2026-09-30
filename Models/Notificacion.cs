@@ -2,6 +2,7 @@
 
 namespace PickingApp.Models
 {
+    // Aviso interno que aparece en la campana. Va a un usuario (UsuarioDestinoId) o a todo un rol (RolDestino).
     public class Notificacion
     {
         [Key]

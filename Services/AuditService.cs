@@ -5,6 +5,7 @@ using PickingApp.Models;
 
 namespace PickingApp.Services
 {
+    // Guarda en la tabla LogsSistema quién hizo qué, en qué módulo y desde qué IP (LOG del sistema, CU-38)
     public class AuditService : IAuditService
     {
         private readonly DbContextOptions<ApplicationDbContext> _options;
@@ -57,6 +58,7 @@ namespace PickingApp.Services
                     DireccionIp = ip
                 };
 
+                // Add prepara el INSERT y SaveChangesAsync lo ejecuta en MySQL
                 db.LogsSistema.Add(log);
                 await db.SaveChangesAsync();
             }

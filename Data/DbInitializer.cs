@@ -5,10 +5,13 @@ using PickingApp.Services;
 
 namespace PickingApp.Data
 {
+    // Se ejecuta una vez al arrancar la aplicación (Program.cs). Cada bloque solo inserta datos
+    // si la tabla está vacía, así que reiniciar la aplicación no duplica nada.
     public static class DbInitializer
     {
         public static async Task SeedAsync(ApplicationDbContext context)
         {
+            // Crea la base de datos si no existe y aplica las migraciones pendientes de la carpeta Migrations
             await context.Database.MigrateAsync();
 
             // 1. Configuraciones del Sistema (RNF-06, RNF-07)
@@ -32,6 +35,7 @@ namespace PickingApp.Data
                         NombreCompleto = "Jonathan Romero (Admin)",
                         Correo = "admin@pickingapp.com",
                         Identificacion = "1000000001",
+                        // La contraseña se guarda como hash BCrypt, nunca en texto plano
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123*"),
                         Rol = "Administrador",
                         Estado = "Activo",
@@ -85,6 +89,7 @@ namespace PickingApp.Data
                     FechaCreacion = DateTime.Now
                 };
 
+                // Se guarda antes de crear las ubicaciones: MySQL asigna el Id de cada bodega en el INSERT
                 await context.Bodegas.AddRangeAsync(bodegaPrincipal, bodegaSecundaria);
                 await context.SaveChangesAsync();
 

@@ -2,6 +2,7 @@
 
 namespace PickingApp.Services
 {
+    // Filas de los reportes: ReportesController las calcula con consultas a MySQL y ReportService las dibuja en el PDF
     public class ReporteTiemposEmpleadoItem
     {
         public string Identificacion { get; set; } = string.Empty;
@@ -62,6 +63,7 @@ namespace PickingApp.Services
         };
     }
 
+    // Contrato de generación de PDFs; la implementación está en ReportService.cs
     public interface IReportService
     {
         byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo);

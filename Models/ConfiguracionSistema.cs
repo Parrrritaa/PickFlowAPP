@@ -2,6 +2,8 @@
 
 namespace PickingApp.Models
 {
+    // Parámetros editables desde Configuración, guardados como pares Clave/Valor.
+    // Las claves posibles y sus valores por defecto están en Services/ParametrosSistema.cs.
     public class ConfiguracionSistema
     {
         [Key]

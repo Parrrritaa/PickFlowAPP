@@ -7,9 +7,11 @@ using PickingApp.Data;
 using PickingApp.Middleware;
 using PickingApp.Services;
 
+// El builder reúne la configuración (appsettings.json) y el contenedor de servicios antes de crear la aplicación
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración de MySQL con Entity Framework Core
+// Configuración de MySQL con Entity Framework Core.
+// La cadena de conexión está en appsettings.json → ConnectionStrings:DefaultConnection.
 // La versión del servidor se detecta una sola vez al arrancar: detectarla dentro de AddDbContext abría una
 // conexión cada vez que se creaba el contexto y fallaba antes de llegar al controlador si MySQL estaba apagado.
 // Si MySQL no responde al arrancar se asume MySQL 8, y cada petición muestra el aviso de base de datos no disponible.
@@ -23,10 +25,13 @@ catch (MySqlException)
 {
     serverVersion = new MySqlServerVersion(new Version(8, 0, 0));
 }
+// Cada petición HTTP recibe su propio ApplicationDbContext; los controladores lo piden en su constructor
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, serverVersion));
 
-// Servicios de la aplicación
+// Servicios de la aplicación (inyección de dependencias).
+// Cada interfaz se asocia a su implementación: quien pide IPickingEngine en su constructor recibe un PickingEngine.
+// AddScoped crea una instancia por petición HTTP.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IExcelService, ExcelService>();
@@ -71,12 +76,12 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// Soporte para MVC con Vistas
+// Soporte para MVC: controladores en Controllers/ y vistas Razor en Views/
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
-// Inicialización y siembra de base de datos (Seed)
+// Inicialización y siembra de base de datos (Seed): aplica las migraciones pendientes y crea los datos iniciales
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -92,7 +97,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configuración del pipeline HTTP
+// Configuración del pipeline HTTP: cada petición pasa por estos middlewares en el orden en que se registran
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -108,9 +113,12 @@ app.UseMiddleware<ErrorBaseDatosMiddleware>();
 app.UseRouting();
 app.UseRateLimiter();
 
+// UseAuthentication lee la cookie de sesión y llena User (nombre, correo, rol);
+// UseAuthorization aplica los [Authorize(Roles = ...)] de los controladores
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Ruta por defecto: /Controlador/Accion/id. Por ejemplo, /Pedidos/Detalle/5 llama a PedidosController.Detalle(5)
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

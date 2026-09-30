@@ -54,6 +54,7 @@
             }
         </span>
         <div>
+            @* asp-action genera el enlace a /Pedidos/CargarExcel; el color sale de la clase .btn-pf-blue en site.css *@
             <a asp-action="CargarExcel" class="btn-pf-blue">
                 + Cargar Excel
             </a>
@@ -67,6 +68,7 @@
         </p>
     }
 
+    @* Los filtros viajan por GET en la URL y llegan como parámetros a PedidosController.Index *@
     <form method="get" asp-action="Index" id="formFiltrosPedidos">
         @if (verDivididos)
         {

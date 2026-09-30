@@ -35,6 +35,7 @@ namespace PickingApp.Controllers
                 return View();
             }
 
+            // ExcelService lee el archivo y valida cada fila contra las bodegas y ubicaciones registradas
             using var stream = archivoExcel.OpenReadStream();
             var validacion = await _excelService.ValidarArchivoExcelAsync(stream);
 
@@ -49,6 +50,8 @@ namespace PickingApp.Controllers
 
             // Los códigos de pedido duplicados ya se rechazaron en ValidarArchivoExcelAsync: un código
             // repetido no se renombra ni se reabre, porque duplicaría el trabajo de alistamiento.
+            // AddRange marca todos los pedidos (con sus Detalles) como nuevos y SaveChangesAsync
+            // hace todos los INSERT en una sola transacción: se guardan todos o ninguno
             _context.Pedidos.AddRange(validacion.PedidosValidados);
 
             await _context.SaveChangesAsync();
@@ -81,6 +84,7 @@ namespace PickingApp.Controllers
             using var stream = archivoExcel!.OpenReadStream();
             var v = await _excelService.ValidarArchivoExcelAsync(stream);
 
+            // Responde en JSON: el JavaScript de CargarExcel.cshtml lo lee y pinta el resultado sin recargar la página
             return Json(new
             {
                 valido = v.IsValid,
@@ -102,6 +106,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public IActionResult DescargarPlantilla()
         {
+            // File(...) envía los bytes al navegador como archivo descargable .xlsx
             var bytes = _excelService.GenerarPlantillaExcel();
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Plantilla_Pedidos_Picking.xlsx");
         }

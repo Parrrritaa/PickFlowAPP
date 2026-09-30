@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Registro de auditoría: cada acción importante guarda una fila aquí mediante AuditService
     public class LogSistema
     {
         [Key]

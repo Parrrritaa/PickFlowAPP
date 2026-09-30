@@ -2,6 +2,8 @@
 
 namespace PickingApp.Models.ViewModels
 {
+    // Los ViewModels transportan lo que escribe el usuario en un formulario; no son tablas.
+    // Sus atributos ([Required], [EmailAddress]...) generan los mensajes de validación de la vista.
     public class LoginViewModel
     {
         [Required(ErrorMessage = "El correo electrónico es obligatorio.")]
@@ -15,6 +17,7 @@ namespace PickingApp.Models.ViewModels
         public bool RememberMe { get; set; } = false;
     }
 
+    // [Compare] valida que ConfirmPassword sea igual a NewPassword
     public class ChangePasswordViewModel
     {
         [Required(ErrorMessage = "La contraseña actual es obligatoria.")]

@@ -10,7 +10,7 @@ namespace PickingApp.Controllers
     // Asignación y reasignación de pedidos a empleados (CU-26, CU-27). Parte de PedidosController: mismas rutas (/Pedidos/...) y dependencias.
     public partial class PedidosController
     {
-        // Slide 8 / CU-26: Asignar pedido a empleado (Vista interactiva)
+        // Diapositiva 8 / CU-26: Asignar pedido a empleado (vista interactiva)
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> Asignar(int id)
@@ -71,6 +71,8 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
+            // Se vuelven a validar las reglas en el servidor (activo, un pedido a la vez, jornada, tiempo restante):
+            // lo que muestra la vista pudo cambiar desde que se abrió la página
             var validacion = await _pickingEngine.ValidarAsignacionAsync(pedidoId, empleadoId);
 
             if (!validacion.PuedeAsignar)
@@ -88,6 +90,7 @@ namespace PickingApp.Controllers
                 NotificarAdvertenciaAsignacion(validacion, pedido, empleado, esReasignacion: false);
             }
 
+            // Cambia estado, empleado, fechas y tiempos del pedido (Models/Pedido.cs) y luego los guarda con un UPDATE
             pedido.Asignar(empleadoId, DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync()),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
 

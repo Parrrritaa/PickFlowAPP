@@ -9,6 +9,7 @@ using PickingApp.Models;
 
 namespace PickingApp.Controllers
 {
+    // [Authorize] sin roles: cualquier usuario con sesión iniciada entra; sin sesión lo manda al login
     [Authorize]
     public class HomeController : Controller
     {
@@ -19,6 +20,7 @@ namespace PickingApp.Controllers
             _context = context;
         }
 
+        // Dashboard (pantalla de inicio): tarjetas con el total de pedidos por estado y los últimos pedidos
         public async Task<IActionResult> Index()
         {
             // Un pedido dividido se cuenta por sus partes, no como un pedido más
@@ -29,6 +31,7 @@ namespace PickingApp.Controllers
             var cancelados = await pedidosDeTrabajo.CountAsync(p => p.Estado == PedidoEstados.Cancelado);
             var reasignados = await pedidosDeTrabajo.CountAsync(p => p.Estado == PedidoEstados.Reasignado);
 
+            // ViewBag pasa datos sueltos a la vista (Views/Home/Index.cshtml los muestra en las tarjetas)
             ViewBag.TotalPendientes = pendientes;
             ViewBag.TotalEnProceso = enProceso;
             ViewBag.TotalCompletados = completados;
@@ -43,6 +46,7 @@ namespace PickingApp.Controllers
                 .Take(6)
                 .ToListAsync();
 
+            // La lista se envía como modelo de la vista (@model en Index.cshtml)
             return View(ultimosPedidos);
         }
 

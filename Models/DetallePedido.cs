@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Una línea del pedido: qué producto, cuántas unidades y de qué ubicación se recoge
     public class DetallePedido
     {
         [Key]

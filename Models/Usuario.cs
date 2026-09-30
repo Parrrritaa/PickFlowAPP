@@ -2,6 +2,9 @@
 
 namespace PickingApp.Models
 {
+    // Cada clase de Models es una tabla de MySQL y cada propiedad una columna.
+    // Los atributos validan los formularios y definen la columna: [Required] = NOT NULL,
+    // [StringLength(100)] = VARCHAR(100), [Key] = llave primaria autoincremental.
     public class Usuario
     {
         [Key]
@@ -21,6 +24,7 @@ namespace PickingApp.Models
         [StringLength(100)]
         public string Correo { get; set; } = string.Empty;
 
+        // Solo se guarda el hash BCrypt de la contraseña (se genera con BCrypt.HashPassword)
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
 
@@ -32,6 +36,7 @@ namespace PickingApp.Models
         [StringLength(20)]
         public string Estado { get; set; } = EstadosUsuario.Activo; // Valores en EstadosUsuario
 
+        // Se suma en cada login fallido; al llegar al máximo configurado la cuenta queda Bloqueada
         public int IntentosFallidos { get; set; } = 0;
 
         public DateTime? FechaBloqueo { get; set; }

@@ -37,6 +37,7 @@ namespace PickingApp.Controllers
                 Atendida = false
             };
 
+            // Se agregan la novedad y la notificación al Administrador; ambas se guardan en el mismo SaveChangesAsync
             _context.NovedadesPedido.Add(novedad);
 
             _context.Notificaciones.Add(new Notificacion

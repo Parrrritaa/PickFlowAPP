@@ -3,6 +3,7 @@ using PickingApp.Models;
 
 namespace PickingApp.Services
 {
+    // Resultado de validar el Excel: errores por fila y pedidos listos para guardar
     public class ExcelValidationResult
     {
         public bool IsValid { get; set; }
@@ -22,6 +23,7 @@ namespace PickingApp.Services
         public int FilasConPedidoDuplicado { get; set; }
     }
 
+    // Contrato del servicio de Excel; la implementación está en ExcelService.cs
     public interface IExcelService
     {
         Task<ExcelValidationResult> ValidarArchivoExcelAsync(Stream stream);

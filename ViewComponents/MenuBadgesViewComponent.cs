@@ -19,6 +19,7 @@ namespace PickingApp.ViewComponents
             _context = context;
         }
 
+        // _Layout.cshtml lo llama con Component.InvokeAsync("MenuBadges", ...) y muestra el número que devuelve
         public async Task<IViewComponentResult> InvokeAsync(string tipo)
         {
             var userIdClaim = UserClaimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);

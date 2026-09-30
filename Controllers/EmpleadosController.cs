@@ -8,6 +8,8 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // Gestión de empleados de bodega. Según el rol, un cambio se aplica directamente
+    // o se convierte en una Solicitud que otro rol debe aprobar.
     [Authorize]
     public class EmpleadosController : Controller
     {
@@ -29,11 +31,13 @@ namespace PickingApp.Controllers
                 .OrderBy(e => e.NombreCompleto)
                 .ToListAsync();
 
+            // Un empleado está "Ocupado" si tiene un pedido Asignado o Reasignado
             ViewBag.EmpleadosOcupados = (await _context.Pedidos
                 .Where(p => p.EmpleadoId != null && PedidoEstados.EnCurso.Contains(p.Estado))
                 .Select(p => p.EmpleadoId!.Value)
                 .ToListAsync())
                 .ToHashSet();
+            // Factor de rendimiento de cada empleado (PickingEngine.CalcularRendimientosAsync)
             ViewBag.Rendimientos = await _pickingEngine.CalcularRendimientosAsync(empleados.Select(e => e.Id).ToList());
             return View(empleados);
         }
@@ -61,6 +65,7 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            // Reglas que necesitan consultar la BD: identificación y correo únicos, duración máxima de jornada
             model.Identificacion = model.Identificacion.Trim();
             model.Correo = ReglasEmpleado.NormalizarCorreo(model.Correo);
             var error = await ReglasEmpleado.ValidarAsync(_context, model.Identificacion, model.Correo,
@@ -71,6 +76,7 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            // Rol e Id del usuario que tiene la sesión, leídos de la cookie
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -89,6 +95,8 @@ namespace PickingApp.Controllers
             // Auxiliar: Solicitar registro de empleado (CU-07)
             else
             {
+                // El empleado aún no se crea: sus datos se guardan como JSON en la solicitud
+                // y se insertan en Empleados solo cuando la solicitud se aprueba
                 var solicitud = Solicitud.Nueva(TiposSolicitud.RegistroEmpleado, userId, DatosEmpleadoSolicitud.Desde(model));
 
                 _context.Solicitudes.Add(solicitud);
@@ -180,6 +188,7 @@ namespace PickingApp.Controllers
                     return View(model);
                 }
 
+                // Lista de campos que cambiaron (valor anterior → nuevo) para que el Administrador los revise
                 var cambios = new List<CambioSolicitud>();
                 void AgregarCambio(string campo, string anterior, string nuevo)
                 {
@@ -249,6 +258,7 @@ namespace PickingApp.Controllers
             // Administrador: Inactivación Directa (CU-12)
             if (userRole == Roles.Administrador)
             {
+                // El mismo botón inactiva o reactiva: invierte el estado actual
                 empleado.Activo = !empleado.Activo;
                 await _context.SaveChangesAsync();
                 TempData["EmpleadoDestacadoId"] = empleado.Id;

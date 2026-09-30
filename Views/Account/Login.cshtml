@@ -6,7 +6,7 @@
 
 <div class="pf-login-card">
     <div class="text-center mb-4">
-        <!-- PickFlow Logo -->
+        <!-- Logo de PickFlow -->
         <img src="~/images/pickflow-logo.jpg" alt="PickFlow" style="height: 110px; object-fit: contain;" class="mb-1" />
     </div>
 
@@ -27,6 +27,8 @@
         </div>
     }
 
+    @* Envía un POST a AccountController.Login; asp-for enlaza cada campo con la propiedad del LoginViewModel.
+       AntiForgeryToken agrega el token oculto que valida [ValidateAntiForgeryToken] *@
     <form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
         @Html.AntiForgeryToken()
 

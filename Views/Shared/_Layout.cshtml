@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@* Plantilla común de todas las páginas con sesión: menú lateral, encabezado y mensajes.
+   Cada vista se inserta donde está @RenderBody(). *@
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
@@ -21,11 +23,12 @@
 <body class="@(TempData["JustLoggedIn"] != null ? "pf-just-logged-in" : "")">
     @if (User.Identity != null && User.Identity.IsAuthenticated)
     {
+        @* Controlador y acción actuales: sirven para marcar como "active" la opción del menú *@
         var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
         var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
         var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
         var userName = User.Identity.Name ?? "Usuario";
-        // Get first name or display name
+        // Nombre para mostrar: si fuera un correo se toma lo que va antes de la @; primera letra en mayúscula
         var displayName = userName.Contains("@") ? userName.Split('@')[0] : userName;
         displayName = char.ToUpper(displayName[0]) + displayName.Substring(1);
 
@@ -55,6 +58,7 @@
                             Pedidos
                         </a>
                     </li>
+                    @* Cada opción solo se muestra a los roles que pueden usarla; el controlador también lo valida con [Authorize] *@
                     @if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
                     {
                         <li class="pf-nav-item">
@@ -189,6 +193,7 @@
             </header>
 
             <main class="pf-content">
+                @* Mensajes que los controladores dejan en TempData antes de redirigir (verde, rojo y amarillo) *@
                 @if (TempData["SuccessMessage"] != null)
                 {
                     <div class="alert alert-success alert-dismissible fade show rounded-3 mb-4" role="alert">
@@ -210,6 +215,7 @@
                     </div>
                 }
 
+                @* Aquí se dibuja la vista de la acción actual (por ejemplo, Views/Pedidos/Index.cshtml) *@
                 @RenderBody()
             </main>
         </div>

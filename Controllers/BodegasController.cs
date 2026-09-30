@@ -8,6 +8,7 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // Bodegas y sus ubicaciones (pasillo/estante/nivel). Cada ubicación guarda un solo producto.
     [Authorize]
     public class BodegasController : Controller
     {
@@ -68,7 +69,7 @@ namespace PickingApp.Controllers
                 .Select(g => new { BodegaId = g.Key, Total = g.Count() })
                 .ToDictionaryAsync(x => x.BodegaId, x => x.Total);
 
-        // Detalle de Bodega y sus Ubicaciones (Slide 26)
+        // Detalle de Bodega y sus Ubicaciones (diapositiva 26)
         public async Task<IActionResult> Detalle(int id, string? filtroUbicacion, string? filtroProducto)
         {
             // AsNoTracking: vista de solo lectura; más abajo se reemplaza bodega.Ubicaciones con la lista filtrada.
@@ -135,6 +136,7 @@ namespace PickingApp.Controllers
                 .Max();
             model.Codigo = $"BOD-{(maxNumero + 1):D2}";
 
+            // INSERT de la nueva bodega en MySQL
             model.FechaCreacion = DateTime.Now;
             _context.Bodegas.Add(model);
             await _context.SaveChangesAsync();
@@ -196,6 +198,7 @@ namespace PickingApp.Controllers
             var bodega = await _context.Bodegas.FindAsync(id);
             if (bodega == null) return NotFound();
 
+            // Se valida antes de borrar: la relación es Restrict y MySQL rechazaría el DELETE
             if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == id) || await _context.Pedidos.AnyAsync(p => p.BodegaId == id))
             {
                 TempData["ErrorMessage"] = $"No se puede eliminar la bodega '{bodega.Nombre}' porque tiene ubicaciones y/o pedidos asociados.";
@@ -300,6 +303,7 @@ namespace PickingApp.Controllers
                 producto.UnidadesPorCaja = unidadesPorCajaValor;
             }
 
+            // Guarda la ubicación y, si es nuevo, también el producto (EF inserta primero el producto para tener su Id)
             model.Producto = producto;
             _context.Ubicaciones.Add(model);
             await _context.SaveChangesAsync();

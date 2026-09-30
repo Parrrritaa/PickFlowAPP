@@ -1,4 +1,6 @@
-﻿/* PickFlow Mockup Theme */
+﻿/* Tema de PickFlow (basado en el mockup)
+   Colores de la aplicación: se definen una vez aquí y se usan con var(--pf-...).
+   Cambiar un valor aquí cambia ese color en todas las pantallas. */
 :root {
     --pf-navy: #00204A;
     --pf-navy-dark: #001736;
@@ -17,8 +19,8 @@
     --pf-warning-text: #603813;
     --pf-banner-blue: #BFDBFE;
 
-    /* Motion & depth tokens — not part of the color palette, used to keep
-       transitions and shadows consistent across components. */
+    /* Movimiento y profundidad: no son colores; mantienen iguales las transiciones
+       y sombras en todos los componentes. */
     --pf-ease: cubic-bezier(0.4, 0, 0.2, 1);
     --pf-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --pf-duration-fast: 0.12s;
@@ -29,6 +31,7 @@
     --pf-shadow-control: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+/* Si el usuario pidió reducir el movimiento en su sistema, las animaciones se vuelven instantáneas */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -39,7 +42,7 @@
     }
 }
 
-/* Session entrance/exit — plays once per login or logout, never on routine navigation. */
+/* Entrada/salida de sesión: se reproduce una vez al iniciar o cerrar sesión, nunca al navegar entre páginas. */
 @keyframes pf-fade-up-in {
     from { opacity: 0; transform: translateY(14px) scale(0.985); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -96,7 +99,7 @@ body {
     min-height: 100vh;
 }
 
-/* Sidebar styling */
+/* Menú lateral */
 .pf-sidebar {
     width: 250px;
     background-color: var(--pf-navy);
@@ -266,7 +269,7 @@ body {
     outline-offset: 2px;
 }
 
-/* Main Content Area */
+/* Área principal de contenido */
 .pf-main-wrapper {
     margin-left: 250px;
     min-height: 100vh;
@@ -276,7 +279,7 @@ body {
     transition: margin-left var(--pf-duration-sidebar) var(--pf-ease-out);
 }
 
-/* Header bar */
+/* Barra superior (encabezado) */
 .pf-header {
     height: 56px;
     border-bottom: 1px solid #E5E7EB;
@@ -293,7 +296,7 @@ body {
     font-weight: 500;
 }
 
-/* Content Area */
+/* Área de contenido */
 .pf-content {
     padding: 28px 40px 60px 40px;
     flex: 1;
@@ -306,7 +309,7 @@ body {
     margin-bottom: 24px;
 }
 
-/* Mockup Gray Card Container */
+/* Contenedor gris tipo tarjeta (mockup) */
 .mockup-card {
     background-color: var(--pf-gray-bg);
     border-radius: 28px;
@@ -316,7 +319,7 @@ body {
     border: none;
 }
 
-/* Top Metric Cards for Dashboard */
+/* Tarjetas de métricas del Dashboard */
 .pf-metric-card {
     background-color: var(--pf-gray-bg);
     border-radius: 20px;
@@ -355,7 +358,7 @@ body {
 .pf-metric-card .val-red { color: #DC2626; }
 .pf-metric-card .val-dark { color: #1F2937; }
 
-/* Buttons */
+/* Botones: cada clase .btn-pf-* es un color de botón; se usan en las vistas con class="btn-pf-..." */
 .btn-pf-blue,
 .btn-pf-orange,
 .btn-pf-gray {
@@ -420,7 +423,7 @@ body {
     box-shadow: var(--pf-shadow-control);
 }
 
-/* Form Styles */
+/* Formularios */
 .mockup-form-group {
     margin-bottom: 20px;
 }
@@ -520,7 +523,7 @@ body {
     margin-bottom: 24px;
 }
 
-/* Mockup Table */
+/* Tablas (mockup) */
 .mockup-table {
     width: 100%;
     border-collapse: separate;
@@ -580,7 +583,7 @@ body {
     border-bottom-right-radius: 8px;
 }
 
-/* Warning Box */
+/* Caja de advertencia */
 .mockup-alert-warning {
     background-color: var(--pf-warning-bg);
     color: var(--pf-warning-text);
@@ -592,7 +595,7 @@ body {
     margin-bottom: 12px;
 }
 
-/* Upload Dropzone */
+/* Zona para soltar archivos (Cargar Excel) */
 .mockup-upload-box {
     border: 2px dashed var(--pf-blue);
     border-radius: 20px;
@@ -601,7 +604,7 @@ body {
     background-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Report Cards */
+/* Tarjetas de reportes */
 .mockup-report-card {
     background-color: var(--pf-gray-bg);
     border-radius: 24px;
@@ -635,7 +638,7 @@ body {
     min-height: 42px;
 }
 
-/* Search bar on top of lists */
+/* Barra de búsqueda sobre las listas */
 .mockup-search-input {
     background-color: #D1D5DB;
     border: none;

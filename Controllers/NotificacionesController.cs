@@ -23,7 +23,8 @@ namespace PickingApp.Controllers
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
 
-            // Solo las pendientes: al marcarse como leída, la notificación se descarta de la lista
+            // Solo las pendientes: al marcarse como leída, la notificación se descarta de la lista.
+            // Se muestran las dirigidas al usuario, a su rol o a todos
             var notificaciones = await _context.Notificaciones
                 .Where(n => !n.Leida)
                 .Where(n => n.UsuarioDestinoId == userId || n.RolDestino == userRole || (n.UsuarioDestinoId == null && n.RolDestino == null))

@@ -2,6 +2,7 @@ using System.Globalization;
 
 namespace PickingApp.Services
 {
+    // Utilidades para mostrar y leer números y duraciones de forma consistente en toda la aplicación
     public static class Formato
     {
         // Duración legible: "45 min", "2 h 15 min", "3 días 4 h" (los pedidos grandes pueden sumar miles de minutos)

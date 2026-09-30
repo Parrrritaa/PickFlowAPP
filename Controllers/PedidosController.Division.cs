@@ -72,6 +72,8 @@ namespace PickingApp.Controllers
             var detalles = pedido.Detalles.OrderBy(d => d.Id).ToList();
             var reparto = new Dictionary<(int DetalleId, int Parte), int>();
 
+            // Valida que cada producto se reparta completo: la suma de sus unidades en todas las partes
+            // debe ser igual a la cantidad original de la línea
             foreach (var d in detalles)
             {
                 var suma = 0;
@@ -106,6 +108,7 @@ namespace PickingApp.Controllers
                 return ErrorDivision(pedidoId, "Ya existen pedidos con los códigos de las partes; revise los pedidos cargados.");
             }
 
+            // Cada parte es un pedido nuevo (PED-XXX-P1, P2...) que apunta al original con PedidoPadreId
             var resumen = new List<string>();
             for (var k = 1; k <= partes; k++)
             {
@@ -133,6 +136,7 @@ namespace PickingApp.Controllers
                 resumen.Add($"{parte.CodigoPedido} ({parte.Detalles.Sum(d => d.Cantidad)} uds)");
             }
 
+            // Un solo SaveChanges: inserta las partes y actualiza el original a "Dividido" en la misma transacción
             pedido.Estado = PedidoEstados.Dividido;
             await _context.SaveChangesAsync();
 
@@ -169,6 +173,7 @@ namespace PickingApp.Controllers
             }
 
             var totalPartes = pedido.Partes.Count;
+            // RemoveRange genera los DELETE de las partes; sus detalles se borran en cascada (ApplicationDbContext)
             _context.Pedidos.RemoveRange(pedido.Partes);
             pedido.Estado = PedidoEstados.Pendiente;
             await _context.SaveChangesAsync();

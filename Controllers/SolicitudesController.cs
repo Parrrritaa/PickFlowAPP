@@ -9,6 +9,8 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // Flujo de aprobación: los cambios que un rol no puede hacer directamente quedan como Solicitud
+    // y aquí el Administrador (o el Supervisor, solo para registros de empleado) los aprueba o rechaza
     [Authorize]
     public class SolicitudesController : Controller
     {
@@ -69,7 +71,7 @@ namespace PickingApp.Controllers
             return View(misSolicitudes);
         }
 
-        // Slide 16 / CU-08: Revisar Solicitud
+        // Diapositiva 16 / CU-08: Revisar Solicitud
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> Revisar(int id)
@@ -123,6 +125,7 @@ namespace PickingApp.Controllers
 
             try
             {
+                // Aplica el cambio pedido (crear, editar o inactivar empleado; editar o eliminar ubicación)
                 await AplicarAsync(solicitud);
 
                 solicitud.Estado = EstadosSolicitud.Aprobada;
@@ -140,6 +143,8 @@ namespace PickingApp.Controllers
                     Enlace = "/Solicitudes/MisSolicitudes"
                 });
 
+                // Un solo SaveChanges guarda el cambio aplicado, la solicitud aprobada y la notificación:
+                // si algo falla, no se guarda nada a medias
                 await _context.SaveChangesAsync();
 
                 await _auditService.RegistrarAsync("Aprobar Solicitud", "Solicitudes",
@@ -229,6 +234,7 @@ namespace PickingApp.Controllers
 
         // Aplica los cambios de la solicitud. Las reglas se validan otra vez: entre la creación de la solicitud
         // y su aprobación otro registro pudo tomar la identificación, el correo o el código, o cambiar la jornada máxima.
+        // Según el tipo, se leen los datos guardados en DatosJson y se aplica el cambio correspondiente
         private Task AplicarAsync(Solicitud solicitud) => solicitud.TipoSolicitud switch
         {
             TiposSolicitud.RegistroEmpleado => RegistrarEmpleadoAsync(solicitud.LeerDatos<DatosEmpleadoSolicitud>()),
@@ -350,6 +356,7 @@ namespace PickingApp.Controllers
             }
         }
 
+        // Excepción propia para reglas de negocio: Aprobar la atrapa y muestra su mensaje al usuario
         private sealed class ReglaNegocioException : Exception
         {
             public ReglaNegocioException(string message) : base(message) { }

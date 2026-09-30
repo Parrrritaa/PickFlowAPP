@@ -5,6 +5,8 @@ using PickingApp.Models;
 
 namespace PickingApp.Services
 {
+    // Lee y valida el Excel de pedidos con la librería ClosedXML. No guarda nada en la base de datos:
+    // devuelve los pedidos válidos y PedidosController (Carga) los guarda cuando el usuario confirma.
     public class ExcelService : IExcelService
     {
         private readonly ApplicationDbContext _context;
@@ -31,6 +33,7 @@ namespace PickingApp.Services
                     return result;
                 }
 
+                // La fila 1 son los encabezados; la columna A debe ser el código del pedido
                 var header1 = worksheet.Cell(1, 1).GetString().Trim();
 
                 if (!header1.Contains("Pedido", StringComparison.OrdinalIgnoreCase))
@@ -49,12 +52,14 @@ namespace PickingApp.Services
                 }
                 result.EstructuraValida = true;
 
+                // Se cargan una sola vez para validar todas las filas sin consultar MySQL por cada fila
                 var bodegasDb = await _context.Bodegas.ToDictionaryAsync(b => b.Codigo.ToUpper(), b => b.Id);
                 var ubicacionesDb = await _context.Ubicaciones.Include(u => u.Producto).ToListAsync();
                 var codigosPedidoExistentes = (await _context.Pedidos.Select(p => p.CodigoPedido).ToListAsync())
                     .Select(c => c.ToUpperInvariant())
                     .ToHashSet();
 
+                // Skip(1) salta la fila de encabezados
                 var rows = range.RowsUsed().Skip(1);
                 var totalFilas = 0;
                 var pedidosDict = new Dictionary<string, Pedido>();
@@ -64,6 +69,7 @@ namespace PickingApp.Services
                     totalFilas++;
                     var filaNum = row.RowNumber();
 
+                    // Columnas A–I, en el mismo orden de la plantilla (GenerarPlantillaExcel)
                     var codPedido = row.Cell(1).GetString().Trim();
                     var codBodega = row.Cell(2).GetString().Trim().ToUpper();
                     var pasillo = row.Cell(3).GetString().Trim().ToUpper();
@@ -113,6 +119,7 @@ namespace PickingApp.Services
                         continue;
                     }
 
+                    // Varias filas con el mismo código forman un solo pedido con varias líneas (Detalles)
                     if (!pedidosDict.TryGetValue(codPedido, out var pedido))
                     {
                         // Un código de pedido ya registrado no se reabre ni se renombra: dos cargas del mismo
@@ -154,6 +161,7 @@ namespace PickingApp.Services
                 result.TotalFilas = totalFilas;
                 result.TotalPedidos = pedidosDict.Count;
                 result.PedidosValidados = pedidosDict.Values.ToList();
+                // El archivo solo es válido si no hubo ningún error: se carga todo o nada
                 result.IsValid = !result.Errors.Any() && result.PedidosValidados.Any();
 
                 if (!result.PedidosValidados.Any() && !result.Errors.Any())
@@ -171,6 +179,7 @@ namespace PickingApp.Services
             return result;
         }
 
+        // Crea en memoria el Excel de ejemplo que se descarga desde Cargar Excel
         public byte[] GenerarPlantillaExcel()
         {
             using var workbook = new XLWorkbook();

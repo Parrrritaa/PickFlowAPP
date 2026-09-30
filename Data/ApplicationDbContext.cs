@@ -3,12 +3,14 @@ using PickingApp.Models;
 
 namespace PickingApp.Data
 {
+    // Puente entre el código y MySQL: Entity Framework traduce las consultas LINQ sobre estos DbSet a SQL
     public class ApplicationDbContext : DbContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
         }
 
+        // Cada DbSet es una tabla de la base de datos; su nombre es el nombre de la tabla
         public DbSet<Usuario> Usuarios { get; set; } = null!;
         public DbSet<Empleado> Empleados { get; set; } = null!;
         public DbSet<Bodega> Bodegas { get; set; } = null!;
@@ -23,11 +25,13 @@ namespace PickingApp.Data
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
         public DbSet<CategoriaProducto> CategoriasProducto { get; set; } = null!;
 
+        // Reglas del modelo que no caben en los atributos de las clases: índices, relaciones y datos iniciales.
+        // Cualquier cambio aquí necesita una migración nueva (dotnet ef migrations add ...).
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Índices únicos
+            // Índices únicos: MySQL rechaza dos filas con el mismo valor (por ejemplo, dos usuarios con el mismo correo)
             modelBuilder.Entity<Usuario>()
                 .HasIndex(u => u.Correo)
                 .IsUnique();
@@ -71,7 +75,9 @@ namespace PickingApp.Data
                 new CategoriaProducto { Id = 3, Nombre = "Grande", MinutosPorUnidad = 4, Descripcion = "Monitores, impresoras", EsPredeterminada = false },
                 new CategoriaProducto { Id = 4, Nombre = "Voluminoso / pesado", MinutosPorUnidad = 10, Descripcion = "Torres de PC, UPS", EsPredeterminada = false });
 
-            // Relaciones y eliminaciones en cascada/restringidas
+            // Relaciones y qué pasa al borrar el registro principal:
+            // Restrict impide borrarlo si tiene hijos, Cascade borra también los hijos
+            // y SetNull deja la llave foránea de los hijos en null
             modelBuilder.Entity<Ubicacion>()
                 .HasOne(u => u.Bodega)
                 .WithMany(b => b.Ubicaciones)

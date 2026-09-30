@@ -8,6 +8,8 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // Gestión de usuarios del sistema. [Authorize(Roles = ...)] en la clase aplica a todas sus acciones:
+    // solo el Administrador entra; los demás roles reciben la página de acceso denegado.
     [Authorize(Roles = Roles.Administrador)]
     public class UsuariosController : Controller
     {
@@ -38,6 +40,8 @@ namespace PickingApp.Controllers
             return View();
         }
 
+        // [Bind] limita qué campos del formulario se copian al modelo: aunque alguien envíe
+        // PasswordHash o IntentosFallidos manipulando el formulario, se ignoran
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear([Bind(nameof(Usuario.NombreCompleto), nameof(Usuario.Identificacion), nameof(Usuario.Correo),
@@ -90,16 +94,19 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            // La contraseña se guarda como hash BCrypt, nunca en texto plano
             model.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
             model.FechaRegistro = DateTime.Now;
             model.IntentosFallidos = 0;
 
+            // Add marca el usuario como nuevo y SaveChangesAsync ejecuta el INSERT en MySQL
             _context.Usuarios.Add(model);
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Crear Usuario", "Usuarios", 
                 $"Usuario creado: {model.NombreCompleto} con rol {model.Rol}");
 
+            // TempData sobrevive a la redirección: _Layout lo muestra como alerta verde en la siguiente página
             TempData["SuccessMessage"] = $"Usuario '{model.NombreCompleto}' ({model.Correo}) creado con éxito.";
             return RedirectToAction(nameof(Index));
         }
@@ -141,6 +148,7 @@ namespace PickingApp.Controllers
                 usuario.FechaBloqueo = null;
             }
 
+            // EF detecta qué propiedades cambiaron y ejecuta el UPDATE solo con esas columnas
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Editar Usuario/Rol", "Usuarios", 

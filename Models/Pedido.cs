@@ -3,6 +3,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Pedido de picking cargado desde Excel. Sus productos están en Detalles (tabla DetallesPedido)
+    // y su estado sigue el ciclo Pendiente → Asignado/Reasignado → Completado o Cancelado.
     public class Pedido
     {
         [Key]
@@ -39,12 +41,14 @@ namespace PickingApp.Models
 
         public DateTime? FechaFinalizacion { get; set; }
 
+        // Tiempo que calcula PickingEngine para el empleado asignado (estándar × factor de rendimiento)
         public double? TiempoEstimadoMinutos { get; set; }
 
         // Tiempo estándar según las categorías de sus productos, sin ajustar por empleado.
         // Se congela al asignar para que el historial no cambie si luego se editan las categorías.
         public double? TiempoEstandarMinutos { get; set; }
 
+        // Tiempo real: de FechaInicioProceso a FechaFinalizacion, se calcula al completar el pedido
         public double? TiempoProcesamientoMinutos { get; set; }
 
         [StringLength(250)]
@@ -65,6 +69,7 @@ namespace PickingApp.Models
 
         public virtual ICollection<Pedido> Partes { get; set; } = new List<Pedido>();
 
+        // Propiedades de navegación: EF las llena con .Include(p => p.Detalles) en las consultas
         public virtual ICollection<DetallePedido> Detalles { get; set; } = new List<DetallePedido>();
         public virtual ICollection<NovedadPedido> Novedades { get; set; } = new List<NovedadPedido>();
 
@@ -113,6 +118,7 @@ namespace PickingApp.Models
             MotivoReasignacion = motivo;
         }
 
+        // Solo cambia el objeto en memoria; el controlador lo guarda en MySQL con SaveChangesAsync
         private void TomarEmpleado(string estado, int empleadoId, DateTime inicioProceso, double tiempoEstimado, double tiempoEstandar)
         {
             EmpleadoId = empleadoId;

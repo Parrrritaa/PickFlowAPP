@@ -1,7 +1,6 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
-
-// Write your JavaScript code.
+﻿// JavaScript compartido por todas las páginas (se carga en _Layout.cshtml y _LayoutLogin.cshtml).
+// Cada bloque escucha eventos en el documento y actúa solo sobre los elementos marcados con sus
+// atributos data-*, así funciona en cualquier vista sin repetir código.
 
 // "Ver más / Ver menos" para tablas largas: el botón [data-ver-mas="idTabla"] muestra u oculta
 // las filas .fila-extra de esa tabla. Guarda el estado en data-expandido.

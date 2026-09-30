@@ -4,6 +4,8 @@ using System.Text.Json;
 
 namespace PickingApp.Models
 {
+    // Solicitud de un Supervisor o Auxiliar que el Administrador debe aprobar o rechazar.
+    // Los datos propuestos viajan en DatosJson y solo se aplican al aprobarla (SolicitudesController.Aprobar).
     public class Solicitud
     {
         [Key]

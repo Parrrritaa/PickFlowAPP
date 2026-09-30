@@ -4,6 +4,8 @@ using PickingApp.Models;
 
 namespace PickingApp.Services
 {
+    // Motor de cálculo del picking: tiempo estándar de un pedido, rendimiento de cada empleado
+    // y reglas para decidir si un empleado puede recibir un pedido. Implementa IPickingEngine.
     public class PickingEngine : IPickingEngine
     {
         private readonly ApplicationDbContext _context;
@@ -38,8 +40,11 @@ namespace PickingApp.Services
                 .GroupBy(l => l.PedidoId)
                 .ToDictionary(g => g.Key, g =>
                 {
+                    // Tiempo de recoger: unidades × minutos por unidad (ya dividido por unidades por caja)
                     var tiempoUnidades = g.Sum(l => l.Cantidad * l.MinutosPorUnidad);
+                    // Tiempo de caminar: cada ubicación distinta suma los minutos de recorrido configurados
                     var tiempoRecorrido = g.Select(l => l.UbicacionId).Distinct().Count() * minutosPorUbicacion;
+                    // Nunca menos de 1 minuto, redondeado a 1 decimal
                     return Math.Round(Math.Max(1.0, tiempoUnidades + tiempoRecorrido), 1);
                 });
         }
@@ -251,7 +256,8 @@ namespace PickingApp.Services
                 return result;
             }
 
-            // Regla 4: Tiempo estimado vs Tiempo restante de jornada
+            // Regla 4: Tiempo estimado vs Tiempo restante de jornada.
+            // Si la salida es menor que la hora actual, el turno termina después de medianoche.
             var tiempoRestanteJornada = empleado.HorarioSalida > horaActual
                 ? empleado.HorarioSalida - horaActual
                 : (TimeSpan.FromHours(24) - horaActual) + empleado.HorarioSalida;

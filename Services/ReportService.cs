@@ -6,15 +6,20 @@ using System.IO;
 
 namespace PickingApp.Services
 {
+    // Arma los reportes en PDF con la librería QuestPDF. Solo dibuja: los datos ya llegan calculados
+    // desde ReportesController, que devuelve los bytes al navegador como archivo descargable.
     public class ReportService : IReportService
     {
         public ReportService()
         {
+            // Licencia gratuita de QuestPDF para proyectos pequeños y académicos
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
         public byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo)
         {
+            // Todos los reportes siguen la misma estructura: página (tamaño, márgenes, fuente),
+            // encabezado con logo, tabla con una fila por dato y pie con el número de página
             var document = Document.Create(container =>
             {
                 container.Page(page =>
@@ -50,6 +55,7 @@ namespace PickingApp.Services
                                 header.Cell().Element(CellStyleHeader).AlignRight().Text("Máximo (m)");
                             });
 
+                            // Una celda por columna, en el mismo orden de ColumnsDefinition
                             foreach (var item in datos)
                             {
                                 table.Cell().Element(CellStyleRow).Text(item.Identificacion);
@@ -71,6 +77,7 @@ namespace PickingApp.Services
                 });
             });
 
+            // Devuelve el PDF como bytes; no se guarda en disco
             return document.GeneratePdf();
         }
 
@@ -474,6 +481,7 @@ namespace PickingApp.Services
             });
         }
 
+        // Estilo de los encabezados de tabla: texto blanco en negrita sobre azul
         private static IContainer CellStyleHeader(IContainer container)
         {
             return container.DefaultTextStyle(x => x.Bold().FontColor(Colors.White))

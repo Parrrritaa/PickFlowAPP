@@ -9,6 +9,7 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // LOG del sistema, Configuración y limpieza de la base de datos (solo Administrador)
     [Authorize(Roles = Roles.Administrador)]
     public class AuditoriaController : Controller
     {
@@ -171,6 +172,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Configuracion));
             }
 
+            // Actualiza la fila de cada parámetro, o la crea si todavía no existe
             foreach (var kvp in valores)
             {
                 var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == kvp.Key);

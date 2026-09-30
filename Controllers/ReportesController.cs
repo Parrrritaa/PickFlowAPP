@@ -8,6 +8,7 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // Reportes en PDF: aquí se consultan y calculan los datos; ReportService solo dibuja el PDF
     [Authorize]
     public class ReportesController : Controller
     {
@@ -66,6 +67,8 @@ namespace PickingApp.Controllers
                 return File(pdf, "application/pdf", $"Reporte_Tiempos_Empleado_{empleado.Identificacion}_{periodo.ParaArchivo}.pdf");
             }
 
+            // Agrupa los pedidos completados por empleado y calcula cantidad, promedio, mínimo y máximo
+            // de TiempoProcesamientoMinutos (el tiempo real guardado al completar cada pedido)
             var pedidos = await query.Include(p => p.Empleado).ToListAsync();
             var datos = pedidos
                 .GroupBy(p => p.EmpleadoId)
@@ -84,6 +87,7 @@ namespace PickingApp.Controllers
             await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos Empleado",
                 $"Reporte general de todos los empleados, periodo: {periodo.Descripcion}.");
 
+            // Genera el PDF y lo envía al navegador como descarga
             var pdfBytes = _reportService.GenerarReporteTiemposPorEmpleadoPdf(datos, periodo);
             return File(pdfBytes, "application/pdf", $"Reporte_Tiempos_Empleados_{periodo.ParaArchivo}.pdf");
         }
@@ -118,6 +122,7 @@ namespace PickingApp.Controllers
                 return File(pdf, "application/pdf", $"Reporte_Tiempos_Bodega_{bodega.Codigo}_{periodo.ParaArchivo}.pdf");
             }
 
+            // Misma idea que por empleado, pero agrupando por bodega y sumando el tiempo total
             var pedidos = await query.Include(p => p.Bodega).ToListAsync();
             var datos = pedidos
                 .GroupBy(p => p.BodegaId)
@@ -210,6 +215,7 @@ namespace PickingApp.Controllers
             return File(pdfBytes, "application/pdf", $"Reporte_{nombre}_{periodo.ParaArchivo}.pdf");
         }
 
+        // Base de los reportes de tiempos: solo pedidos completados con tiempo real, filtrados por fecha de finalización
         private IQueryable<Pedido> PedidosCompletadosEnPeriodo(PeriodoReporte periodo)
         {
             var query = _context.Pedidos

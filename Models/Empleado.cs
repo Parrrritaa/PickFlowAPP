@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Operario de bodega que recoge los pedidos. No inicia sesión: no confundir con Usuario.
     public class Empleado
     {
         [Key]
@@ -48,6 +49,7 @@ namespace PickingApp.Models
         [NotMapped]
         public string JornadaLaboral => $"{HorarioEntrada:hh\\:mm} - {HorarioSalida:hh\\:mm}";
 
+        // [NotMapped]: se calcula en C# y no existe como columna en MySQL
         [NotMapped]
         public int MesesExperiencia
         {

@@ -23,6 +23,7 @@ namespace PickingApp.Controllers
             _auditService = auditService;
         }
 
+        // Página de Productos: categorías arriba y tabla de productos con su categoría abajo
         public async Task<IActionResult> Index()
         {
             ViewBag.Categorias = await _context.CategoriasProducto
@@ -82,6 +83,7 @@ namespace PickingApp.Controllers
                 accion = $"Categoría '{nombre}' creada con {minutos:0.##} min/u";
             }
 
+            // Cambiar los minutos por unidad cambia el tiempo estándar de los pedidos que se asignen desde ahora
             categoria.Nombre = nombre;
             categoria.MinutosPorUnidad = Math.Round(minutos, 2);
             categoria.Descripcion = descripcion;

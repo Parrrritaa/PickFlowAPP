@@ -10,6 +10,7 @@ namespace PickingApp.Controllers
 {
     [Authorize]
     // Consulta y ciclo de vida del pedido. El resto de acciones está en los archivos PedidosController.*.cs
+    // ("partial" permite repartir una misma clase en varios archivos: Carga, Asignacion, Division, Novedades)
     public partial class PedidosController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -36,6 +37,8 @@ namespace PickingApp.Controllers
         {
             var verDivididos = vista == "divididos";
 
+            // Include trae también los datos relacionados (JOIN), así la vista puede mostrar el nombre de la bodega
+            // o del empleado. La consulta aún no se ejecuta: se van sumando filtros y se lanza en ToListAsync
             var query = _context.Pedidos
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
@@ -50,6 +53,7 @@ namespace PickingApp.Controllers
                 ? query.Where(p => p.Partes.Any())
                 : query.Where(p => p.PedidoPadreId == null && !p.Partes.Any());
 
+            // Cada filtro que llega desde el formulario de búsqueda agrega un WHERE a la consulta
             if (!string.IsNullOrEmpty(estado))
             {
                 query = query.Where(p => p.Estado == estado);
@@ -111,6 +115,7 @@ namespace PickingApp.Controllers
             ViewBag.Vista = verDivididos ? "divididos" : null;
             ViewBag.DivididosEnCurso = await _context.Pedidos.CountAsync(p => p.Estado == PedidoEstados.Dividido);
 
+            // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes
             var pedidos = await query
                 .OrderByDescending(p => p.Prioridad == "Alta")
                 .ThenByDescending(p => p.FechaCarga)
@@ -175,8 +180,9 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var fechaFin = DateTime.Now;
+            // Cálculo del tiempo real de picking (PickingEngine.CalcularTiempoProcesamiento).
             // El tiempo real cuenta desde el inicio fijado al asignar (asignación + margen de ese momento)
+            var fechaFin = DateTime.Now;
             var inicioProceso = pedido.FechaInicioProceso
                 ?? (pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10)).AddMinutes(await ObtenerMargenInicioAsync());
             var tiempoReal = _pickingEngine.CalcularTiempoProcesamiento(inicioProceso, fechaFin);
@@ -188,6 +194,7 @@ namespace PickingApp.Controllers
 
             var padreCerrado = await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
 
+            // Guarda en una sola transacción el pedido completado (y el pedido original si se cerró)
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Completar Pedido", "Pedidos",

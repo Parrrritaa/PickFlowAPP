@@ -12,12 +12,14 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // Inicio y cierre de sesión, recuperación y cambio de contraseña
     public class AccountController : Controller
     {
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
         private readonly IEmailService _emailService;
 
+        // Inyección de dependencias: ASP.NET entrega estos objetos según lo registrado en Program.cs
         public AccountController(ApplicationDbContext context, IAuditService auditService, IEmailService emailService)
         {
             _context = context;
@@ -75,6 +77,7 @@ namespace PickingApp.Controllers
             return anulado;
         }
 
+        // GET: muestra el formulario de inicio de sesión
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
@@ -87,22 +90,27 @@ namespace PickingApp.Controllers
             return View();
         }
 
+        // POST: recibe el correo y la contraseña del formulario (LoginViewModel).
+        // [ValidateAntiForgeryToken] rechaza envíos que no vengan del formulario de la propia aplicación.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
 
+            // ModelState.IsValid es false si falla alguna validación del ViewModel ([Required], [EmailAddress])
             if (!ModelState.IsValid)
             {
                 return View(model);
             }
 
+            // SELECT del usuario por correo (los correos se guardan en minúsculas)
             var usuario = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Correo == model.Correo.Trim().ToLower());
 
             if (usuario == null)
             {
+                // Mismo mensaje que con contraseña incorrecta: no revela qué correos existen
                 ModelState.AddModelError(string.Empty, "Credenciales de acceso inválidas.");
                 await _auditService.LogAsync(model.Correo, "Desconocido", "Fallo de Autenticación", "Autenticación", 
                     $"Intento fallido con correo no registrado: {model.Correo}");
@@ -142,7 +150,8 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            // Validar hash de contraseña
+            // Validar hash de contraseña: BCrypt aplica el mismo proceso a la contraseña escrita, con la sal
+            // guardada dentro del hash, y compara el resultado. La contraseña nunca se desencripta.
             bool passwordValida = false;
             try
             {
@@ -197,11 +206,13 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            // Inicio de sesión exitoso
+            // Inicio de sesión exitoso: se reinician los intentos y se guarda la fecha de acceso
             usuario.IntentosFallidos = 0;
             usuario.UltimoAcceso = DateTime.Now;
             await _context.SaveChangesAsync();
 
+            // Los claims son los datos del usuario que viajan dentro de la cookie de sesión.
+            // Con ellos se lee después User.Identity.Name, el rol para [Authorize] y el Id del usuario.
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
@@ -220,6 +231,7 @@ namespace PickingApp.Controllers
                 ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(minutosInactividad)
             };
 
+            // Crea la cookie cifrada de sesión y la envía al navegador
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(claimsIdentity),
@@ -231,6 +243,7 @@ namespace PickingApp.Controllers
             // Marca la llegada como "recién logueado" para la animación de entrada del panel (solo se ve una vez).
             TempData["JustLoggedIn"] = true;
 
+            // Url.IsLocalUrl evita redirigir a otro sitio si alguien manipula el returnUrl
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
@@ -239,6 +252,7 @@ namespace PickingApp.Controllers
             return RedirectToAction("Index", "Home");
         }
 
+        // Cierra la sesión: borra la cookie de autenticación del navegador
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
@@ -335,6 +349,7 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            // Se guarda el hash BCrypt de la nueva contraseña y se invalida el código usado
             usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
             usuario.CodigoVerificacion = null;
             usuario.CodigoVerificacionExpira = null;
@@ -371,6 +386,7 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            // El Id del usuario sale del claim guardado en la cookie al iniciar sesión
             var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(userIdString, out int userId))
             {
@@ -383,6 +399,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction("Login");
             }
 
+            // Antes de cambiarla se comprueba que conoce la contraseña actual
             if (!BCrypt.Net.BCrypt.Verify(model.CurrentPassword, usuario.PasswordHash))
             {
                 ModelState.AddModelError("CurrentPassword", "La contraseña actual no es correcta.");
@@ -466,6 +483,7 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
+            // Código correcto: el hash pendiente pasa a ser la contraseña vigente
             usuario.PasswordHash = usuario.PasswordPendienteHash;
             usuario.PasswordPendienteHash = null;
             usuario.CodigoVerificacion = null;
