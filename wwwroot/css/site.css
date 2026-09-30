@@ -1782,3 +1782,38 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 }
 
 .pf-aviso-bd .btn-pf-login { margin-bottom: 0; }
+
+/* --- Botones: crecen un poco al pasar el cursor (como las tarjetas del Dashboard) y se hunden al pulsarlos ---
+   El crecimiento usa la propiedad "scale", aparte de "transform", para no chocar con otros transform.
+   :is() toma la especificidad de su argumento más específico (.btn:not(...):not(...)), así esta transición
+   gana a la que declara cada botón, incluida la del estilo en línea de _LayoutLogin.
+   Quedan fuera los botones de solo texto o ícono (btn-link, btn-close) y los pegados a otro control (stepper). */
+:is(.btn-pf-blue, .btn-pf-orange, .btn-pf-gray, .btn-pf-login, .btn-pf-logout, .pf-alert-btn, .pf-notif-read,
+    .btn:not(.btn-link):not(.btn-close)) {
+    transition-property: background-color, color, border-color, box-shadow, opacity, transform, scale;
+    transition-duration: var(--pf-duration-base), var(--pf-duration-base), var(--pf-duration-base),
+                         var(--pf-duration-base), var(--pf-duration-base), var(--pf-duration-fast), var(--pf-duration-base);
+    transition-timing-function: var(--pf-ease), var(--pf-ease), var(--pf-ease),
+                                var(--pf-ease), var(--pf-ease), var(--pf-ease), var(--pf-ease-out);
+}
+
+/* Solo con mouse (en pantallas táctiles el hover se queda pegado) y si no se pidió reducir el movimiento */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    :is(.btn-pf-blue, .btn-pf-orange, .btn-pf-gray, .btn-pf-login, .btn-pf-logout, .pf-alert-btn, .pf-notif-read,
+        .btn:not(.btn-link):not(.btn-close)):hover:not(:disabled, .disabled, [aria-disabled="true"]) {
+        scale: 1.05;
+    }
+
+    /* Los que ocupan todo el ancho crecen menos: un 5 % de un botón ancho se nota demasiado */
+    :is(.btn-pf-blue, .btn-pf-orange, .btn-pf-gray, .btn-pf-login, .btn-pf-logout, .pf-alert-btn, .pf-notif-read,
+        .btn:not(.btn-link):not(.btn-close)):is(.btn-pf-login, .btn-pf-logout, .pf-alert-btn, .w-100):hover:not(:disabled, .disabled, [aria-disabled="true"]) {
+        scale: 1.02;
+    }
+}
+
+/* Al pulsar vuelve a su tamaño y se hunde apenas */
+:is(.btn-pf-blue, .btn-pf-orange, .btn-pf-gray, .btn-pf-login, .btn-pf-logout, .pf-alert-btn, .pf-notif-read,
+    .btn:not(.btn-link):not(.btn-close)):active:not(:disabled, .disabled, [aria-disabled="true"]) {
+    scale: 1;
+    transform: scale(0.97);
+}
