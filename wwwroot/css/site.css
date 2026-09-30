@@ -1844,3 +1844,85 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     scale: 1;
     transform: scale(0.97);
 }
+
+/* --- Crear/Editar ubicación: producto existente o nuevo (Views/Bodegas/_SeleccionProducto.cshtml) --- */
+/* El formulario va sobre la tarjeta gris: el carril del control se oscurece un poco para distinguirse */
+.pf-seleccion-producto .pf-segmented {
+    max-width: 420px;
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Lista de productos: muestra varias filas a la vez para elegir sin abrir un desplegable */
+.mockup-input.pf-lista-productos {
+    height: auto;
+    padding: 4px;
+}
+
+.pf-lista-productos option {
+    padding: 7px 10px;
+    border-radius: 6px;
+}
+
+.pf-producto-vacio {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--pf-text-muted);
+}
+
+/* Datos del producto elegido: solo lectura, se editan en Productos */
+.pf-producto-resumen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: var(--pf-radius-control);
+    background-color: var(--pf-gray-light);
+    font-size: 14px;
+    color: var(--pf-text-dark);
+}
+
+.pf-producto-resumen i {
+    margin-right: 6px;
+    color: var(--pf-text-muted);
+}
+
+/* Aviso de código repetido mientras se escribe el número del producto nuevo */
+.pf-aviso-producto {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    padding: 10px 14px;
+    border-radius: var(--pf-radius-control);
+    background-color: var(--pf-warning-bg);
+    color: var(--pf-warning-text);
+    font-size: 14px;
+}
+
+.pf-aviso-producto strong {
+    font-weight: 600;
+}
+
+/* Botón con aspecto de enlace dentro de un texto */
+.pf-enlace-boton {
+    margin-left: 4px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--pf-blue);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.pf-aviso-producto .pf-enlace-boton {
+    color: inherit;
+}
+
+.pf-enlace-boton:focus-visible {
+    outline: 2px solid var(--pf-blue);
+    outline-offset: 2px;
+    border-radius: 2px;
+}

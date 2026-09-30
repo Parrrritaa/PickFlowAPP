@@ -424,3 +424,162 @@ window.addEventListener('pageshow', function (e) {
         });
     });
 })();
+
+// Crear/Editar ubicación: elegir un producto existente o registrar uno nuevo (Views/Bodegas/_SeleccionProducto.cshtml).
+// Solo se envía el bloque visible; el otro queda deshabilitado. Un código de producto repetido se avisa
+// mientras se escribe, y el servidor lo vuelve a validar al guardar.
+(function () {
+    var bloque = document.querySelector('[data-seleccion-producto]');
+    if (!bloque) return;
+
+    var datos = document.getElementById('datosProductosUbicacion');
+    var productos = datos ? JSON.parse(datos.textContent) : [];
+    var lista = bloque.querySelector('[data-lista-productos]');
+    var buscar = bloque.querySelector('[data-buscar-producto]');
+    var sinCoincidencias = bloque.querySelector('[data-sin-coincidencias]');
+    var resumen = bloque.querySelector('[data-resumen-producto]');
+    var numero = bloque.querySelector('[data-numero-producto]');
+    var codigoTexto = bloque.querySelector('[data-codigo-producto]');
+    var codigoTextoInicial = codigoTexto.textContent;
+    var aviso = bloque.querySelector('[data-aviso-repetido]');
+    var avisoTexto = bloque.querySelector('[data-aviso-texto]');
+    var repetido = null;
+
+    // Entre 3 y 6 filas visibles: sin espacio vacío con pocos productos ni una lista enorme con muchos
+    function filasLista(cantidad) {
+        return Math.min(6, Math.max(3, cantidad));
+    }
+
+    function productoPorId(id) {
+        return productos.filter(function (p) { return String(p.id) === String(id); })[0] || null;
+    }
+
+    function elegirModo(modo, animar) {
+        var radio = bloque.querySelector('input[name="seleccion.Modo"][value="' + modo + '"]');
+        if (radio) radio.checked = true;
+        bloque.querySelectorAll('[data-si-modo]').forEach(function (b) {
+            var visible = b.dataset.siModo === modo;
+            b.hidden = !visible;
+            b.querySelectorAll('input, select').forEach(function (c) { c.disabled = !visible; });
+            if (visible && animar) {
+                b.classList.remove('pf-appear');
+                void b.offsetWidth;
+                b.classList.add('pf-appear');
+            }
+        });
+    }
+
+    // Categoría, cantidad por caja y ubicaciones del producto elegido; se escribe como texto, nunca como HTML
+    function actualizarResumen() {
+        var p = productoPorId(lista.value);
+        resumen.hidden = !p;
+        resumen.textContent = '';
+        if (!p) return;
+        [
+            ['bi-tag', p.categoria],
+            ['bi-box-seam', p.unidadesPorCaja === 1 ? '1 unidad por caja' : p.unidadesPorCaja + ' unidades por caja'],
+            ['bi-geo-alt', p.ubicaciones === 0 ? 'Aún sin ubicaciones' : (p.ubicaciones === 1 ? 'En 1 ubicación' : 'En ' + p.ubicaciones + ' ubicaciones')]
+        ].forEach(function (dato) {
+            var span = document.createElement('span');
+            var icono = document.createElement('i');
+            icono.className = 'bi ' + dato[0];
+            icono.setAttribute('aria-hidden', 'true');
+            span.appendChild(icono);
+            span.appendChild(document.createTextNode(dato[1]));
+            resumen.appendChild(span);
+        });
+    }
+
+    // La lista se reconstruye con los productos que coinciden, conservando el elegido si sigue en ella
+    function filtrar() {
+        var texto = buscar.value.trim().toLowerCase();
+        var elegido = lista.value;
+        var coincidencias = productos.filter(function (p) {
+            return (p.codigo + ' ' + p.nombre).toLowerCase().indexOf(texto) !== -1;
+        });
+        lista.textContent = '';
+        coincidencias.forEach(function (p) {
+            var opcion = new Option(p.codigo + ' · ' + p.nombre, p.id);
+            opcion.selected = String(p.id) === elegido;
+            lista.add(opcion);
+        });
+        sinCoincidencias.hidden = coincidencias.length > 0;
+        lista.size = filasLista(coincidencias.length);
+        actualizarResumen();
+    }
+
+    // Mismo código que genera el servidor: PROD- y el número con al menos 3 dígitos
+    function revisarCodigo() {
+        var n = numero.value.trim();
+        repetido = null;
+        if (/^\d+$/.test(n)) {
+            var valor = String(parseInt(n, 10));
+            var codigo = 'PROD-' + (valor.length < 3 ? ('000' + valor).slice(-3) : valor);
+            codigoTexto.textContent = 'Código: ' + codigo;
+            repetido = productos.filter(function (p) { return p.codigo.toUpperCase() === codigo; })[0] || null;
+        } else {
+            codigoTexto.textContent = codigoTextoInicial;
+        }
+        aviso.hidden = !repetido;
+        numero.setCustomValidity(repetido ? 'Ese producto ya existe: elige «Producto existente».' : '');
+        if (repetido) avisoTexto.textContent = repetido.codigo + ' ya existe (' + repetido.nombre + ').';
+    }
+
+    bloque.addEventListener('change', function (e) {
+        if (e.target.name === 'seleccion.Modo') {
+            elegirModo(e.target.value, true);
+            if (e.target.value === 'nuevo') revisarCodigo();
+        } else if (e.target === lista) {
+            actualizarResumen();
+        }
+    });
+
+    buscar.hidden = false;
+    buscar.addEventListener('input', filtrar);
+    buscar.addEventListener('keydown', function (e) {
+        // Enter no envía el formulario desde el buscador: elige la única coincidencia, si la hay
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (lista.options.length === 1) {
+                lista.selectedIndex = 0;
+                actualizarResumen();
+            }
+        } else if (e.key === 'ArrowDown' && lista.options.length > 0) {
+            e.preventDefault();
+            if (lista.selectedIndex < 0) lista.selectedIndex = 0;
+            lista.focus();
+            actualizarResumen();
+        }
+    });
+
+    numero.addEventListener('input', revisarCodigo);
+
+    // "Usar ese producto": pasa a Producto existente con el producto repetido ya elegido
+    bloque.querySelector('[data-usar-existente]').addEventListener('click', function () {
+        if (!repetido) return;
+        var id = repetido.id;
+        elegirModo('existente', true);
+        buscar.value = '';
+        filtrar();
+        lista.value = String(id);
+        actualizarResumen();
+        lista.focus();
+    });
+
+    // Sin coincidencias en la búsqueda: pasa a Producto nuevo con lo escrito como número o como nombre
+    bloque.querySelector('[data-ir-a-nuevo]').addEventListener('click', function () {
+        var texto = buscar.value.trim();
+        var nombre = bloque.querySelector('#nombreProducto');
+        elegirModo('nuevo', true);
+        if (/^\d+$/.test(texto)) {
+            numero.value = texto;
+        } else if (texto && !nombre.value) {
+            nombre.value = texto;
+        }
+        revisarCodigo();
+        (numero.value ? nombre : numero).focus();
+    });
+
+    actualizarResumen();
+    revisarCodigo();
+})();

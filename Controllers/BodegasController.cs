@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -12,8 +13,6 @@ namespace PickingApp.Controllers
     [Authorize]
     public class BodegasController : Controller
     {
-        private const int MaxUnidadesPorCaja = 10000;
-
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
 
@@ -224,94 +223,57 @@ namespace PickingApp.Controllers
             if (bodega == null) return NotFound();
 
             ViewBag.Bodega = bodega;
-            await CargarCategoriasAsync(null);
+            await PrepararSeleccionProductoAsync(new SeleccionProductoViewModel());
             var model = new Ubicacion { BodegaId = bodegaId };
             return View(model);
         }
 
+        // Los datos del producto llegan en "seleccion" (campos seleccion.Modo, seleccion.ProductoId, ...)
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearUbicacion([Bind(nameof(Ubicacion.BodegaId), nameof(Ubicacion.Pasillo), nameof(Ubicacion.Estante),
-            nameof(Ubicacion.Nivel), nameof(Ubicacion.Activa))] Ubicacion model, string numeroProducto, string nombreProducto, string? categoriaProductoId, string? unidadesPorCaja)
+            nameof(Ubicacion.Nivel), nameof(Ubicacion.Activa))] Ubicacion model, SeleccionProductoViewModel seleccion)
         {
             var bodega = await _context.Bodegas.FindAsync(model.BodegaId);
             if (bodega == null) return NotFound();
             ViewBag.Bodega = bodega;
-            var categoriaId = await ResolverCategoriaAsync(categoriaProductoId);
-            await CargarCategoriasAsync(categoriaId);
-
-            numeroProducto = (numeroProducto ?? string.Empty).Trim();
-            nombreProducto = (nombreProducto ?? string.Empty).Trim();
             ModelState.Remove("Producto");
 
-            if (string.IsNullOrWhiteSpace(numeroProducto))
+            var producto = await ResolverProductoAsync(seleccion);
+            if (!ModelState.IsValid || producto == null)
             {
-                ModelState.AddModelError(string.Empty, "El número de producto es obligatorio.");
-            }
-            else if (!System.Text.RegularExpressions.Regex.IsMatch(numeroProducto, @"^\d+$") || !int.TryParse(numeroProducto, out _))
-            {
-                ModelState.AddModelError(string.Empty, "El número de producto solo debe contener números (máximo 10 dígitos).");
-            }
-            if (string.IsNullOrWhiteSpace(nombreProducto))
-            {
-                ModelState.AddModelError(string.Empty, "El nombre de producto es obligatorio.");
-            }
-            if (!int.TryParse(unidadesPorCaja, out var unidadesPorCajaValor) || unidadesPorCajaValor < 1 || unidadesPorCajaValor > MaxUnidadesPorCaja)
-            {
-                ModelState.AddModelError(string.Empty, $"La cantidad máxima por caja debe ser un número entero entre 1 y {MaxUnidadesPorCaja}.");
-            }
-
-            if (!ModelState.IsValid)
-            {
-                ViewBag.NumeroProducto = numeroProducto;
-                ViewBag.NombreProducto = nombreProducto;
-                ViewBag.UnidadesPorCaja = unidadesPorCaja;
+                await PrepararSeleccionProductoAsync(seleccion);
                 return View(model);
             }
-
-            // El código de producto siempre se genera automáticamente con el formato PROD-XXX a partir del número ingresado.
-            var codigoProducto = $"PROD-{int.Parse(numeroProducto):D3}";
 
             // El código de ubicación siempre se genera automáticamente: PASXX-ESTXX-NIVXX
             model.Pasillo = model.Pasillo.Trim();
             model.Estante = model.Estante.Trim();
             model.Nivel = model.Nivel.Trim();
-            model.CodigoUbicacion = $"PAS{int.Parse(model.Pasillo):D2}-EST{int.Parse(model.Estante):D2}-NIV{int.Parse(model.Nivel):D2}";
+            model.CodigoUbicacion = CodigoUbicacion(model.Pasillo, model.Estante, model.Nivel);
 
             if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == model.BodegaId && u.CodigoUbicacion == model.CodigoUbicacion))
             {
                 ModelState.AddModelError("CodigoUbicacion", "Ya existe una ubicación con ese código en esta bodega.");
-                ViewBag.NumeroProducto = numeroProducto;
-                ViewBag.NombreProducto = nombreProducto;
+                await PrepararSeleccionProductoAsync(seleccion);
                 return View(model);
             }
 
-            // El producto se reutiliza si ya existe con ese código; si no, se crea.
-            var producto = await _context.Productos
-                .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == codigoProducto.ToUpper());
-            if (producto == null)
-            {
-                producto = new Producto { Codigo = codigoProducto, Nombre = nombreProducto, CategoriaProductoId = categoriaId, UnidadesPorCaja = unidadesPorCajaValor };
-                _context.Productos.Add(producto);
-            }
-            else
-            {
-                producto.Nombre = nombreProducto;
-                // Un producto existente conserva su categoría salvo que se elija otra
-                if (categoriaId.HasValue) producto.CategoriaProductoId = categoriaId;
-                producto.UnidadesPorCaja = unidadesPorCajaValor;
-            }
+            // Producto nuevo: se inserta junto con la ubicación en el mismo SaveChanges
+            var productoNuevo = producto.Id == 0;
+            if (productoNuevo) _context.Productos.Add(producto);
 
-            // Guarda la ubicación y, si es nuevo, también el producto (EF inserta primero el producto para tener su Id)
             model.Producto = producto;
             _context.Ubicaciones.Add(model);
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Crear Ubicación", "Ubicaciones",
-                $"Ubicación creada en bodega {bodega.Codigo}: {model.CodigoUbicacion} (Producto: {producto.Codigo} - {producto.Nombre})");
+                $"Ubicación creada en bodega {bodega.Codigo}: {model.CodigoUbicacion} ({(productoNuevo ? "producto nuevo" : "Producto")}: {producto.Codigo} - {producto.Nombre})");
 
-            TempData["SuccessMessage"] = $"Ubicación '{model.CodigoUbicacion}' creada con éxito para el producto '{producto.Codigo}'.";
+            TempData["SuccessMessage"] = productoNuevo
+                ? $"Ubicación '{model.CodigoUbicacion}' creada con el producto nuevo '{producto.Codigo}'."
+                : $"Ubicación '{model.CodigoUbicacion}' creada para el producto '{producto.Codigo}'.";
             return RedirectToAction(nameof(Detalle), new { id = model.BodegaId });
         }
 
@@ -328,107 +290,70 @@ namespace PickingApp.Controllers
             if (ubicacion == null) return NotFound();
 
             ViewBag.Bodega = ubicacion.Bodega;
-            ViewBag.UnidadesPorCaja = ubicacion.Producto?.UnidadesPorCaja ?? 1;
-            await CargarCategoriasAsync(ubicacion.Producto?.CategoriaProductoId);
+            await PrepararSeleccionProductoAsync(new SeleccionProductoViewModel { ProductoId = ubicacion.ProductoId });
             return View(ubicacion);
         }
 
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, string numeroProducto, string nombreProducto, string? motivo, string? categoriaProductoId, string? unidadesPorCaja)
+        public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, SeleccionProductoViewModel seleccion, string? motivo)
         {
             var ubicacionExistente = await _context.Ubicaciones
                 .Include(u => u.Bodega)
                 .Include(u => u.Producto)
-                    .ThenInclude(p => p!.Categoria)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (ubicacionExistente == null) return NotFound();
             ViewBag.Bodega = ubicacionExistente.Bodega;
-            var categoriaId = await ResolverCategoriaAsync(categoriaProductoId);
-            await CargarCategoriasAsync(categoriaId);
 
             ModelState.Remove("Producto");
             ModelState.Remove("CodigoUbicacion");
 
-            numeroProducto = (numeroProducto ?? string.Empty).Trim();
-            nombreProducto = (nombreProducto ?? string.Empty).Trim();
             motivo = (motivo ?? string.Empty).Trim();
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
 
-            if (string.IsNullOrWhiteSpace(numeroProducto))
-            {
-                ModelState.AddModelError(string.Empty, "El número de producto es obligatorio.");
-            }
-            else if (!System.Text.RegularExpressions.Regex.IsMatch(numeroProducto, @"^\d+$") || !int.TryParse(numeroProducto, out _))
-            {
-                ModelState.AddModelError(string.Empty, "El número de producto solo debe contener números (máximo 10 dígitos).");
-            }
-            if (string.IsNullOrWhiteSpace(nombreProducto))
-            {
-                ModelState.AddModelError(string.Empty, "El nombre de producto es obligatorio.");
-            }
             if (userRole == Roles.Supervisor && string.IsNullOrWhiteSpace(motivo))
             {
                 ModelState.AddModelError(string.Empty, "Debe indicar el motivo de la edición.");
             }
-            if (!int.TryParse(unidadesPorCaja, out var unidadesPorCajaValor) || unidadesPorCajaValor < 1 || unidadesPorCajaValor > MaxUnidadesPorCaja)
-            {
-                ModelState.AddModelError(string.Empty, $"La cantidad máxima por caja debe ser un número entero entre 1 y {MaxUnidadesPorCaja}.");
-            }
 
-            if (!ModelState.IsValid)
+            // Vuelve a mostrar el formulario con lo que escribió el usuario (no se guarda nada)
+            async Task<IActionResult> Reintentar()
             {
                 ubicacionExistente.Pasillo = model.Pasillo;
                 ubicacionExistente.Estante = model.Estante;
                 ubicacionExistente.Nivel = model.Nivel;
                 ubicacionExistente.Activa = model.Activa;
-                ViewBag.NumeroProducto = numeroProducto;
-                ViewBag.NombreProducto = nombreProducto;
                 ViewBag.Motivo = motivo;
-                ViewBag.UnidadesPorCaja = unidadesPorCaja;
+                await PrepararSeleccionProductoAsync(seleccion);
                 return View(ubicacionExistente);
             }
 
-            var codigoProductoNuevo = $"PROD-{int.Parse(numeroProducto):D3}";
+            var producto = await ResolverProductoAsync(seleccion);
+            if (!ModelState.IsValid || producto == null)
+            {
+                return await Reintentar();
+            }
+
             var pasillo = model.Pasillo.Trim();
             var estante = model.Estante.Trim();
             var nivel = model.Nivel.Trim();
-            var codigoUbicacionNuevo = $"PAS{int.Parse(pasillo):D2}-EST{int.Parse(estante):D2}-NIV{int.Parse(nivel):D2}";
+            var codigoUbicacionNuevo = CodigoUbicacion(pasillo, estante, nivel);
 
             if (codigoUbicacionNuevo != ubicacionExistente.CodigoUbicacion &&
                 await _context.Ubicaciones.AnyAsync(u => u.BodegaId == ubicacionExistente.BodegaId && u.CodigoUbicacion == codigoUbicacionNuevo && u.Id != id))
             {
                 ModelState.AddModelError(string.Empty, "Ya existe una ubicación con ese código en esta bodega.");
-                ubicacionExistente.Pasillo = pasillo;
-                ubicacionExistente.Estante = estante;
-                ubicacionExistente.Nivel = nivel;
-                ubicacionExistente.Activa = model.Activa;
-                ViewBag.NumeroProducto = numeroProducto;
-                ViewBag.NombreProducto = nombreProducto;
-                ViewBag.Motivo = motivo;
-                ViewBag.UnidadesPorCaja = unidadesPorCaja;
-                return View(ubicacionExistente);
+                return await Reintentar();
             }
 
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var codigoProductoAnterior = ubicacionExistente.Producto?.Codigo ?? "-";
-            var nombreProductoAnterior = ubicacionExistente.Producto?.Nombre ?? "-";
+            var productoNuevo = producto.Id == 0;
 
             if (userRole == Roles.Administrador)
             {
-                var producto = await _context.Productos
-                    .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == codigoProductoNuevo.ToUpper());
-                if (producto == null)
-                {
-                    producto = new Producto { Codigo = codigoProductoNuevo, Nombre = nombreProducto };
-                    _context.Productos.Add(producto);
-                }
-                else
-                {
-                    producto.Nombre = nombreProducto;
-                }
+                if (productoNuevo) _context.Productos.Add(producto);
 
                 ubicacionExistente.Pasillo = pasillo;
                 ubicacionExistente.Estante = estante;
@@ -436,19 +361,18 @@ namespace PickingApp.Controllers
                 ubicacionExistente.CodigoUbicacion = codigoUbicacionNuevo;
                 ubicacionExistente.Activa = model.Activa;
                 ubicacionExistente.Producto = producto;
-                producto.CategoriaProductoId = categoriaId;
-                producto.UnidadesPorCaja = unidadesPorCajaValor;
 
                 await _context.SaveChangesAsync();
 
                 await _auditService.RegistrarAsync("Editar Ubicación", "Ubicaciones",
-                    $"Ubicación editada en bodega {ubicacionExistente.Bodega!.Codigo}: {codigoUbicacionNuevo} (Producto: {producto.Codigo} - {producto.Nombre})");
+                    $"Ubicación editada en bodega {ubicacionExistente.Bodega!.Codigo}: {codigoUbicacionNuevo} ({(productoNuevo ? "producto nuevo" : "Producto")}: {producto.Codigo} - {producto.Nombre})");
 
                 TempData["SuccessMessage"] = $"Ubicación '{codigoUbicacionNuevo}' actualizada exitosamente.";
             }
             else
             {
-                // Supervisor: solicitar edición de ubicación (requiere aprobación del Administrador)
+                // Supervisor: solicitar edición de ubicación (requiere aprobación del Administrador).
+                // El producto nuevo no se crea todavía: sus datos viajan en la solicitud.
                 var cambios = new List<CambioSolicitud>();
                 void AgregarCambio(string campo, string anterior, string nuevo)
                 {
@@ -458,22 +382,27 @@ namespace PickingApp.Controllers
                     }
                 }
 
+                var productoAnterior = ubicacionExistente.Producto;
                 AgregarCambio("Código de ubicación", ubicacionExistente.CodigoUbicacion, codigoUbicacionNuevo);
                 AgregarCambio("Estado", ubicacionExistente.Activa ? "Activa" : "Inactiva", model.Activa ? "Activa" : "Inactiva");
-                AgregarCambio("Código de producto", codigoProductoAnterior, codigoProductoNuevo);
-                AgregarCambio("Nombre de producto", nombreProductoAnterior, nombreProducto);
-                var nombreCategoriaNueva = categoriaId.HasValue
-                    ? (await _context.CategoriasProducto.FindAsync(categoriaId.Value))?.Nombre ?? "Sin clasificar"
-                    : "Sin clasificar";
-                AgregarCambio("Categoría", ubicacionExistente.Producto?.Categoria?.Nombre ?? "Sin clasificar", nombreCategoriaNueva);
-                AgregarCambio("Cantidad máx. por caja", (ubicacionExistente.Producto?.UnidadesPorCaja ?? 1).ToString(), unidadesPorCajaValor.ToString());
+                AgregarCambio("Producto",
+                    productoAnterior != null ? $"{productoAnterior.Codigo} · {productoAnterior.Nombre}" : "-",
+                    $"{producto.Codigo} · {producto.Nombre}{(productoNuevo ? " (nuevo)" : "")}");
+                if (productoNuevo)
+                {
+                    var nombreCategoria = producto.CategoriaProductoId.HasValue
+                        ? (await _context.CategoriasProducto.FindAsync(producto.CategoriaProductoId.Value))?.Nombre ?? "Sin clasificar"
+                        : "Sin clasificar";
+                    AgregarCambio("Categoría del producto nuevo", "-", nombreCategoria);
+                    AgregarCambio("Cantidad máx. por caja del producto nuevo", "-", producto.UnidadesPorCaja.ToString());
+                }
 
                 var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionUbicacion, userId, new SolicitudEdicionUbicacion
                 {
                     UbicacionId = ubicacionExistente.Id,
                     BodegaId = ubicacionExistente.BodegaId,
                     BodegaCodigo = ubicacionExistente.Bodega?.Codigo,
-                    Motivo = motivo ?? string.Empty,
+                    Motivo = motivo,
                     Cambios = cambios,
                     NuevosDatos = new DatosUbicacionSolicitud
                     {
@@ -482,10 +411,12 @@ namespace PickingApp.Controllers
                         Nivel = nivel,
                         CodigoUbicacion = codigoUbicacionNuevo,
                         Activa = model.Activa,
-                        CodigoProducto = codigoProductoNuevo,
-                        NombreProducto = nombreProducto,
-                        CategoriaProductoId = categoriaId,
-                        UnidadesPorCaja = unidadesPorCajaValor
+                        ProductoId = productoNuevo ? null : producto.Id,
+                        ProductoNuevo = productoNuevo,
+                        CodigoProducto = producto.Codigo,
+                        NombreProducto = producto.Nombre,
+                        CategoriaProductoId = producto.CategoriaProductoId,
+                        UnidadesPorCaja = producto.UnidadesPorCaja
                     }
                 });
 
@@ -581,11 +512,89 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Detalle), new { id = ubicacion.BodegaId });
         }
 
-        // Lista de categorías para el formulario de ubicación
-        private async Task CargarCategoriasAsync(int? seleccionada)
+        private static string CodigoUbicacion(string pasillo, string estante, string nivel) =>
+            $"PAS{int.Parse(pasillo):D2}-EST{int.Parse(estante):D2}-NIV{int.Parse(nivel):D2}";
+
+        // Productos y categorías para el bloque "Producto" del formulario de ubicación
+        private async Task PrepararSeleccionProductoAsync(SeleccionProductoViewModel seleccion)
         {
-            ViewBag.Categorias = await _context.CategoriasProducto.OrderBy(c => c.MinutosPorUnidad).ToListAsync();
-            ViewBag.CategoriaSeleccionada = seleccionada?.ToString() ?? "";
+            seleccion.Productos = await _context.Productos
+                .OrderBy(p => p.Codigo)
+                .Select(p => new ProductoOpcion
+                {
+                    Id = p.Id,
+                    Codigo = p.Codigo,
+                    Nombre = p.Nombre,
+                    Categoria = p.Categoria != null ? p.Categoria.Nombre : null,
+                    UnidadesPorCaja = p.UnidadesPorCaja,
+                    Ubicaciones = p.Ubicaciones.Count
+                })
+                .ToListAsync();
+            seleccion.Categorias = await _context.CategoriasProducto.OrderBy(c => c.MinutosPorUnidad).ToListAsync();
+            seleccion.NombreCategoriaPredeterminada = seleccion.Categorias.FirstOrDefault(c => c.EsPredeterminada)?.Nombre ?? "por defecto";
+
+            // Sin productos registrados no hay nada que elegir: el formulario empieza en "Nuevo"
+            if (seleccion.Productos.Count == 0) seleccion.Modo = SeleccionProductoViewModel.ModoNuevo;
+
+            ViewBag.SeleccionProducto = seleccion;
+        }
+
+        // Producto que tendrá la ubicación: uno existente elegido de la lista, o uno nuevo cuyo código no puede
+        // repetirse. Un producto existente nunca se modifica aquí: su nombre y datos se editan en Productos.
+        // Devuelve null y deja el motivo en ModelState si los datos no son válidos. El producto nuevo no se agrega al contexto.
+        private async Task<Producto?> ResolverProductoAsync(SeleccionProductoViewModel seleccion)
+        {
+            if (seleccion.Modo != SeleccionProductoViewModel.ModoNuevo)
+            {
+                var existente = seleccion.ProductoId is int productoId ? await _context.Productos.FindAsync(productoId) : null;
+                if (existente == null)
+                {
+                    ModelState.AddModelError(string.Empty, "Selecciona el producto que se guardará en esta ubicación.");
+                }
+                return existente;
+            }
+
+            var numero = (seleccion.NumeroProducto ?? string.Empty).Trim();
+            var nombre = (seleccion.NombreProducto ?? string.Empty).Trim();
+            var valido = true;
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(numero, @"^\d+$") || !int.TryParse(numero, out var numeroValor))
+            {
+                ModelState.AddModelError(string.Empty, "El número de producto es obligatorio y solo debe contener números (máximo 10 dígitos).");
+                numeroValor = 0;
+                valido = false;
+            }
+            if (nombre.Length == 0 || nombre.Length > 150)
+            {
+                ModelState.AddModelError(string.Empty, "El nombre de producto es obligatorio y admite hasta 150 caracteres.");
+                valido = false;
+            }
+            if (!int.TryParse(seleccion.UnidadesPorCaja, out var unidades) || unidades < 1 || unidades > Producto.MaxUnidadesPorCaja)
+            {
+                ModelState.AddModelError(string.Empty, $"La cantidad máxima por caja debe ser un número entero entre 1 y {Producto.MaxUnidadesPorCaja}.");
+                valido = false;
+            }
+            if (!valido) return null;
+
+            // El código siempre se genera a partir del número: PROD-XXX
+            var codigo = $"PROD-{numeroValor:D3}";
+            var nombreExistente = await _context.Productos
+                .Where(p => p.Codigo.ToUpper() == codigo)
+                .Select(p => p.Nombre)
+                .FirstOrDefaultAsync();
+            if (nombreExistente != null)
+            {
+                ModelState.AddModelError(string.Empty, $"El producto {codigo} ya existe ({nombreExistente}). Elige «Producto existente» para guardarlo en esta ubicación.");
+                return null;
+            }
+
+            return new Producto
+            {
+                Codigo = codigo,
+                Nombre = nombre,
+                CategoriaProductoId = await ResolverCategoriaAsync(seleccion.CategoriaProductoId),
+                UnidadesPorCaja = unidades
+            };
         }
 
         // Valor del formulario → Id de categoría existente, o null (sin clasificar)

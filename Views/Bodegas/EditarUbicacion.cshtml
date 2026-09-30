@@ -1,21 +1,9 @@
 ﻿@model PickingApp.Models.Ubicacion
 @{
     var bodega = ViewBag.Bodega as PickingApp.Models.Bodega;
-    var numeroProducto = ViewBag.NumeroProducto as string;
-    var nombreProducto = (ViewBag.NombreProducto as string) ?? Model.Producto?.Nombre;
     var motivo = ViewBag.Motivo as string;
-    var categorias = ViewBag.Categorias as List<PickingApp.Models.CategoriaProducto> ?? new List<PickingApp.Models.CategoriaProducto>();
-    var categoriaSeleccionada = ViewBag.CategoriaSeleccionada as string ?? "";
-    var unidadesPorCaja = (ViewBag.UnidadesPorCaja as string) ?? ViewBag.UnidadesPorCaja?.ToString() ?? (Model.Producto?.UnidadesPorCaja ?? 1).ToString();
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var esAdministrador = userRole == Roles.Administrador;
-
-    var numeroProductoDefault = numeroProducto;
-    if (string.IsNullOrEmpty(numeroProductoDefault) && Model.Producto != null)
-    {
-        var m = System.Text.RegularExpressions.Regex.Match(Model.Producto.Codigo, @"(\d+)$");
-        numeroProductoDefault = m.Success ? m.Groups[1].Value : Model.Producto.Codigo;
-    }
 
     ViewData["Title"] = "Editar ubicación";
 }
@@ -72,39 +60,7 @@
             El código de la ubicación se genera automáticamente a partir de estos datos (ej: <strong>PAS01-EST02-NIV03</strong>). Código actual: <strong>@Model.CodigoUbicacion</strong>.
         </div>
 
-        <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Número de producto <span class="text-danger">*</span></label>
-                <input type="text" name="numeroProducto" class="mockup-input" placeholder="100" value="@numeroProductoDefault" inputmode="numeric" pattern="\d*" title="Solo números" required />
-            </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Nombre de producto <span class="text-danger">*</span></label>
-                <input type="text" name="nombreProducto" class="mockup-input" placeholder="Mouse Inalámbrico Logitech" value="@nombreProducto" required />
-            </div>
-        </div>
-
-        <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label" for="categoriaProductoId">Categoría del producto</label>
-                <select name="categoriaProductoId" id="categoriaProductoId" class="mockup-input">
-                    <option value="">Sin clasificar (usa «@(categorias.FirstOrDefault(c => c.EsPredeterminada)?.Nombre ?? "por defecto")»)</option>
-                    @foreach (var c in categorias)
-                    {
-                        <option value="@c.Id" selected="@(categoriaSeleccionada == c.Id.ToString())">@c.Nombre · @c.MinutosPorUnidad.ToString("0.##") min/u</option>
-                    }
-                </select>
-                <div class="form-text small">Define cuánto se tarda en recoger una unidad; aplica al producto en todas sus ubicaciones.</div>
-            </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label" for="unidadesPorCaja">Cantidad máx. de producto por caja</label>
-                <input type="number" name="unidadesPorCaja" id="unidadesPorCaja" class="mockup-input" min="1" step="1" value="@unidadesPorCaja" required />
-                <div class="form-text small">Unidades que trae la caja/empaque de este producto. Si vienen varias unidades por caja, el tiempo de picking no se multiplica por cada una. Usa 1 si el producto se recoge de a una unidad (ej. un monitor).</div>
-            </div>
-        </div>
-
-        <div class="mockup-info-banner mb-3" style="font-size: 13px;">
-            El código de producto se genera automáticamente a partir del número ingresado (ej: <strong>PROD-100</strong>). Si el código ya existe, se reutilizará; si no, se creará automáticamente.
-        </div>
+        <partial name="_SeleccionProducto" model="(PickingApp.Models.ViewModels.SeleccionProductoViewModel)ViewBag.SeleccionProducto" />
 
         <div class="row mb-4">
             <div class="col-md-6 mockup-form-group">

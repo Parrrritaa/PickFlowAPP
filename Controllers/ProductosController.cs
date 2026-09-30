@@ -8,7 +8,8 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
-    // Categorías de manipulación y clasificación de productos (solo Administrador): definen el tiempo estándar de picking
+    // Productos y sus categorías de manipulación (solo Administrador): definen el tiempo estándar de picking.
+    // Aquí se edita qué es cada producto; en Bodegas solo se elige en qué ubicación está.
     [Authorize(Roles = Roles.Administrador)]
     public class ProductosController : Controller
     {
@@ -163,6 +164,43 @@ namespace PickingApp.Controllers
             }
 
             TempData["SuccessMessage"] = cambios == 1 ? "Se actualizó la categoría de 1 producto." : $"Se actualizó la categoría de {cambios} productos.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // Único lugar donde se cambia el nombre o la cantidad por caja de un producto: el cambio
+        // aplica en todas sus ubicaciones. Su código no cambia porque lo usan los pedidos y el Excel.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditarProducto(int id, string? nombre, string? unidadesPorCaja)
+        {
+            var producto = await _context.Productos.FindAsync(id);
+            if (producto == null) return Error("El producto ya no existe.");
+
+            nombre = (nombre ?? string.Empty).Trim();
+            if (nombre.Length == 0 || nombre.Length > 150)
+            {
+                return Error("El nombre del producto es obligatorio y admite hasta 150 caracteres.");
+            }
+            if (!int.TryParse(unidadesPorCaja, out var unidades) || unidades < 1 || unidades > Producto.MaxUnidadesPorCaja)
+            {
+                return Error($"La cantidad máxima por caja debe ser un número entero entre 1 y {Producto.MaxUnidadesPorCaja}.");
+            }
+
+            var cambios = new List<string>();
+            if (producto.Nombre != nombre) cambios.Add($"nombre '{producto.Nombre}' → '{nombre}'");
+            if (producto.UnidadesPorCaja != unidades) cambios.Add($"unidades por caja {producto.UnidadesPorCaja} → {unidades}");
+            if (cambios.Count == 0)
+            {
+                TempData["SuccessMessage"] = $"El producto '{producto.Codigo}' no tenía cambios.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            producto.Nombre = nombre;
+            producto.UnidadesPorCaja = unidades;
+            await _context.SaveChangesAsync();
+
+            await RegistrarAsync("Editar Producto", $"Producto {producto.Codigo} actualizado: {string.Join(", ", cambios)}.");
+            TempData["SuccessMessage"] = $"Producto '{producto.Codigo}' actualizado.";
             return RedirectToAction(nameof(Index));
         }
 

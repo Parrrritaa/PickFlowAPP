@@ -81,6 +81,14 @@ namespace PickingApp.Models
         public string Nivel { get; set; } = string.Empty;
         public string CodigoUbicacion { get; set; } = string.Empty;
         public bool Activa { get; set; }
+
+        // Producto existente elegido para la ubicación; null si se propone un producto nuevo
+        public int? ProductoId { get; set; }
+
+        // true si la solicitud registra un producto nuevo: su código no debe existir al aprobarla.
+        // Las solicitudes anteriores a esta opción no traen ni ProductoId ni ProductoNuevo.
+        public bool ProductoNuevo { get; set; }
+
         public string CodigoProducto { get; set; } = string.Empty;
         public string? NombreProducto { get; set; }
         public int? CategoriaProductoId { get; set; }

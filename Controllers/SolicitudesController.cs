@@ -301,17 +301,34 @@ namespace PickingApp.Controllers
                 throw new ReglaNegocioException($"No se puede aprobar: ya existe otra ubicación con el código '{nuevos.CodigoUbicacion}' en esta bodega. La solicitud sigue pendiente.");
             }
 
-            var nombreProducto = nuevos.NombreProducto ?? nuevos.CodigoProducto;
-            var producto = await _context.Productos
-                .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == nuevos.CodigoProducto.ToUpper());
-            if (producto == null)
+            // La ubicación toma un producto existente sin modificarlo, o registra el producto nuevo propuesto
+            ubicacion.Producto = await ProductoDeSolicitudAsync(nuevos);
+            ubicacion.Pasillo = nuevos.Pasillo;
+            ubicacion.Estante = nuevos.Estante;
+            ubicacion.Nivel = nuevos.Nivel;
+            ubicacion.CodigoUbicacion = nuevos.CodigoUbicacion;
+            ubicacion.Activa = nuevos.Activa;
+        }
+
+        private async Task<Producto> ProductoDeSolicitudAsync(DatosUbicacionSolicitud nuevos)
+        {
+            if (nuevos.ProductoId is int productoId)
             {
-                producto = new Producto { Codigo = nuevos.CodigoProducto, Nombre = nombreProducto };
-                _context.Productos.Add(producto);
+                return await _context.Productos.FindAsync(productoId)
+                    ?? throw new ReglaNegocioException("No se puede aprobar: el producto elegido ya no existe. Rechace la solicitud.");
             }
-            else
+
+            var existente = await _context.Productos
+                .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == nuevos.CodigoProducto.ToUpper());
+            if (existente != null)
             {
-                producto.Nombre = nombreProducto;
+                // Otro registro tomó el código mientras la solicitud esperaba
+                if (nuevos.ProductoNuevo)
+                {
+                    throw new ReglaNegocioException($"No se puede aprobar: el producto {existente.Codigo} ya existe ({existente.Nombre}). Rechace la solicitud para que se elija como producto existente.");
+                }
+                // Solicitud anterior a esta opción: se usa el producto con ese código tal como está
+                return existente;
             }
 
             // Si la categoría fue eliminada mientras tanto, el producto queda sin clasificar
@@ -320,18 +337,16 @@ namespace PickingApp.Controllers
             {
                 categoriaId = null;
             }
-            producto.CategoriaProductoId = categoriaId;
-            if (nuevos.UnidadesPorCaja.HasValue)
-            {
-                producto.UnidadesPorCaja = Math.Max(1, nuevos.UnidadesPorCaja.Value);
-            }
 
-            ubicacion.Pasillo = nuevos.Pasillo;
-            ubicacion.Estante = nuevos.Estante;
-            ubicacion.Nivel = nuevos.Nivel;
-            ubicacion.CodigoUbicacion = nuevos.CodigoUbicacion;
-            ubicacion.Activa = nuevos.Activa;
-            ubicacion.Producto = producto;
+            var producto = new Producto
+            {
+                Codigo = nuevos.CodigoProducto,
+                Nombre = nuevos.NombreProducto ?? nuevos.CodigoProducto,
+                CategoriaProductoId = categoriaId,
+                UnidadesPorCaja = Math.Max(1, nuevos.UnidadesPorCaja ?? 1)
+            };
+            _context.Productos.Add(producto);
+            return producto;
         }
 
         private async Task EliminarUbicacionAsync(SolicitudEliminacionUbicacion datos)

@@ -138,6 +138,7 @@
                             <th>Producto</th>
                             <th>Ubicaciones</th>
                             <th style="min-width: 210px;">Categoría</th>
+                            <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -157,10 +158,17 @@
                                         }
                                     </select>
                                 </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn-pf-gray" style="padding: 4px 14px; font-size: 14px;"
+                                            data-bs-toggle="modal" data-bs-target="#modalProducto"
+                                            data-id="@p.Id" data-codigo="@p.Codigo" data-nombre="@p.Nombre" data-unidades="@p.UnidadesPorCaja" data-ubicaciones="@p.Ubicaciones.Count">
+                                        Editar
+                                    </button>
+                                </td>
                             </tr>
                         }
                         <tr id="filaSinProductos" class="d-none">
-                            <td colspan="4" class="text-center text-muted py-3">Ningún producto coincide con el filtro.</td>
+                            <td colspan="5" class="text-center text-muted py-3">Ningún producto coincide con el filtro.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -215,6 +223,38 @@
     </div>
 </div>
 
+<!-- Editar producto: nombre y cantidad por caja (la categoría se cambia en la tabla) -->
+<div class="modal fade" id="modalProducto" tabindex="-1" aria-labelledby="tituloModalProducto" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="EditarProducto" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="productoId" />
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="tituloModalProducto">Editar producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small mb-3" style="color: #4B5563;" id="textoModalProducto"></p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="productoNombre">Nombre</label>
+                        <input type="text" class="form-control" id="productoNombre" name="nombre" maxlength="150" required />
+                    </div>
+                    <div>
+                        <label class="form-label fw-semibold" for="productoUnidades">Cantidad máx. por caja</label>
+                        <input type="number" class="form-control" id="productoUnidades" name="unidadesPorCaja" min="1" max="@Producto.MaxUnidadesPorCaja" step="1" required />
+                        <div class="form-text">Unidades que trae la caja o empaque. Usa 1 si se recoge de a una unidad.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Confirmar eliminación de categoría -->
 <div class="modal fade" id="modalEliminarCategoria" tabindex="-1" aria-labelledby="tituloEliminarCategoria" aria-describedby="textoEliminarCategoria" aria-hidden="true">
     <div class="modal-dialog pf-alert-dialog">
@@ -252,6 +292,23 @@
             });
             modalCategoria.addEventListener('shown.bs.modal', function () {
                 document.getElementById('categoriaNombre').focus();
+            });
+
+            // Diálogo de producto: el código no cambia; el nombre aplica en todas sus ubicaciones
+            var modalProducto = document.getElementById('modalProducto');
+            modalProducto.addEventListener('show.bs.modal', function (e) {
+                var origen = e.relatedTarget;
+                var ubicaciones = parseInt(origen.dataset.ubicaciones, 10) || 0;
+                document.getElementById('tituloModalProducto').textContent = 'Editar ' + origen.dataset.codigo;
+                document.getElementById('textoModalProducto').textContent = ubicaciones > 1
+                    ? 'Los cambios se verán en sus ' + ubicaciones + ' ubicaciones.'
+                    : 'El código del producto no cambia.';
+                document.getElementById('productoId').value = origen.dataset.id;
+                document.getElementById('productoNombre').value = origen.dataset.nombre;
+                document.getElementById('productoUnidades').value = origen.dataset.unidades;
+            });
+            modalProducto.addEventListener('shown.bs.modal', function () {
+                document.getElementById('productoNombre').focus();
             });
 
             var modalEliminar = document.getElementById('modalEliminarCategoria');

@@ -1,0 +1,113 @@
+@model PickingApp.Models.ViewModels.SeleccionProductoViewModel
+@using PickingApp.Models.ViewModels
+@{
+    // Bloque "Producto" de Crear/Editar ubicación. Los campos se envían como seleccion.* y los recibe
+    // BodegasController (SeleccionProductoViewModel). Solo viaja el bloque visible: el otro va deshabilitado.
+    var esNuevo = Model.Modo == SeleccionProductoViewModel.ModoNuevo;
+    var hayProductos = Model.Productos.Any();
+    var esAdministrador = User.IsInRole(Roles.Administrador);
+}
+
+<fieldset class="pf-campo pf-seleccion-producto mb-4" data-seleccion-producto>
+    <legend class="mockup-label">Producto <span class="text-danger">*</span></legend>
+
+    <div class="pf-segmented mb-3" role="radiogroup" aria-label="Tipo de producto">
+        <input type="radio" class="pf-seg-input" name="seleccion.Modo" id="modoExistente" value="@SeleccionProductoViewModel.ModoExistente"
+               checked="@(!esNuevo)" disabled="@(!hayProductos)" />
+        <label for="modoExistente">Producto existente</label>
+        <input type="radio" class="pf-seg-input" name="seleccion.Modo" id="modoNuevo" value="@SeleccionProductoViewModel.ModoNuevo" checked="@esNuevo" />
+        <label for="modoNuevo">Producto nuevo</label>
+    </div>
+
+    @* Producto existente: se elige de la lista; sus datos se muestran pero no se editan aquí *@
+    <div data-si-modo="@SeleccionProductoViewModel.ModoExistente" hidden="@esNuevo">
+        <label class="visually-hidden" for="buscarProductoUbicacion">Buscar producto</label>
+        <input type="search" id="buscarProductoUbicacion" class="mockup-input mb-2" placeholder="Buscar por código o nombre…"
+               autocomplete="off" data-buscar-producto hidden />
+
+        <label class="visually-hidden" for="productoId">Producto</label>
+        <select name="seleccion.ProductoId" id="productoId" class="mockup-input pf-lista-productos" size="@Math.Min(6, Math.Max(3, Model.Productos.Count))" required
+                disabled="@esNuevo" data-lista-productos>
+            @foreach (var p in Model.Productos)
+            {
+                <option value="@p.Id" selected="@(Model.ProductoId == p.Id)">@p.Codigo · @p.Nombre</option>
+            }
+        </select>
+
+        <p class="pf-producto-vacio" data-sin-coincidencias hidden>
+            Ningún producto coincide con la búsqueda.
+            <button type="button" class="pf-enlace-boton" data-ir-a-nuevo>Registrarlo como producto nuevo</button>
+        </p>
+
+        <div class="pf-producto-resumen" aria-live="polite" data-resumen-producto hidden></div>
+
+        <div class="form-text small mt-2">
+            Un producto puede estar en varias ubicaciones.
+            @if (esAdministrador)
+            {
+                <text>Su nombre, categoría y cantidad por caja se cambian en <a asp-controller="Productos" asp-action="Index">Productos</a>.</text>
+            }
+            else
+            {
+                <text>Su nombre, categoría y cantidad por caja los cambia el Administrador en Productos.</text>
+            }
+        </div>
+    </div>
+
+    @* Producto nuevo: se registra con esta ubicación. Su código (PROD-XXX) no puede existir *@
+    <div data-si-modo="@SeleccionProductoViewModel.ModoNuevo" hidden="@(!esNuevo)">
+        <div class="row">
+            <div class="col-md-6 mockup-form-group mb-3">
+                <label class="mockup-label" for="numeroProducto">Número de producto <span class="text-danger">*</span></label>
+                <input type="text" name="seleccion.NumeroProducto" id="numeroProducto" class="mockup-input" placeholder="100"
+                       value="@Model.NumeroProducto" inputmode="numeric" pattern="\d{1,9}" maxlength="9" title="Solo números"
+                       required disabled="@(!esNuevo)" aria-describedby="codigoProductoNuevo" data-numero-producto />
+                <div class="form-text small" id="codigoProductoNuevo" data-codigo-producto>El código se genera a partir del número (ej: PROD-100).</div>
+            </div>
+            <div class="col-md-6 mockup-form-group mb-3">
+                <label class="mockup-label" for="nombreProducto">Nombre de producto <span class="text-danger">*</span></label>
+                <input type="text" name="seleccion.NombreProducto" id="nombreProducto" class="mockup-input" placeholder="Mouse Inalámbrico Logitech"
+                       value="@Model.NombreProducto" maxlength="150" required disabled="@(!esNuevo)" />
+            </div>
+        </div>
+
+        <div class="pf-aviso-producto mb-3" role="status" data-aviso-repetido hidden>
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>
+                <strong data-aviso-texto></strong>
+                <button type="button" class="pf-enlace-boton" data-usar-existente>Usar ese producto</button>
+            </span>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mockup-form-group mb-3">
+                <label class="mockup-label" for="categoriaProductoId">Categoría del producto</label>
+                <select name="seleccion.CategoriaProductoId" id="categoriaProductoId" class="mockup-input" disabled="@(!esNuevo)">
+                    <option value="">Sin clasificar (usa «@Model.NombreCategoriaPredeterminada»)</option>
+                    @foreach (var c in Model.Categorias)
+                    {
+                        <option value="@c.Id" selected="@(Model.CategoriaProductoId == c.Id.ToString())">@c.Nombre · @c.MinutosPorUnidad.ToString("0.##") min/u</option>
+                    }
+                </select>
+                <div class="form-text small">Define cuánto se tarda en recoger una unidad.</div>
+            </div>
+            <div class="col-md-6 mockup-form-group mb-3">
+                <label class="mockup-label" for="unidadesPorCaja">Cantidad máx. de producto por caja</label>
+                <input type="number" name="seleccion.UnidadesPorCaja" id="unidadesPorCaja" class="mockup-input" min="1" max="@Producto.MaxUnidadesPorCaja" step="1"
+                       value="@Model.UnidadesPorCaja" required disabled="@(!esNuevo)" />
+                <div class="form-text small">Unidades que trae la caja o empaque. Usa 1 si se recoge de a una unidad (ej. un monitor).</div>
+            </div>
+        </div>
+    </div>
+</fieldset>
+
+@* Datos de los productos para buscar, mostrar el resumen y detectar un código repetido sin consultar al servidor *@
+<script type="application/json" id="datosProductosUbicacion">@Json.Serialize(Model.Productos.Select(p => new
+{
+    id = p.Id,
+    codigo = p.Codigo,
+    nombre = p.Nombre,
+    categoria = p.Categoria ?? $"Sin clasificar (usa «{Model.NombreCategoriaPredeterminada}»)",
+    unidadesPorCaja = p.UnidadesPorCaja,
+    ubicaciones = p.Ubicaciones
+}))</script>
