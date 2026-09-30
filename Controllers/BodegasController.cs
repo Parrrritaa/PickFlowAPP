@@ -251,7 +251,7 @@ namespace PickingApp.Controllers
             model.Pasillo = model.Pasillo.Trim();
             model.Estante = model.Estante.Trim();
             model.Nivel = model.Nivel.Trim();
-            model.CodigoUbicacion = CodigoUbicacion(model.Pasillo, model.Estante, model.Nivel);
+            model.CodigoUbicacion = Ubicacion.GenerarCodigo(model.Pasillo, model.Estante, model.Nivel);
 
             if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == model.BodegaId && u.CodigoUbicacion == model.CodigoUbicacion))
             {
@@ -339,7 +339,7 @@ namespace PickingApp.Controllers
             var pasillo = model.Pasillo.Trim();
             var estante = model.Estante.Trim();
             var nivel = model.Nivel.Trim();
-            var codigoUbicacionNuevo = CodigoUbicacion(pasillo, estante, nivel);
+            var codigoUbicacionNuevo = Ubicacion.GenerarCodigo(pasillo, estante, nivel);
 
             if (codigoUbicacionNuevo != ubicacionExistente.CodigoUbicacion &&
                 await _context.Ubicaciones.AnyAsync(u => u.BodegaId == ubicacionExistente.BodegaId && u.CodigoUbicacion == codigoUbicacionNuevo && u.Id != id))
@@ -511,9 +511,6 @@ namespace PickingApp.Controllers
 
             return RedirectToAction(nameof(Detalle), new { id = ubicacion.BodegaId });
         }
-
-        private static string CodigoUbicacion(string pasillo, string estante, string nivel) =>
-            $"PAS{int.Parse(pasillo):D2}-EST{int.Parse(estante):D2}-NIV{int.Parse(nivel):D2}";
 
         // Productos y categorías para el bloque "Producto" del formulario de ubicación
         private async Task PrepararSeleccionProductoAsync(SeleccionProductoViewModel seleccion)

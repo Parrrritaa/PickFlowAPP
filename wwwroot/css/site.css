@@ -14,6 +14,8 @@
     --pf-gray-border: #D1D5DB;
     --pf-text-dark: #1F2937;
     --pf-text-muted: #6B7280;
+    --pf-text-secondary: #4B5563;
+    --pf-attention: #B45309;
     --pf-success: #52A447;
     --pf-warning-bg: #F2E3B8;
     --pf-warning-text: #603813;
@@ -1925,4 +1927,139 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     outline: 2px solid var(--pf-blue);
     outline-offset: 2px;
     border-radius: 2px;
+}
+
+/* --- Cargar Excel: decisiones sobre productos y ubicaciones (Views/Pedidos/CargarExcel.cshtml) --- */
+.pf-texto-revisar {
+    color: var(--pf-attention);
+}
+
+/* Cada incidencia es una tarjeta blanca sobre la tarjeta gris del formulario */
+.pf-incidencia {
+    padding: 18px 20px;
+    border-radius: 16px;
+    background-color: #FFFFFF;
+    box-shadow: var(--pf-shadow-control);
+}
+
+.pf-incidencia-cabecera {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.pf-incidencia-icono {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--pf-warning-bg);
+    color: var(--pf-warning-text);
+    font-size: 17px;
+}
+
+.pf-incidencia-titulo {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--pf-text-dark);
+    overflow-wrap: anywhere;
+}
+
+.pf-incidencia-meta {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: var(--pf-text-muted);
+}
+
+.pf-incidencia-texto {
+    margin: 12px 0 16px;
+    font-size: 14px;
+    color: var(--pf-text-dark);
+}
+
+.pf-opciones {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+/* Opciones agrupadas en una lista con separadores, como una tabla agrupada */
+.pf-opciones-lista {
+    border: 1px solid var(--pf-gray-border);
+    border-radius: var(--pf-radius-control);
+    overflow: hidden;
+}
+
+.pf-opcion-fila + .pf-opcion-fila {
+    border-top: 1px solid var(--pf-gray-border);
+}
+
+.pf-opcion {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-height: 44px;
+    margin: 0;
+    padding: 11px 14px;
+    background-color: #FFFFFF;
+    cursor: pointer;
+    transition: background-color var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-opcion:hover {
+    background-color: var(--pf-gray-light);
+}
+
+.pf-opcion:has(input:checked),
+.pf-opcion-detalle {
+    background-color: rgba(59, 113, 202, 0.08);
+}
+
+.pf-opcion .form-check-input {
+    flex: none;
+    margin-top: 3px;
+}
+
+.pf-opcion-titulo {
+    display: block;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--pf-text-dark);
+    overflow-wrap: anywhere;
+}
+
+.pf-opcion-nota {
+    display: block;
+    font-size: 13px;
+    color: var(--pf-text-secondary);
+}
+
+/* Campos de la ubicación nueva, alineados con el texto de la opción (debajo del radio) */
+.pf-opcion-detalle {
+    padding: 2px 14px 14px 40px;
+}
+
+/* Dentro de la tarjeta el espacio entre campos lo dan los márgenes de la fila (row g-*) */
+.pf-incidencia .mockup-form-group {
+    margin-bottom: 0;
+}
+
+.pf-incidencia-error {
+    margin: 10px 0 0;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+@media (max-width: 575.98px) {
+    .pf-incidencia {
+        padding: 16px;
+    }
+
+    .pf-opcion-detalle {
+        padding-left: 14px;
+    }
 }

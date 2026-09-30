@@ -42,5 +42,9 @@ namespace PickingApp.Models
         public virtual Producto? Producto { get; set; }
 
         public virtual ICollection<DetallePedido> DetallesPedido { get; set; } = new List<DetallePedido>();
+
+        // Código a partir de pasillo, estante y nivel (solo números): PAS01-EST02-NIV03
+        public static string GenerarCodigo(string pasillo, string estante, string nivel) =>
+            $"PAS{int.Parse(pasillo):D2}-EST{int.Parse(estante):D2}-NIV{int.Parse(nivel):D2}";
     }
 }
