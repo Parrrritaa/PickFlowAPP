@@ -100,15 +100,5 @@ namespace PickingApp.Controllers
                 errores = v.Errors
             });
         }
-
-        // Descargar Plantilla Excel
-        [Authorize(Roles = Roles.AdministradorOSupervisor)]
-        [HttpGet]
-        public IActionResult DescargarPlantilla()
-        {
-            // File(...) envía los bytes al navegador como archivo descargable .xlsx
-            var bytes = _excelService.GenerarPlantillaExcel();
-            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Plantilla_Pedidos_Picking.xlsx");
-        }
     }
 }

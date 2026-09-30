@@ -69,7 +69,7 @@ namespace PickingApp.Services
                     totalFilas++;
                     var filaNum = row.RowNumber();
 
-                    // Columnas A–I, en el mismo orden de la plantilla (GenerarPlantillaExcel)
+                    // Columnas A–I: CodigoPedido, Bodega, Pasillo, Estante, Nivel, CodigoProducto, NombreProducto, Cantidad, Prioridad
                     var codPedido = row.Cell(1).GetString().Trim();
                     var codBodega = row.Cell(2).GetString().Trim().ToUpper();
                     var pasillo = row.Cell(3).GetString().Trim().ToUpper();
@@ -177,59 +177,6 @@ namespace PickingApp.Services
             }
 
             return result;
-        }
-
-        // Crea en memoria el Excel de ejemplo que se descarga desde Cargar Excel
-        public byte[] GenerarPlantillaExcel()
-        {
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("Pedidos");
-
-            worksheet.Cell(1, 1).Value = "CodigoPedido";
-            worksheet.Cell(1, 2).Value = "Bodega";
-            worksheet.Cell(1, 3).Value = "Pasillo";
-            worksheet.Cell(1, 4).Value = "Estante";
-            worksheet.Cell(1, 5).Value = "Nivel";
-            worksheet.Cell(1, 6).Value = "CodigoProducto";
-            worksheet.Cell(1, 7).Value = "NombreProducto";
-            worksheet.Cell(1, 8).Value = "Cantidad";
-            worksheet.Cell(1, 9).Value = "Prioridad";
-
-            var headerRange = worksheet.Range("A1:I1");
-            headerRange.Style.Font.Bold = true;
-            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#0D6EFD");
-            headerRange.Style.Font.FontColor = XLColor.White;
-
-            worksheet.Cell(2, 1).Value = "PED-2026-001";
-            worksheet.Cell(2, 2).Value = "BOD-01";
-            worksheet.Cell(2, 3).Value = 1;
-            worksheet.Cell(2, 4).Value = 1;
-            worksheet.Cell(2, 5).Value = 1;
-            worksheet.Cell(2, 6).Value = "PROD-100";
-            worksheet.Cell(2, 7).Value = "Mouse Inalámbrico Logitech";
-            worksheet.Cell(2, 8).Value = 2;
-            worksheet.Cell(2, 9).Value = "Alta";
-
-            worksheet.Cell(3, 1).Value = "PED-2026-001";
-            worksheet.Cell(3, 2).Value = "BOD-01";
-            worksheet.Cell(3, 3).Value = 1;
-            worksheet.Cell(3, 4).Value = 2;
-            worksheet.Cell(3, 5).Value = 1;
-            worksheet.Cell(3, 6).Value = "PROD-105";
-            worksheet.Cell(3, 7).Value = "Teclado Mecánico RGB";
-            worksheet.Cell(3, 8).Value = 1;
-            worksheet.Cell(3, 9).Value = "Alta";
-
-            var notaRange = worksheet.Range("A5:I5").Merge();
-            notaRange.Value = "Pasillo, Estante y Nivel deben ser solo números (sin letras), tal como se registran en Bodegas > Ubicaciones.";
-            notaRange.Style.Font.Italic = true;
-            notaRange.Style.Font.FontColor = XLColor.Gray;
-
-            worksheet.Columns().AdjustToContents();
-
-            using var stream = new MemoryStream();
-            workbook.SaveAs(stream);
-            return stream.ToArray();
         }
     }
 }

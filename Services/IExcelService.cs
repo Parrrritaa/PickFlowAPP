@@ -27,6 +27,5 @@ namespace PickingApp.Services
     public interface IExcelService
     {
         Task<ExcelValidationResult> ValidarArchivoExcelAsync(Stream stream);
-        byte[] GenerarPlantillaExcel();
     }
 }
