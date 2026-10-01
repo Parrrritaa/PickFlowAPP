@@ -61,7 +61,7 @@ namespace PickingApp.Controllers
                     $"Reporte individual de {empleado.NombreCompleto} ({empleado.Identificacion}), periodo: {periodo.Descripcion}. {pedidosEmpleado.Count} pedidos.");
 
                 var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
-                    "Reporte Individual de Tiempos de Picking (CU-32)",
+                    "Reporte Individual de Tiempos de Picking",
                     $"Empleado: {empleado.NombreCompleto} · Doc. {empleado.Identificacion}",
                     pedidosEmpleado, periodo, porEmpleado: true);
                 return File(pdf, "application/pdf", $"Reporte_Tiempos_Empleado_{empleado.Identificacion}_{periodo.ParaArchivo}.pdf");
@@ -116,7 +116,7 @@ namespace PickingApp.Controllers
                     $"Reporte individual de la bodega {bodega.Codigo}, periodo: {periodo.Descripcion}. {pedidosBodega.Count} pedidos.");
 
                 var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
-                    "Reporte de Tiempos de Entrega por Bodega (CU-33)",
+                    "Reporte de Tiempos de Entrega por Bodega",
                     $"Bodega: {bodega.Nombre} ({bodega.Codigo})",
                     pedidosBodega, periodo, porEmpleado: false);
                 return File(pdf, "application/pdf", $"Reporte_Tiempos_Bodega_{bodega.Codigo}_{periodo.ParaArchivo}.pdf");

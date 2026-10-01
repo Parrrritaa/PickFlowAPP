@@ -29,7 +29,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte de Tiempos de Picking por Empleado (CU-32)", periodo.Descripcion, "Todos los empleados"));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte de Tiempos de Picking por Empleado", periodo.Descripcion, "Todos los empleados"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -92,7 +92,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte General de Tiempos de Entrega (CU-33)", periodo.Descripcion, "Todas las bodegas"));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte General de Tiempos de Entrega", periodo.Descripcion, "Todas las bodegas"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -147,7 +147,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte Consolidado de Pedidos por Periodo (CU-34)", periodo.Descripcion, filtro ?? "Todas las bodegas"));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte Consolidado de Pedidos por Periodo", periodo.Descripcion, filtro ?? "Todas las bodegas"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -211,7 +211,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Reporte de Pedidos Completados, Cancelados y Reasignados (CU-35)", periodo.Descripcion, filtro ?? "Completados, cancelados y reasignados"));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte de Pedidos Completados, Cancelados y Reasignados", periodo.Descripcion, filtro ?? "Completados, cancelados y reasignados"));
 
                     page.Content().PaddingVertical(10).Element(c =>
                     {
@@ -371,7 +371,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "LOG del Sistema (CU-38)", new PeriodoReporte(fechaDesde, fechaHasta).Descripcion, null));
+                    page.Header().Element(c => ComposeHeader(c, "LOG del Sistema", new PeriodoReporte(fechaDesde, fechaHasta).Descripcion, null));
 
                     page.Content().PaddingVertical(10).Column(col =>
                     {
@@ -615,7 +615,7 @@ namespace PickingApp.Services
         {
             container.Row(row =>
             {
-                row.RelativeItem().Text("PickFlow • Reporte exportado en formato PDF conforme a CU-36").FontSize(8).FontColor(Colors.Grey.Medium);
+                row.RelativeItem().Text("PickFlow • Reporte exportado en formato PDF").FontSize(8).FontColor(Colors.Grey.Medium);
                 row.ConstantItem(100).AlignRight().Text(x =>
                 {
                     x.Span("Página ");

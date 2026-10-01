@@ -18,7 +18,7 @@
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-header bg-white py-3 border-bottom">
                     <h5 class="fw-bold mb-0 text-primary">
-                        <i class="bi bi-sliders me-2"></i> Configuración de Parámetros y Auditoría (CU-39, RNF-07)
+                        <i class="bi bi-sliders me-2"></i> Configuración de Parámetros y Auditoría
                     </h5>
                 </div>
                 <div class="card-body p-4">
@@ -125,7 +125,8 @@
                     <p class="text-secondary small mb-3">
                         Simula @PickingApp.Services.DatosDemostracion.DiasSimulados días de uso hasta hoy: cargas de Excel, pedidos asignados,
                         reasignados, completados, cancelados y divididos, novedades y solicitudes. Las cantidades y los tiempos cambian
-                        cada vez, pero siempre aparece cada caso. Para quitarlos, borre el historial de pedidos (las solicitudes se conservan).
+                        cada vez, pero siempre aparece cada caso. Los pedidos se reparten entre las bodegas activas que tengan ubicaciones
+                        activas con producto. Para quitarlos, borre el historial de pedidos (las solicitudes se conservan).
                     </p>
                     <form asp-action="CargarDatosDemostracion" method="post" id="formDemostracion"
                           class="d-flex flex-wrap align-items-center justify-content-between gap-2">

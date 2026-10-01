@@ -166,7 +166,7 @@ namespace PickingApp.Services
 
             var errorPedido = estadoPedido == null ? "El pedido no existe." : estadoPedido switch
             {
-                PedidoEstados.Cancelado => "El pedido se encuentra cancelado y no puede reactivarse (RN-03-CU31).",
+                PedidoEstados.Cancelado => "El pedido se encuentra cancelado y no puede reactivarse.",
                 PedidoEstados.Completado => "El pedido ya se encuentra completado y no puede asignarse ni reasignarse.",
                 PedidoEstados.Dividido => "El pedido fue dividido en partes: asigne cada parte por separado.",
                 _ => null
@@ -237,7 +237,7 @@ namespace PickingApp.Services
             // Regla 2: Un solo pedido simultáneo
             if (tienePedidoEnCurso)
             {
-                result.MensajeError = $"El empleado '{empleado.NombreCompleto}' ya tiene un pedido asignado en curso (RN-01-CU26).";
+                result.MensajeError = $"El empleado '{empleado.NombreCompleto}' ya tiene un pedido asignado en curso.";
                 result.MotivoCorto = "Con pedido en curso";
                 return result;
             }

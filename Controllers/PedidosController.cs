@@ -167,7 +167,7 @@ namespace PickingApp.Controllers
         {
             if (!confirmacionFisica)
             {
-                TempData["ErrorMessage"] = "El pedido no puede marcarse como completado porque no existe confirmación física de la entrega (FE-1-CU28).";
+                TempData["ErrorMessage"] = "El pedido no puede marcarse como completado porque no existe confirmación física de la entrega.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
@@ -222,7 +222,7 @@ namespace PickingApp.Controllers
 
             if (pedido.Estado == PedidoEstados.Cancelado)
             {
-                TempData["ErrorMessage"] = "El pedido ya se encuentra cancelado y no puede reactivarse (RNF-01).";
+                TempData["ErrorMessage"] = "El pedido ya se encuentra cancelado y no puede reactivarse.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
