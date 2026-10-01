@@ -591,8 +591,12 @@ window.addEventListener('pageshow', function (e) {
     var ESTIRAMIENTO_MAX = 100;   // px a los que tiende el estiramiento por mucho que se empuje
     var RESISTENCIA = 0.55;       // la misma constante del rebote de iOS
     var FACTOR_RUEDA = 0.35;      // un paso de la rueda del mouse estira unos 18 px
-    var SOLTAR_TRAS_MS = 120;     // sin más movimiento de la rueda, el contenido vuelve
+    var SOLTAR_TRAS_MS = 70;      // sin más movimiento de la rueda, el contenido vuelve
+    var MAX_ESTIRADO_MS = 160;    // vuelve a más tardar a este tiempo, aunque la inercia del trackpad siga empujando
     var PAUSA_INERCIA_MS = 180;   // la inercia del trackpad que sigue llegando al soltar no vuelve a estirar
+    // Rigidez de los resortes: más alta = más rápido. La vuelta tarda unos 0,3 s.
+    var RIGIDEZ_EMPUJE = 900;
+    var RIGIDEZ_VUELTA = 420;
 
     // Cuanto más se empuja, menos se mueve: nunca pasa de ESTIRAMIENTO_MAX
     function elastico(distancia) {
@@ -624,6 +628,7 @@ window.addEventListener('pageshow', function (e) {
         var temporizador = 0;
         var ignorarInercia = false;
         var ultimaRueda = 0;
+        var inicioEstirado = 0;
         var ultimoY = 0;
 
         function pintar() {
@@ -640,7 +645,7 @@ window.addEventListener('pageshow', function (e) {
         function animar(tiempo) {
             var dt = Math.min((tiempo - tiempoAnterior) / 1000, 0.032);
             tiempoAnterior = tiempo;
-            var rigidez = soltado ? 170 : 600;
+            var rigidez = soltado ? RIGIDEZ_VUELTA : RIGIDEZ_EMPUJE;
             var aceleracion = -rigidez * (posicion - objetivo) - 2 * Math.sqrt(rigidez) * velocidad;
             velocidad += aceleracion * dt;
             posicion += velocidad * dt;
@@ -687,17 +692,21 @@ window.addEventListener('pageshow', function (e) {
                 return;
             }
 
-            if (soltado) distancia = distanciaDe(posicion);
+            if (soltado) {
+                distancia = distanciaDe(posicion);
+                inicioEstirado = ahora;
+            }
             soltado = false;
             distancia = dy < 0 ? Math.max(0, distancia) - dy * FACTOR_RUEDA : Math.min(0, distancia) - dy * FACTOR_RUEDA;
             objetivo = elastico(distancia);
             arrancar();
 
+            // Vuelve al dejar de mover la rueda, o al cumplir MAX_ESTIRADO_MS aunque la inercia siga llegando
             clearTimeout(temporizador);
             temporizador = setTimeout(function () {
                 soltar();
                 ignorarInercia = true;
-            }, SOLTAR_TRAS_MS);
+            }, Math.max(0, Math.min(SOLTAR_TRAS_MS, inicioEstirado + MAX_ESTIRADO_MS - ahora)));
         }
 
         function inicioToque(e) {
