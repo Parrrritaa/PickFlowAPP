@@ -198,10 +198,10 @@ namespace PickingApp.Controllers
         {
             _context.Notificaciones.Add(new Notificacion
             {
-                RolDestino = Roles.Administrador,
+                RolDestinoId = Roles.IdAdministrador,
                 Titulo = "Alerta de Asignación de Picking",
                 Mensaje = $"El {User.DescripcionParaNotificacion()} {(esReasignacion ? "reasignó" : "asignó")} el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} ({validacion.MotivoAdvertencia}).",
-                Tipo = "Warning",
+                Tipo = TiposNotificacion.Warning,
                 FechaCreacion = DateTime.Now
             });
         }

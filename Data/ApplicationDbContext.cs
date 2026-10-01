@@ -12,6 +12,8 @@ namespace PickingApp.Data
 
         // Cada DbSet es una tabla de la base de datos; su nombre es el nombre de la tabla
         public DbSet<Usuario> Usuarios { get; set; } = null!;
+        public DbSet<Rol> RolesUsuario { get; set; } = null!;
+        public DbSet<TipoSolicitud> CatalogoTiposSolicitud { get; set; } = null!;
         public DbSet<Empleado> Empleados { get; set; } = null!;
         public DbSet<Bodega> Bodegas { get; set; } = null!;
         public DbSet<Ubicacion> Ubicaciones { get; set; } = null!;
@@ -25,11 +27,32 @@ namespace PickingApp.Data
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
         public DbSet<CategoriaProducto> CategoriasProducto { get; set; } = null!;
 
+        // Columna ENUM de MySQL con los valores permitidos: la base rechaza cualquier otro texto
+        private static string EnumMySql(IEnumerable<string> valores) =>
+            "enum(" + string.Join(",", valores.Select(v => $"'{v}'")) + ")";
+
         // Reglas del modelo que no caben en los atributos de las clases: índices, relaciones y datos iniciales.
         // Cualquier cambio aquí necesita una migración nueva (dotnet ef migrations add ...).
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Catálogos: tablas de apoyo con Id fijo (ver Roles y TiposSolicitud en Models)
+            modelBuilder.Entity<Rol>().ToTable("Roles");
+            modelBuilder.Entity<Rol>().HasIndex(r => r.Nombre).IsUnique();
+            modelBuilder.Entity<Rol>().HasData(Roles.Catalogo);
+
+            modelBuilder.Entity<TipoSolicitud>().ToTable("TiposSolicitud");
+            modelBuilder.Entity<TipoSolicitud>().HasIndex(t => t.Nombre).IsUnique();
+            modelBuilder.Entity<TipoSolicitud>().HasData(TiposSolicitud.Catalogo);
+
+            // Columnas con pocos valores posibles: ENUM de MySQL (el código sigue usando texto)
+            modelBuilder.Entity<Usuario>().Property(u => u.Estado).HasColumnType(EnumMySql(EstadosUsuario.Todos));
+            modelBuilder.Entity<Pedido>().Property(p => p.Estado).HasColumnType(EnumMySql(PedidoEstados.Todos));
+            modelBuilder.Entity<Pedido>().Property(p => p.Prioridad).HasColumnType(EnumMySql(Prioridades.Todas));
+            modelBuilder.Entity<Solicitud>().Property(s => s.Estado).HasColumnType(EnumMySql(EstadosSolicitud.Todos));
+            modelBuilder.Entity<NovedadPedido>().Property(n => n.TipoNovedad).HasColumnType(EnumMySql(TiposNovedad.Todos));
+            modelBuilder.Entity<Notificacion>().Property(n => n.Tipo).HasColumnType(EnumMySql(TiposNotificacion.Todos));
 
             // Índices únicos: MySQL rechaza dos filas con el mismo valor (por ejemplo, dos usuarios con el mismo correo)
             modelBuilder.Entity<Usuario>()
@@ -74,6 +97,27 @@ namespace PickingApp.Data
                 new CategoriaProducto { Id = 2, Nombre = "Mediano", MinutosPorUnidad = 1.5, Descripcion = "Teclados, routers, audífonos", EsPredeterminada = true },
                 new CategoriaProducto { Id = 3, Nombre = "Grande", MinutosPorUnidad = 4, Descripcion = "Monitores, impresoras", EsPredeterminada = false },
                 new CategoriaProducto { Id = 4, Nombre = "Voluminoso / pesado", MinutosPorUnidad = 10, Descripcion = "Torres de PC, UPS", EsPredeterminada = false });
+
+            // Un rol o un tipo de solicitud en uso no se puede borrar; siempre se cargan junto a su registro
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Rol)
+                .WithMany()
+                .HasForeignKey(u => u.RolId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Usuario>().Navigation(u => u.Rol).AutoInclude();
+
+            modelBuilder.Entity<Notificacion>()
+                .HasOne(n => n.RolDestino)
+                .WithMany()
+                .HasForeignKey(n => n.RolDestinoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Solicitud>()
+                .HasOne(s => s.TipoSolicitud)
+                .WithMany()
+                .HasForeignKey(s => s.TipoSolicitudId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Solicitud>().Navigation(s => s.TipoSolicitud).AutoInclude();
 
             // Relaciones y qué pasa al borrar el registro principal:
             // Restrict impide borrarlo si tiene hijos, Cascade borra también los hijos

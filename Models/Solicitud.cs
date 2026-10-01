@@ -12,8 +12,14 @@ namespace PickingApp.Models
         public int Id { get; set; }
 
         [Required]
-        [StringLength(50)]
-        public string TipoSolicitud { get; set; } = string.Empty; // Valores en TiposSolicitud
+        public int TipoSolicitudId { get; set; } // Id fijo de TiposSolicitud
+
+        // Se carga siempre junto con la solicitud (AutoInclude en ApplicationDbContext)
+        [ForeignKey("TipoSolicitudId")]
+        public virtual TipoSolicitud? TipoSolicitud { get; set; }
+
+        [NotMapped]
+        public string NombreTipo => TipoSolicitud?.Nombre ?? string.Empty;
 
         [Required]
         public int UsuarioSolicitanteId { get; set; }
@@ -22,7 +28,6 @@ namespace PickingApp.Models
         public virtual Usuario? UsuarioSolicitante { get; set; }
 
         [Required]
-        [StringLength(30)]
         public string Estado { get; set; } = EstadosSolicitud.Pendiente; // Valores en EstadosSolicitud
 
         public DateTime FechaSolicitud { get; set; } = DateTime.Now;
@@ -43,9 +48,9 @@ namespace PickingApp.Models
         // T es la clase de SolicitudDatos.cs que corresponde a TipoSolicitud
         public T LeerDatos<T>() where T : new() => JsonSerializer.Deserialize<T>(DatosJson) ?? new T();
 
-        public static Solicitud Nueva(string tipo, int usuarioSolicitanteId, object datos) => new()
+        public static Solicitud Nueva(int tipoSolicitudId, int usuarioSolicitanteId, object datos) => new()
         {
-            TipoSolicitud = tipo,
+            TipoSolicitudId = tipoSolicitudId,
             UsuarioSolicitanteId = usuarioSolicitanteId,
             Estado = EstadosSolicitud.Pendiente,
             FechaSolicitud = DateTime.Now,

@@ -12,7 +12,7 @@ namespace PickingApp.Services
         public static async Task<Solicitud?> DeEmpleadoAsync(ApplicationDbContext context, int empleadoId)
         {
             var pendientes = await PendientesAsync(context, TiposSolicitud.EdicionEmpleado, TiposSolicitud.InactivacionEmpleado);
-            return pendientes.FirstOrDefault(s => s.TipoSolicitud == TiposSolicitud.EdicionEmpleado
+            return pendientes.FirstOrDefault(s => s.TipoSolicitudId == TiposSolicitud.EdicionEmpleado
                 ? s.LeerDatos<SolicitudEdicionEmpleado>().NuevosDatos.Id == empleadoId
                 : s.LeerDatos<SolicitudInactivacionEmpleado>().EmpleadoId == empleadoId);
         }
@@ -26,19 +26,19 @@ namespace PickingApp.Services
         public static async Task<Solicitud?> DeUbicacionAsync(ApplicationDbContext context, int ubicacionId)
         {
             var pendientes = await PendientesAsync(context, TiposSolicitud.EdicionUbicacion, TiposSolicitud.EliminacionUbicacion);
-            return pendientes.FirstOrDefault(s => s.TipoSolicitud == TiposSolicitud.EdicionUbicacion
+            return pendientes.FirstOrDefault(s => s.TipoSolicitudId == TiposSolicitud.EdicionUbicacion
                 ? s.LeerDatos<SolicitudEdicionUbicacion>().UbicacionId == ubicacionId
                 : s.LeerDatos<SolicitudEliminacionUbicacion>().UbicacionId == ubicacionId);
         }
 
         // sobre: "este empleado", "esta ubicación"...
         public static string Mensaje(Solicitud pendiente, string sobre) =>
-            $"Ya hay una solicitud pendiente sobre {sobre} (SOL-{pendiente.Id}: {TiposSolicitud.Nombre(pendiente.TipoSolicitud)}). " +
+            $"Ya hay una solicitud pendiente sobre {sobre} (SOL-{pendiente.Id}: {pendiente.NombreTipo}). " +
             "Espere a que la respondan antes de pedir otro cambio.";
 
-        private static Task<List<Solicitud>> PendientesAsync(ApplicationDbContext context, params string[] tipos) =>
+        private static Task<List<Solicitud>> PendientesAsync(ApplicationDbContext context, params int[] tipos) =>
             context.Solicitudes
-                .Where(s => s.Estado == EstadosSolicitud.Pendiente && tipos.Contains(s.TipoSolicitud))
+                .Where(s => s.Estado == EstadosSolicitud.Pendiente && tipos.Contains(s.TipoSolicitudId))
                 .ToListAsync();
     }
 }

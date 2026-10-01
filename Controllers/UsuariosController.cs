@@ -26,7 +26,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> Index()
         {
             var usuarios = await _context.Usuarios
-                .OrderBy(u => u.Rol)
+                .OrderBy(u => u.Rol!.Nombre)
                 .ThenBy(u => u.NombreCompleto)
                 .ToListAsync();
 
@@ -45,7 +45,7 @@ namespace PickingApp.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear([Bind(nameof(Usuario.NombreCompleto), nameof(Usuario.Identificacion), nameof(Usuario.Correo),
-            nameof(Usuario.Rol), nameof(Usuario.Estado))] Usuario model, string password, string confirmPassword)
+            nameof(Usuario.RolId), nameof(Usuario.Estado))] Usuario model, string password, string confirmPassword)
         {
             // El formulario envía la contraseña en "password", no en "PasswordHash": el binding automático
             // la deja vacía y dispara el [Required] del modelo antes de llegar aquí. Se valida a mano abajo.
@@ -74,9 +74,9 @@ namespace PickingApp.Controllers
                 ModelState.AddModelError("Correo", "Ese correo ya está en uso por un empleado registrado.");
             }
 
-            if (!Roles.Todos.Contains(model.Rol))
+            if (!Roles.Catalogo.Any(r => r.Id == model.RolId))
             {
-                ModelState.AddModelError("Rol", "Seleccione un rol válido.");
+                ModelState.AddModelError("RolId", "Seleccione un rol válido.");
             }
             if (!EstadosUsuario.Todos.Contains(model.Estado))
             {
@@ -104,7 +104,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Crear Usuario", "Usuarios", 
-                $"Usuario creado: {model.NombreCompleto} con rol {model.Rol}");
+                $"Usuario creado: {model.NombreCompleto} con rol {Roles.Catalogo.First(r => r.Id == model.RolId).Nombre}");
 
             // TempData sobrevive a la redirección: _Layout lo muestra como alerta verde en la siguiente página
             TempData["SuccessMessage"] = $"Usuario '{model.NombreCompleto}' ({model.Correo}) creado con éxito.";
@@ -123,12 +123,12 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Editar(int id, string nombreCompleto, string identificacion, string rol, string estado)
+        public async Task<IActionResult> Editar(int id, string nombreCompleto, string identificacion, int rolId, string estado)
         {
             var usuario = await _context.Usuarios.FindAsync(id);
             if (usuario == null) return NotFound();
 
-            if (!Roles.Todos.Contains(rol) || !EstadosUsuario.Todos.Contains(estado))
+            if (!Roles.Catalogo.Any(r => r.Id == rolId) || !EstadosUsuario.Todos.Contains(estado))
             {
                 TempData["ErrorMessage"] = "El rol o el estado seleccionado no es válido.";
                 return RedirectToAction(nameof(Editar), new { id });
@@ -139,7 +139,7 @@ namespace PickingApp.Controllers
             // o mediante el flujo de aprobación de CU-41/CU-42. No se acepta aquí bajo ningún parámetro.
             usuario.NombreCompleto = nombreCompleto.Trim();
             usuario.Identificacion = (identificacion ?? string.Empty).Trim();
-            usuario.Rol = rol;
+            usuario.RolId = rolId;
             usuario.Estado = estado;
 
             if (estado == EstadosUsuario.Activo)
@@ -152,7 +152,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Editar Usuario/Rol", "Usuarios", 
-                $"Usuario {usuario.NombreCompleto} actualizado: Rol={rol}, Estado={estado}");
+                $"Usuario {usuario.NombreCompleto} actualizado: Rol={Roles.Catalogo.First(r => r.Id == rolId).Nombre}, Estado={estado}");
 
             TempData["SuccessMessage"] = $"Usuario '{usuario.Correo}' actualizado exitosamente.";
             return RedirectToAction(nameof(Index));

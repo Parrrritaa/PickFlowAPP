@@ -42,10 +42,10 @@ namespace PickingApp.Controllers
 
             _context.Notificaciones.Add(new Notificacion
             {
-                RolDestino = Roles.Administrador,
+                RolDestinoId = Roles.IdAdministrador,
                 Titulo = "Novedad en Pedido",
                 Mensaje = $"Se registró una novedad de tipo '{tipoNovedad}' en el pedido {pedido.CodigoPedido}.",
-                Tipo = "Warning",
+                Tipo = TiposNotificacion.Warning,
                 FechaCreacion = DateTime.Now,
                 Enlace = $"/Pedidos/Detalle/{pedidoId}"
             });

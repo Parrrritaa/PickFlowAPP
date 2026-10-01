@@ -109,10 +109,10 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = Roles.Supervisor,
+                    RolDestinoId = Roles.IdSupervisor,
                     Titulo = "Solicitud de Nuevo Empleado",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó el registro del empleado {model.NombreCompleto}.",
-                    Tipo = "Info",
+                    Tipo = TiposNotificacion.Info,
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
                 });
@@ -234,10 +234,10 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = Roles.Administrador,
+                    RolDestinoId = Roles.IdAdministrador,
                     Titulo = "Solicitud de Edición de Empleado",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar los datos del empleado {model.NombreCompleto}.",
-                    Tipo = "Info",
+                    Tipo = TiposNotificacion.Info,
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
                 });
@@ -315,10 +315,10 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = Roles.Administrador,
+                    RolDestinoId = Roles.IdAdministrador,
                     Titulo = "Solicitud de Inactivación de Empleado",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó inactivar al empleado {empleado.NombreCompleto}.",
-                    Tipo = "Warning",
+                    Tipo = TiposNotificacion.Warning,
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
                 });

@@ -4,13 +4,13 @@ namespace PickingApp.Models.ViewModels
     public class FiltrosSolicitudes
     {
         public string? Busqueda { get; set; }
-        public string? Tipo { get; set; }
+        public int? Tipo { get; set; }
         public string? Estado { get; set; }
         public int? SolicitanteId { get; set; }
         public DateTime? FechaDesde { get; set; }
         public DateTime? FechaHasta { get; set; }
 
-        public bool HayFiltros => !string.IsNullOrWhiteSpace(Busqueda) || !string.IsNullOrEmpty(Tipo) || !string.IsNullOrEmpty(Estado)
+        public bool HayFiltros => !string.IsNullOrWhiteSpace(Busqueda) || Tipo.HasValue || !string.IsNullOrEmpty(Estado)
             || SolicitanteId.HasValue || FechaDesde.HasValue || FechaHasta.HasValue;
     }
 
@@ -28,7 +28,7 @@ namespace PickingApp.Models.ViewModels
         public int PendientesPorRevisar { get; set; }
 
         // Opciones de los filtros: solo los tipos y solicitantes que aparecen en la lista sin filtrar
-        public List<string> Tipos { get; set; } = new();
+        public List<TipoSolicitud> Tipos { get; set; } = new();
         public List<Usuario> Solicitantes { get; set; } = new();
     }
 

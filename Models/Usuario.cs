@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
@@ -29,11 +30,16 @@ namespace PickingApp.Models
         public string PasswordHash { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(30)]
-        public string Rol { get; set; } = Roles.Auxiliar; // Valores en Roles
+        public int RolId { get; set; } = Roles.IdAuxiliar;
+
+        // Se carga siempre junto con el usuario (AutoInclude en ApplicationDbContext)
+        [ForeignKey("RolId")]
+        public virtual Rol? Rol { get; set; }
+
+        [NotMapped]
+        public string NombreRol => Rol?.Nombre ?? string.Empty;
 
         [Required]
-        [StringLength(20)]
         public string Estado { get; set; } = EstadosUsuario.Activo; // Valores en EstadosUsuario
 
         // Se suma en cada login fallido; al llegar al máximo configurado la cuenta queda Bloqueada

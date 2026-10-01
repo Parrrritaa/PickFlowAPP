@@ -21,11 +21,9 @@ namespace PickingApp.Models
         public virtual Bodega? Bodega { get; set; }
 
         [Required]
-        [StringLength(20)]
-        public string Prioridad { get; set; } = "Media"; // "Alta", "Media", "Baja"
+        public string Prioridad { get; set; } = Prioridades.Media; // Valores en Prioridades
 
         [Required]
-        [StringLength(30)]
         public string Estado { get; set; } = PedidoEstados.Pendiente; // Valores en PedidoEstados
 
         public int? EmpleadoId { get; set; }

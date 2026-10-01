@@ -436,10 +436,10 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = Roles.Administrador,
+                    RolDestinoId = Roles.IdAdministrador,
                     Titulo = "Solicitud de Edición de Ubicación",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar la ubicación {ubicacionExistente.CodigoUbicacion}.",
-                    Tipo = "Info",
+                    Tipo = TiposNotificacion.Info,
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
                 });
@@ -514,10 +514,10 @@ namespace PickingApp.Controllers
                 _context.Solicitudes.Add(solicitud);
                 _context.Notificaciones.Add(new Notificacion
                 {
-                    RolDestino = Roles.Administrador,
+                    RolDestinoId = Roles.IdAdministrador,
                     Titulo = "Solicitud de Eliminación de Ubicación",
                     Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó eliminar la ubicación {ubicacion.CodigoUbicacion}.",
-                    Tipo = "Warning",
+                    Tipo = TiposNotificacion.Warning,
                     FechaCreacion = DateTime.Now,
                     Enlace = "/Solicitudes/Index"
                 });

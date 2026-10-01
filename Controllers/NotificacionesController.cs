@@ -27,7 +27,7 @@ namespace PickingApp.Controllers
             // Se muestran las dirigidas al usuario, a su rol o a todos
             var notificaciones = await _context.Notificaciones
                 .Where(n => !n.Leida)
-                .Where(n => n.UsuarioDestinoId == userId || n.RolDestino == userRole || (n.UsuarioDestinoId == null && n.RolDestino == null))
+                .Where(n => n.UsuarioDestinoId == userId || n.RolDestino!.Nombre == userRole || (n.UsuarioDestinoId == null && n.RolDestinoId == null))
                 .OrderByDescending(n => n.FechaCreacion)
                 .Take(50)
                 .ToListAsync();
@@ -42,13 +42,13 @@ namespace PickingApp.Controllers
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
 
-            var notificacion = await _context.Notificaciones.FindAsync(id);
+            var notificacion = await _context.Notificaciones.Include(n => n.RolDestino).FirstOrDefaultAsync(n => n.Id == id);
 
             // Evita que un usuario marque como leída una notificación dirigida específicamente a otro usuario (IDOR).
             // Las notificaciones por rol o globales sí son compartidas y cualquiera del rol puede marcarlas.
             var esDelUsuario = notificacion != null &&
                 (notificacion.UsuarioDestinoId == null || notificacion.UsuarioDestinoId == userId) &&
-                (notificacion.RolDestino == null || notificacion.RolDestino == userRole || notificacion.UsuarioDestinoId == userId);
+                (notificacion.RolDestinoId == null || notificacion.RolDestino!.Nombre == userRole || notificacion.UsuarioDestinoId == userId);
 
             if (notificacion != null && esDelUsuario)
             {

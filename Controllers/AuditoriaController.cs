@@ -116,7 +116,7 @@ namespace PickingApp.Controllers
         private async Task ReemplazarCorreosEnDetalleAsync(List<LogSistema> logs)
         {
             var usuarios = await _context.Usuarios.AsNoTracking()
-                .Select(u => new { u.Correo, u.NombreCompleto, u.Rol })
+                .Select(u => new { u.Correo, u.NombreCompleto, Rol = u.Rol!.Nombre })
                 .ToListAsync();
             var nombresPorCorreo = usuarios.ToDictionary(u => u.Correo, u => $"{u.NombreCompleto} ({u.Rol})", StringComparer.OrdinalIgnoreCase);
 

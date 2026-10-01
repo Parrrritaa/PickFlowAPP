@@ -302,14 +302,12 @@ namespace PickingApp.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
-                    b.Property<string>("RolDestino")
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                    b.Property<int?>("RolDestinoId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Tipo")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("enum('Info','Warning','Success','Danger')");
 
                     b.Property<string>("Titulo")
                         .IsRequired()
@@ -320,6 +318,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RolDestinoId");
 
                     b.HasIndex("UsuarioDestinoId");
 
@@ -366,8 +366,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("TipoNovedad")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Otro')");
 
                     b.HasKey("Id");
 
@@ -400,8 +399,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("Estado")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
+                        .HasColumnType("enum('Pendiente','Asignado','Reasignado','Completado','Cancelado','Dividido')");
 
                     b.Property<DateTime?>("FechaAsignacion")
                         .HasColumnType("datetime(6)");
@@ -431,8 +429,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("Prioridad")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("enum('Alta','Media','Baja')");
 
                     b.Property<double?>("TiempoEstandarMinutos")
                         .HasColumnType("double");
@@ -491,6 +488,44 @@ namespace PickingApp.Migrations
                     b.ToTable("Productos");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.Rol", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Nombre = "Administrador"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Nombre = "Supervisor"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Nombre = "Auxiliar"
+                        });
+                });
+
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
                     b.Property<int>("Id")
@@ -505,8 +540,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("Estado")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
+                        .HasColumnType("enum('Pendiente','Aprobada','Rechazada')");
 
                     b.Property<DateTime?>("FechaRespuesta")
                         .HasColumnType("datetime(6)");
@@ -518,10 +552,8 @@ namespace PickingApp.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
-                    b.Property<string>("TipoSolicitud")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                    b.Property<int>("TipoSolicitudId")
+                        .HasColumnType("int");
 
                     b.Property<int?>("UsuarioRespondeId")
                         .HasColumnType("int");
@@ -531,11 +563,61 @@ namespace PickingApp.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TipoSolicitudId");
+
                     b.HasIndex("UsuarioRespondeId");
 
                     b.HasIndex("UsuarioSolicitanteId");
 
                     b.ToTable("Solicitudes");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.TipoSolicitud", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("TiposSolicitud", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Nombre = "Registro de empleado"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Nombre = "Editar empleado"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Nombre = "Inactivar empleado"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Nombre = "Editar ubicación"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Nombre = "Eliminar ubicación"
+                        });
                 });
 
             modelBuilder.Entity("PickingApp.Models.Ubicacion", b =>
@@ -606,8 +688,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("Estado")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("enum('Activo','Inactivo','Bloqueado')");
 
                     b.Property<DateTime?>("FechaBloqueo")
                         .HasColumnType("datetime(6)");
@@ -637,10 +718,8 @@ namespace PickingApp.Migrations
                     b.Property<string>("PasswordPendienteHash")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Rol")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
+                    b.Property<int>("RolId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UltimoAcceso")
                         .HasColumnType("datetime(6)");
@@ -649,6 +728,8 @@ namespace PickingApp.Migrations
 
                     b.HasIndex("Correo")
                         .IsUnique();
+
+                    b.HasIndex("RolId");
 
                     b.ToTable("Usuarios");
                 });
@@ -684,10 +765,17 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Notificacion", b =>
                 {
+                    b.HasOne("PickingApp.Models.Rol", "RolDestino")
+                        .WithMany()
+                        .HasForeignKey("RolDestinoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PickingApp.Models.Usuario", "UsuarioDestino")
                         .WithMany()
                         .HasForeignKey("UsuarioDestinoId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("RolDestino");
 
                     b.Navigation("UsuarioDestino");
                 });
@@ -740,6 +828,12 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
+                    b.HasOne("PickingApp.Models.TipoSolicitud", "TipoSolicitud")
+                        .WithMany()
+                        .HasForeignKey("TipoSolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("PickingApp.Models.Usuario", "UsuarioResponde")
                         .WithMany()
                         .HasForeignKey("UsuarioRespondeId")
@@ -750,6 +844,8 @@ namespace PickingApp.Migrations
                         .HasForeignKey("UsuarioSolicitanteId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("TipoSolicitud");
 
                     b.Navigation("UsuarioResponde");
 
@@ -772,6 +868,17 @@ namespace PickingApp.Migrations
                     b.Navigation("Bodega");
 
                     b.Navigation("Producto");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.Usuario", b =>
+                {
+                    b.HasOne("PickingApp.Models.Rol", "Rol")
+                        .WithMany()
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Rol");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Bodega", b =>

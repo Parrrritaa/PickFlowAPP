@@ -68,7 +68,7 @@ namespace PickingApp.Controllers
             }
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(usuario.Correo, usuario.Rol,
+            await _auditService.LogAsync(usuario.Correo, usuario.NombreRol,
                 anulado ? "Código Anulado" : "Código Incorrecto", "Seguridad",
                 anulado
                     ? $"Código de verificación anulado tras {MaxIntentosCodigo} intentos fallidos."
@@ -129,14 +129,14 @@ namespace PickingApp.Controllers
                     usuario.FechaBloqueo = null;
                     await _context.SaveChangesAsync();
 
-                    await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Desbloqueo Automático", "Seguridad",
+                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Desbloqueo Automático", "Seguridad",
                         "Cuenta desbloqueada automáticamente tras 24 horas de bloqueo.");
                 }
                 else
                 {
                     ModelState.AddModelError(string.Empty,
                         "Tu cuenta se encuentra bloqueada por superar el límite de intentos consecutivos fallidos. Contacta a un Administrador o espera 24 horas.");
-                    await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Acceso Bloqueado", "Autenticación",
+                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Bloqueado", "Autenticación",
                         "Intento de acceso a cuenta bloqueada");
                     return View(model);
                 }
@@ -145,7 +145,7 @@ namespace PickingApp.Controllers
             if (usuario.Estado == EstadosUsuario.Inactivo)
             {
                 ModelState.AddModelError(string.Empty, "Tu cuenta se encuentra inactiva. Contacta al Administrador.");
-                await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Acceso Inactivo", "Autenticación", 
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Inactivo", "Autenticación", 
                     "Intento de acceso a cuenta inactiva");
                 return View(model);
             }
@@ -167,23 +167,23 @@ namespace PickingApp.Controllers
                 usuario.IntentosFallidos++;
 
                 // RNF-06: Bloqueo al alcanzar los intentos consecutivos configurados, excepto Administrador
-                if (usuario.IntentosFallidos >= maxIntentos && usuario.Rol != Roles.Administrador)
+                if (usuario.IntentosFallidos >= maxIntentos && usuario.NombreRol != Roles.Administrador)
                 {
                     usuario.Estado = EstadosUsuario.Bloqueado;
                     usuario.FechaBloqueo = DateTime.Now;
 
                     _context.Notificaciones.Add(new Notificacion
                     {
-                        RolDestino = Roles.Administrador,
+                        RolDestinoId = Roles.IdAdministrador,
                         Titulo = "Cuenta Bloqueada",
-                        Mensaje = $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.Rol)} ha sido bloqueada por {usuario.IntentosFallidos} intentos fallidos.",
-                        Tipo = "Danger",
+                        Mensaje = $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.NombreRol)} ha sido bloqueada por {usuario.IntentosFallidos} intentos fallidos.",
+                        Tipo = TiposNotificacion.Danger,
                         FechaCreacion = DateTime.Now
                     });
 
                     await _context.SaveChangesAsync();
 
-                    await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Bloqueo de Cuenta", "Seguridad", 
+                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Bloqueo de Cuenta", "Seguridad", 
                         $"Cuenta bloqueada tras {usuario.IntentosFallidos} intentos fallidos consecutivos");
 
                     ModelState.AddModelError(string.Empty,
@@ -194,13 +194,13 @@ namespace PickingApp.Controllers
                 await _context.SaveChangesAsync();
 
                 var intentosRestantes = Math.Max(0, maxIntentos - usuario.IntentosFallidos);
-                var mensajeError = usuario.Rol == Roles.Administrador
+                var mensajeError = usuario.NombreRol == Roles.Administrador
                     ? "Credenciales de acceso inválidas."
                     : $"Credenciales inválidas. Intentos restantes antes del bloqueo: {intentosRestantes}";
 
                 ModelState.AddModelError(string.Empty, mensajeError);
 
-                await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Contraseña Incorrecta", "Autenticación", 
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Contraseña Incorrecta", "Autenticación", 
                     $"Intento fallido #{usuario.IntentosFallidos}");
 
                 return View(model);
@@ -218,7 +218,7 @@ namespace PickingApp.Controllers
                 new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                 new Claim(ClaimTypes.Name, usuario.NombreCompleto),
                 new Claim(ClaimTypes.Email, usuario.Correo),
-                new Claim(ClaimTypes.Role, usuario.Rol)
+                new Claim(ClaimTypes.Role, usuario.NombreRol)
             };
 
             var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -237,7 +237,7 @@ namespace PickingApp.Controllers
                 new ClaimsPrincipal(claimsIdentity),
                 authProperties);
 
-            await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Inicio de Sesión", "Autenticación",
+            await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Inicio de Sesión", "Autenticación",
                 "Inicio de sesión correcto en el sistema");
 
             // Marca la llegada como "recién logueado" para la animación de entrada del panel (solo se ve una vez).
@@ -301,12 +301,12 @@ namespace PickingApp.Controllers
                 try
                 {
                     await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo);
-                    await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Solicitud Código Recuperación", "Seguridad",
+                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Solicitud Código Recuperación", "Seguridad",
                         "Se generó y envió un código de verificación para recuperar la contraseña.");
                 }
                 catch (Exception ex)
                 {
-                    await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Error Envío Código", "Seguridad",
+                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Error Envío Código", "Seguridad",
                         $"No se pudo enviar el código de verificación por correo: {ex.Message}");
                 }
             }
@@ -362,7 +362,7 @@ namespace PickingApp.Controllers
             }
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Restablecimiento de Contraseña", "Seguridad",
+            await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Restablecimiento de Contraseña", "Seguridad",
                 "El usuario restableció su contraseña tras verificar el código enviado por correo.");
 
             TempData["SuccessMessage"] = "Tu contraseña ha sido restablecida con éxito. Ya puedes iniciar sesión.";
@@ -393,7 +393,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction("Login");
             }
 
-            var usuario = await _context.Usuarios.FindAsync(userId);
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == userId);
             if (usuario == null)
             {
                 return RedirectToAction("Login");
@@ -407,12 +407,12 @@ namespace PickingApp.Controllers
             }
 
             // Administrador: cambio directo e inmediato.
-            if (usuario.Rol == Roles.Administrador)
+            if (usuario.NombreRol == Roles.Administrador)
             {
                 usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
                 await _context.SaveChangesAsync();
 
-                await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Cambio de Contraseña", "Seguridad",
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Cambio de Contraseña", "Seguridad",
                     "El usuario actualizó su contraseña exitosamente");
 
                 TempData["SuccessMessage"] = "Tu contraseña ha sido actualizada con éxito.";
@@ -429,12 +429,12 @@ namespace PickingApp.Controllers
             try
             {
                 await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo);
-                await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Solicitud Código Cambio Contraseña", "Seguridad",
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Solicitud Código Cambio Contraseña", "Seguridad",
                     "Se envió un código de verificación al correo para confirmar el cambio de contraseña.");
             }
             catch (Exception ex)
             {
-                await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Error Envío Código", "Seguridad",
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Error Envío Código", "Seguridad",
                     $"No se pudo enviar el código de verificación por correo: {ex.Message}");
             }
 
@@ -462,7 +462,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction("Login");
             }
 
-            var usuario = await _context.Usuarios.FindAsync(userId);
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == userId);
             if (usuario == null)
             {
                 return RedirectToAction("Login");
@@ -491,7 +491,7 @@ namespace PickingApp.Controllers
             usuario.IntentosCodigo = 0;
             await _context.SaveChangesAsync();
 
-            await _auditService.LogAsync(usuario.Correo, usuario.Rol, "Cambio de Contraseña", "Seguridad",
+            await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Cambio de Contraseña", "Seguridad",
                 "El usuario confirmó el cambio de contraseña mediante código enviado por correo.");
 
             TempData["SuccessMessage"] = "Tu contraseña ha sido actualizada con éxito.";

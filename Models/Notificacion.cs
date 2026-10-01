@@ -12,8 +12,9 @@ namespace PickingApp.Models
 
         public Usuario? UsuarioDestino { get; set; }
 
-        [StringLength(50)]
-        public string? RolDestino { get; set; } // Un valor de Roles, o null para todos
+        public int? RolDestinoId { get; set; } // Id de Roles, o null para todos
+
+        public Rol? RolDestino { get; set; }
 
         [Required]
         [StringLength(150)]
@@ -24,8 +25,7 @@ namespace PickingApp.Models
         public string Mensaje { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(20)]
-        public string Tipo { get; set; } = "Info"; // "Info", "Warning", "Success", "Danger"
+        public string Tipo { get; set; } = TiposNotificacion.Info; // Valores en TiposNotificacion
 
         public bool Leida { get; set; } = false;
 

@@ -1,21 +1,21 @@
 namespace PickingApp.Models
 {
+    // Id fijos de la tabla TiposSolicitud (el catálogo se siembra con estas mismas filas)
     public static class TiposSolicitud
     {
-        public const string RegistroEmpleado = "RegistroEmpleado";
-        public const string EdicionEmpleado = "EdicionEmpleado";
-        public const string InactivacionEmpleado = "InactivacionEmpleado";
-        public const string EdicionUbicacion = "EdicionUbicacion";
-        public const string EliminacionUbicacion = "EliminacionUbicacion";
+        public const int RegistroEmpleado = 1;
+        public const int EdicionEmpleado = 2;
+        public const int InactivacionEmpleado = 3;
+        public const int EdicionUbicacion = 4;
+        public const int EliminacionUbicacion = 5;
 
-        public static string Nombre(string tipo) => tipo switch
+        public static readonly TipoSolicitud[] Catalogo =
         {
-            RegistroEmpleado => "Registro de empleado",
-            EdicionEmpleado => "Editar empleado",
-            InactivacionEmpleado => "Inactivar empleado",
-            EdicionUbicacion => "Editar ubicación",
-            EliminacionUbicacion => "Eliminar ubicación",
-            _ => tipo
+            new() { Id = RegistroEmpleado, Nombre = "Registro de empleado" },
+            new() { Id = EdicionEmpleado, Nombre = "Editar empleado" },
+            new() { Id = InactivacionEmpleado, Nombre = "Inactivar empleado" },
+            new() { Id = EdicionUbicacion, Nombre = "Editar ubicación" },
+            new() { Id = EliminacionUbicacion, Nombre = "Eliminar ubicación" }
         };
     }
 

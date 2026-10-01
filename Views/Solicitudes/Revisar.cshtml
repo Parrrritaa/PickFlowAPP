@@ -4,7 +4,7 @@
     // Qué datos se muestran según el tipo se decide en ConstruirDetalleAsync.
     var s = Model.Solicitud;
     var esPropia = Model.AccionVolver == "MisSolicitudes";
-    var tipoDisplay = TiposSolicitud.Nombre(s.TipoSolicitud);
+    var tipoDisplay = s.NombreTipo;
     var hayValoresCambiados = Model.Cambios.Any(c => c.Actual != null);
     ViewData["Title"] = esPropia ? "Detalle de solicitud" : "Revisar solicitud";
 }
@@ -106,7 +106,7 @@
     else if (Model.EsEdicion)
     {
         <div class="mockup-info-banner mb-4">
-            No se detectaron cambios en los campos @(s.TipoSolicitud == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
+            No se detectaron cambios en los campos @(s.TipoSolicitudId == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
         </div>
     }
 

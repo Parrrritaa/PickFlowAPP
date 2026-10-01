@@ -25,14 +25,14 @@ namespace PickingApp.Controllers
         }
 
         // CU-08: el Supervisor solo revisa, aprueba o rechaza registros de empleados; el resto es del Administrador
-        private const string TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
+        private const int TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
         private const string MensajeSinPermisoSupervisor = "Los Supervisores solo tienen permiso para gestionar solicitudes de registro de empleados.";
 
         // Cabe en la notificación al solicitante (500 caracteres con el resto del mensaje) y en MotivoRechazo
         private const int MaxMotivoRechazo = 400;
 
         private bool PuedeGestionar(Solicitud solicitud) =>
-            !User.IsInRole(Roles.Supervisor) || solicitud.TipoSolicitud == TipoGestionableSupervisor;
+            !User.IsInRole(Roles.Supervisor) || solicitud.TipoSolicitudId == TipoGestionableSupervisor;
 
         private int UsuarioActualId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -57,11 +57,11 @@ namespace PickingApp.Controllers
             else if (esSupervisor)
             {
                 // Supervisor solo puede aprobar/rechazar solicitudes de Registro de Empleado (CU-08)
-                baseQuery = baseQuery.Where(s => s.TipoSolicitud == TipoGestionableSupervisor);
+                baseQuery = baseQuery.Where(s => s.TipoSolicitudId == TipoGestionableSupervisor);
             }
 
             // Opciones de los filtros: lo que existe en esta lista, antes de filtrar
-            var tipos = await baseQuery.Select(s => s.TipoSolicitud).Distinct().ToListAsync();
+            var idsTipos = await baseQuery.Select(s => s.TipoSolicitudId).Distinct().ToListAsync();
             var idsSolicitantes = esBandeja
                 ? await baseQuery.Select(s => s.UsuarioSolicitanteId).Distinct().ToListAsync()
                 : new List<int>();
@@ -81,9 +81,9 @@ namespace PickingApp.Controllers
             {
                 query = query.Where(s => s.Id == numero);
             }
-            if (!string.IsNullOrEmpty(filtros.Tipo))
+            if (filtros.Tipo.HasValue)
             {
-                query = query.Where(s => s.TipoSolicitud == filtros.Tipo);
+                query = query.Where(s => s.TipoSolicitudId == filtros.Tipo.Value);
             }
             if (!string.IsNullOrEmpty(filtros.Estado))
             {
@@ -115,9 +115,12 @@ namespace PickingApp.Controllers
                 EsBandeja = esBandeja,
                 MostrarPestanas = esSupervisor,
                 PendientesPorRevisar = esSupervisor
-                    ? await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitud == TipoGestionableSupervisor)
+                    ? await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor)
                     : 0,
-                Tipos = tipos.OrderBy(TiposSolicitud.Nombre).ToList(),
+                Tipos = await _context.CatalogoTiposSolicitud
+                    .Where(t => idsTipos.Contains(t.Id))
+                    .OrderBy(t => t.Nombre)
+                    .ToListAsync(),
                 Solicitantes = solicitantes
             };
             return View("Index", modelo);
@@ -179,7 +182,7 @@ namespace PickingApp.Controllers
             var modelo = new SolicitudDetalleViewModel { Solicitud = solicitud };
             var pendiente = solicitud.Estado == EstadosSolicitud.Pendiente;
 
-            switch (solicitud.TipoSolicitud)
+            switch (solicitud.TipoSolicitudId)
             {
                 case TiposSolicitud.RegistroEmpleado:
                 {
@@ -271,7 +274,7 @@ namespace PickingApp.Controllers
                     break;
             }
 
-            if (string.IsNullOrWhiteSpace(modelo.Motivo) && solicitud.TipoSolicitud != TiposSolicitud.RegistroEmpleado)
+            if (string.IsNullOrWhiteSpace(modelo.Motivo) && solicitud.TipoSolicitudId != TiposSolicitud.RegistroEmpleado)
             {
                 modelo.Motivo = "No especificado";
             }
@@ -360,8 +363,8 @@ namespace PickingApp.Controllers
                 {
                     UsuarioDestinoId = solicitud.UsuarioSolicitanteId,
                     Titulo = "Solicitud Aprobada",
-                    Mensaje = $"Tu solicitud SOL-{solicitud.Id} \"{TiposSolicitud.Nombre(solicitud.TipoSolicitud)}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.",
-                    Tipo = "Success",
+                    Mensaje = $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.",
+                    Tipo = TiposNotificacion.Success,
                     FechaCreacion = DateTime.Now,
                     Enlace = $"/Solicitudes/Detalle/{solicitud.Id}"
                 });
@@ -371,7 +374,7 @@ namespace PickingApp.Controllers
                 await _context.SaveChangesAsync();
 
                 await _auditService.RegistrarAsync("Aprobar Solicitud", "Solicitudes",
-                    $"Solicitud #{solicitud.Id} ({TiposSolicitud.Nombre(solicitud.TipoSolicitud)}) aprobada.");
+                    $"Solicitud #{solicitud.Id} ({solicitud.NombreTipo}) aprobada.");
 
                 TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} aprobada correctamente.";
                 return RedirectToAction(nameof(Index));
@@ -429,8 +432,8 @@ namespace PickingApp.Controllers
             {
                 UsuarioDestinoId = solicitud.UsuarioSolicitanteId,
                 Titulo = "Solicitud Rechazada",
-                Mensaje = $"Tu solicitud SOL-{solicitud.Id} \"{TiposSolicitud.Nombre(solicitud.TipoSolicitud)}\" fue rechazada. Motivo: {motivoRechazo}",
-                Tipo = "Danger",
+                Mensaje = $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" fue rechazada. Motivo: {motivoRechazo}",
+                Tipo = TiposNotificacion.Danger,
                 FechaCreacion = DateTime.Now,
                 Enlace = $"/Solicitudes/Detalle/{solicitud.Id}"
             });
@@ -461,14 +464,14 @@ namespace PickingApp.Controllers
         // Aplica los cambios de la solicitud. Las reglas se validan otra vez: entre la creación de la solicitud
         // y su aprobación otro registro pudo tomar la identificación, el correo o el código, o cambiar la jornada máxima.
         // Según el tipo, se leen los datos guardados en DatosJson y se aplica el cambio correspondiente
-        private Task AplicarAsync(Solicitud solicitud) => solicitud.TipoSolicitud switch
+        private Task AplicarAsync(Solicitud solicitud) => solicitud.TipoSolicitudId switch
         {
             TiposSolicitud.RegistroEmpleado => RegistrarEmpleadoAsync(solicitud.LeerDatos<DatosEmpleadoSolicitud>()),
             TiposSolicitud.EdicionEmpleado => EditarEmpleadoAsync(solicitud.LeerDatos<SolicitudEdicionEmpleado>()),
             TiposSolicitud.InactivacionEmpleado => InactivarEmpleadoAsync(solicitud.LeerDatos<SolicitudInactivacionEmpleado>()),
             TiposSolicitud.EdicionUbicacion => EditarUbicacionAsync(solicitud.LeerDatos<SolicitudEdicionUbicacion>()),
             TiposSolicitud.EliminacionUbicacion => EliminarUbicacionAsync(solicitud.LeerDatos<SolicitudEliminacionUbicacion>()),
-            _ => throw new ReglaNegocioException($"No se puede aprobar: tipo de solicitud desconocido ({solicitud.TipoSolicitud}).")
+            _ => throw new ReglaNegocioException($"No se puede aprobar: tipo de solicitud desconocido ({solicitud.TipoSolicitudId}).")
         };
 
         private async Task RegistrarEmpleadoAsync(DatosEmpleadoSolicitud datos)

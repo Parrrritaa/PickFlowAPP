@@ -11,7 +11,7 @@ namespace PickingApp.ViewComponents
     // y SolicitudesController.Index, para que el número coincida con lo que se ve al entrar.
     public class MenuBadgesViewComponent : ViewComponent
     {
-        private const string TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
+        private const int TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
         private readonly ApplicationDbContext _context;
 
         public MenuBadgesViewComponent(ApplicationDbContext context)
@@ -33,14 +33,14 @@ namespace PickingApp.ViewComponents
             var count = tipo switch
             {
                 "notificaciones" => await _context.Notificaciones.CountAsync(n => !n.Leida &&
-                    (n.UsuarioDestinoId == userId || n.RolDestino == userRole ||
-                     (n.UsuarioDestinoId == null && n.RolDestino == null))),
+                    (n.UsuarioDestinoId == userId || n.RolDestino!.Nombre == userRole ||
+                     (n.UsuarioDestinoId == null && n.RolDestinoId == null))),
 
                 "solicitudes" when userRole == Roles.Administrador =>
                     await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente),
 
                 "solicitudes" when userRole == Roles.Supervisor =>
-                    await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitud == TipoGestionableSupervisor),
+                    await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor),
 
                 _ => 0
             };

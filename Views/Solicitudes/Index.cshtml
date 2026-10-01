@@ -6,7 +6,7 @@
     var f = Model.Filtros;
 
     var activoBusqueda = !string.IsNullOrWhiteSpace(f.Busqueda);
-    var activoTipo = !string.IsNullOrEmpty(f.Tipo);
+    var activoTipo = f.Tipo.HasValue;
     var activoSolicitante = f.SolicitanteId.HasValue;
     var activoFecha = f.FechaDesde.HasValue || f.FechaHasta.HasValue;
     var activoEstado = !string.IsNullOrEmpty(f.Estado);
@@ -74,7 +74,7 @@
                                             <option value="">Todos</option>
                                             @foreach (var tipo in Model.Tipos)
                                             {
-                                                <option value="@tipo" selected="@(f.Tipo == tipo)">@TiposSolicitud.Nombre(tipo)</option>
+                                                <option value="@tipo.Id" selected="@(f.Tipo == tipo.Id)">@tipo.Nombre</option>
                                             }
                                         </select>
                                     </div>
@@ -160,7 +160,7 @@
                             var pendiente = s.Estado == EstadosSolicitud.Pendiente;
                             <tr>
                                 <td class="fw-semibold">SOL-@s.Id</td>
-                                <td>@TiposSolicitud.Nombre(s.TipoSolicitud)</td>
+                                <td>@s.NombreTipo</td>
                                 @if (Model.EsBandeja)
                                 {
                                     <td>@(s.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</td>

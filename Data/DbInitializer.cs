@@ -37,8 +37,8 @@ namespace PickingApp.Data
                         Identificacion = "1000000001",
                         // La contraseña se guarda como hash BCrypt, nunca en texto plano
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123*"),
-                        Rol = "Administrador",
-                        Estado = "Activo",
+                        RolId = Roles.IdAdministrador,
+                        Estado = EstadosUsuario.Activo,
                         IntentosFallidos = 0,
                         FechaRegistro = DateTime.Now
                     },
@@ -48,8 +48,8 @@ namespace PickingApp.Data
                         Correo = "supervisor@pickingapp.com",
                         Identificacion = "1000000002",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super123*"),
-                        Rol = "Supervisor",
-                        Estado = "Activo",
+                        RolId = Roles.IdSupervisor,
+                        Estado = EstadosUsuario.Activo,
                         IntentosFallidos = 0,
                         FechaRegistro = DateTime.Now
                     },
@@ -59,8 +59,8 @@ namespace PickingApp.Data
                         Correo = "auxiliar@pickingapp.com",
                         Identificacion = "1000000003",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Aux123*"),
-                        Rol = "Auxiliar",
-                        Estado = "Activo",
+                        RolId = Roles.IdAuxiliar,
+                        Estado = EstadosUsuario.Activo,
                         IntentosFallidos = 0,
                         FechaRegistro = DateTime.Now
                     }

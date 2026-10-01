@@ -19,8 +19,7 @@ namespace PickingApp.Models
         public string Descripcion { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(50)]
-        public string TipoNovedad { get; set; } = "Faltante"; // "Faltante", "Avería", "Ubicación Incorrecta", "Otro"
+        public string TipoNovedad { get; set; } = TiposNovedad.Faltante; // Valores en TiposNovedad
 
         public DateTime FechaRegistro { get; set; } = DateTime.Now;
 
