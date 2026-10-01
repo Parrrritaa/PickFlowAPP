@@ -95,6 +95,13 @@ namespace PickingApp.Controllers
             // Auxiliar: Solicitar registro de empleado (CU-07)
             else
             {
+                var pendiente = await SolicitudesPendientes.DeRegistroAsync(_context, model.Identificacion);
+                if (pendiente != null)
+                {
+                    ModelState.AddModelError(nameof(Empleado.Identificacion), SolicitudesPendientes.Mensaje(pendiente, "un empleado con esta identificación"));
+                    return View(model);
+                }
+
                 // El empleado aún no se crea: sus datos se guardan como JSON en la solicitud
                 // y se insertan en Empleados solo cuando la solicitud se aprueba
                 var solicitud = Solicitud.Nueva(TiposSolicitud.RegistroEmpleado, userId, DatosEmpleadoSolicitud.Desde(model));
@@ -198,11 +205,24 @@ namespace PickingApp.Controllers
                     }
                 }
 
-                AgregarCambio("Nombre completo", empleadoExistente.NombreCompleto, model.NombreCompleto);
-                AgregarCambio("Correo electrónico", empleadoExistente.Correo ?? "-", model.Correo ?? "-");
-                AgregarCambio("Fecha de ingreso", empleadoExistente.FechaIngreso.ToString("dd/MM/yyyy"), model.FechaIngreso.ToString("dd/MM/yyyy"));
-                AgregarCambio("Hora de entrada", FormatHora(empleadoExistente.HorarioEntrada), FormatHora(model.HorarioEntrada));
-                AgregarCambio("Hora de salida", FormatHora(empleadoExistente.HorarioSalida), FormatHora(model.HorarioSalida));
+                AgregarCambio(CamposEmpleado.Nombre, empleadoExistente.NombreCompleto, model.NombreCompleto);
+                AgregarCambio(CamposEmpleado.Correo, empleadoExistente.Correo ?? "-", model.Correo ?? "-");
+                AgregarCambio(CamposEmpleado.FechaIngreso, empleadoExistente.FechaIngreso.ToString("dd/MM/yyyy"), model.FechaIngreso.ToString("dd/MM/yyyy"));
+                AgregarCambio(CamposEmpleado.HoraEntrada, FormatHora(empleadoExistente.HorarioEntrada), FormatHora(model.HorarioEntrada));
+                AgregarCambio(CamposEmpleado.HoraSalida, FormatHora(empleadoExistente.HorarioSalida), FormatHora(model.HorarioSalida));
+
+                // Una solicitud sin cambios no tiene nada que aprobar; una segunda sobre el mismo empleado
+                // mostraría valores "anteriores" que ya no serían los reales al aprobarla
+                var pendiente = await SolicitudesPendientes.DeEmpleadoAsync(_context, empleadoExistente.Id);
+                var errorSolicitud = cambios.Count == 0 ? "No cambió ningún dato del empleado: no hay nada que solicitar."
+                    : pendiente != null ? SolicitudesPendientes.Mensaje(pendiente, "este empleado")
+                    : null;
+                if (errorSolicitud != null)
+                {
+                    ModelState.AddModelError(string.Empty, errorSolicitud);
+                    ViewBag.Motivo = motivo;
+                    return View(model);
+                }
 
                 var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionEmpleado, userId, new SolicitudEdicionEmpleado
                 {
@@ -272,12 +292,24 @@ namespace PickingApp.Controllers
             // Supervisor y Auxiliar: Solicitar Inactivación (CU-13)
             else
             {
+                motivo = (motivo ?? string.Empty).Trim();
+                var pendiente = await SolicitudesPendientes.DeEmpleadoAsync(_context, empleado.Id);
+                var errorSolicitud = !empleado.Activo ? $"'{empleado.NombreCompleto}' ya está inactivo."
+                    : motivo.Length == 0 ? "Debe indicar el motivo de la inactivación."
+                    : pendiente != null ? SolicitudesPendientes.Mensaje(pendiente, $"'{empleado.NombreCompleto}'")
+                    : null;
+                if (errorSolicitud != null)
+                {
+                    TempData["ErrorMessage"] = errorSolicitud;
+                    return RedirectToAction(nameof(Index));
+                }
+
                 var solicitud = Solicitud.Nueva(TiposSolicitud.InactivacionEmpleado, userId, new SolicitudInactivacionEmpleado
                 {
                     EmpleadoId = empleado.Id,
                     Identificacion = empleado.Identificacion,
                     NombreCompleto = empleado.NombreCompleto,
-                    Motivo = motivo ?? "Solicitud de inactivación por novedades laborales"
+                    Motivo = motivo
                 });
 
                 _context.Solicitudes.Add(solicitud);

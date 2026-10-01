@@ -1,93 +1,59 @@
-@model PickingApp.Models.Solicitud
+@model PickingApp.Models.ViewModels.SolicitudDetalleViewModel
 @{
-    ViewData["Title"] = "Revisar solicitud";
-    var tipoDisplay = TiposSolicitud.Nombre(Model.TipoSolicitud);
-
-    // Datos concretos del empleado/ubicación asociados a la solicitud (CU-08 / CU-11 / CU-14 / CU-21).
-    var datosEmpleado = new List<(string Etiqueta, string Valor)>();
-    var cambiosEmpleado = new List<CambioSolicitud>();
-    var motivo = "No especificado";
-    var esEdicion = Model.TipoSolicitud is TiposSolicitud.EdicionEmpleado or TiposSolicitud.EdicionUbicacion;
-
-    switch (Model.TipoSolicitud)
-    {
-        case TiposSolicitud.RegistroEmpleado:
-            var registro = Model.LeerDatos<DatosEmpleadoSolicitud>();
-            datosEmpleado.Add(("Número de documento", registro.Identificacion));
-            datosEmpleado.Add(("Nombre completo", registro.NombreCompleto));
-            if (registro.Correo != null) datosEmpleado.Add(("Correo electrónico", registro.Correo));
-            datosEmpleado.Add(("Fecha de ingreso", registro.FechaIngreso.ToString("dd/MM/yyyy")));
-            datosEmpleado.Add(("Hora de entrada", registro.HorarioEntrada.ToString(@"hh\:mm")));
-            datosEmpleado.Add(("Hora de salida", registro.HorarioSalida.ToString(@"hh\:mm")));
-            motivo = "Solicitud de registro de nuevo empleado.";
-            break;
-        case TiposSolicitud.EdicionEmpleado:
-            var edicionEmpleado = Model.LeerDatos<SolicitudEdicionEmpleado>();
-            cambiosEmpleado = edicionEmpleado.Cambios;
-            motivo = edicionEmpleado.Motivo;
-            break;
-        case TiposSolicitud.EdicionUbicacion:
-            var edicionUbicacion = Model.LeerDatos<SolicitudEdicionUbicacion>();
-            cambiosEmpleado = edicionUbicacion.Cambios;
-            motivo = edicionUbicacion.Motivo;
-            break;
-        case TiposSolicitud.InactivacionEmpleado:
-            var inactivacion = Model.LeerDatos<SolicitudInactivacionEmpleado>();
-            datosEmpleado.Add(("Número de documento", inactivacion.Identificacion));
-            datosEmpleado.Add(("Nombre completo", inactivacion.NombreCompleto));
-            motivo = inactivacion.Motivo;
-            break;
-        case TiposSolicitud.EliminacionUbicacion:
-            var eliminacion = Model.LeerDatos<SolicitudEliminacionUbicacion>();
-            datosEmpleado.Add(("Ubicación", eliminacion.CodigoUbicacion));
-            if (eliminacion.BodegaCodigo != null) datosEmpleado.Add(("Bodega", eliminacion.BodegaCodigo));
-            motivo = eliminacion.Motivo;
-            break;
-    }
-    if (string.IsNullOrWhiteSpace(motivo)) motivo = "No especificado";
+    // La arman SolicitudesController.Revisar (bandeja) y .Detalle (solicitud propia, solo consulta).
+    // Qué datos se muestran según el tipo se decide en ConstruirDetalleAsync.
+    var s = Model.Solicitud;
+    var esPropia = Model.AccionVolver == "MisSolicitudes";
+    var tipoDisplay = TiposSolicitud.Nombre(s.TipoSolicitud);
+    var hayValoresCambiados = Model.Cambios.Any(c => c.Actual != null);
+    ViewData["Title"] = esPropia ? "Detalle de solicitud" : "Revisar solicitud";
 }
 
-<h1 class="pf-page-title">Revisar solicitud</h1>
+<h1 class="pf-page-title">@ViewData["Title"]</h1>
 
 <div class="mockup-card">
-    <div class="mb-4">
-        <h4 class="fw-bold text-dark mb-1">Solicitud SOL-@Model.Id</h4>
-        <div class="text-secondary fw-medium">@tipoDisplay</div>
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+        <h4 class="fw-bold text-dark mb-0">Solicitud SOL-@s.Id</h4>
+        <partial name="_EstadoSolicitud" model="s.Estado" />
     </div>
 
-    <div class="row g-3 mb-3">
-        <div class="col-md-6">
-            <div class="bg-white rounded-3 p-3 shadow-sm">
-                <div class="text-secondary small fw-medium">Solicitante</div>
-                <div class="fs-5 text-dark fw-normal mt-1">@(Model.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="bg-white rounded-3 p-3 shadow-sm">
-                <div class="text-secondary small fw-medium">Fecha de solicitud</div>
-                <div class="fs-5 text-dark fw-normal mt-1">@Model.FechaSolicitud.ToString("dd/MM/yyyy")</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-md-6">
-            <div class="bg-white rounded-3 p-3 shadow-sm">
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="bg-white rounded-3 p-3 shadow-sm h-100">
                 <div class="text-secondary small fw-medium">Tipo de solicitud</div>
                 <div class="fs-5 text-dark fw-normal mt-1">@tipoDisplay</div>
             </div>
         </div>
+        <div class="col-md-4">
+            <div class="bg-white rounded-3 p-3 shadow-sm h-100">
+                <div class="text-secondary small fw-medium">Solicitante</div>
+                <div class="fs-5 text-dark fw-normal mt-1">@(s.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="bg-white rounded-3 p-3 shadow-sm h-100">
+                <div class="text-secondary small fw-medium">Fecha de solicitud</div>
+                <div class="fs-5 text-dark fw-normal mt-1">@s.FechaSolicitud.ToString("dd/MM/yyyy HH:mm")</div>
+            </div>
+        </div>
     </div>
 
-    @if (datosEmpleado.Any())
+    @if (Model.Aviso != null && s.Estado == EstadosSolicitud.Pendiente)
+    {
+        <div class="mockup-alert-warning mt-0 mb-4" role="status">
+            <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>@Model.Aviso
+        </div>
+    }
+
+    @if (Model.Datos.Any())
     {
         <div class="mb-4">
-            <h5 class="fw-bold text-dark mb-2">Datos a registrar</h5>
+            <h5 class="fw-bold text-dark mb-2">@Model.TituloDatos</h5>
             <div class="row g-3">
-                @foreach (var dato in datosEmpleado)
+                @foreach (var dato in Model.Datos)
                 {
                     <div class="col-md-6">
-                        <div class="bg-white rounded-3 p-3 shadow-sm">
+                        <div class="bg-white rounded-3 p-3 shadow-sm h-100">
                             <div class="text-secondary small fw-medium">@dato.Etiqueta</div>
                             <div class="fs-5 text-dark fw-normal mt-1">@dato.Valor</div>
                         </div>
@@ -97,10 +63,17 @@
         </div>
     }
 
-    @if (cambiosEmpleado.Any())
+    @if (Model.Cambios.Any())
     {
         <div class="mb-4">
             <h5 class="fw-bold text-dark mb-2">Cambios solicitados</h5>
+            @if (hayValoresCambiados)
+            {
+                <p class="small text-secondary mb-2">
+                    Algunos valores cambiaron después de enviar la solicitud (se indica el valor de hoy).
+                    Al aprobarla se aplica el valor nuevo solo en los campos de esta lista.
+                </p>
+            }
             <div class="table-responsive">
                 <table class="mockup-table">
                     <thead>
@@ -111,11 +84,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var c in cambiosEmpleado)
+                        @foreach (var c in Model.Cambios)
                         {
                             <tr>
                                 <td class="fw-semibold">@c.Campo</td>
-                                <td>@c.Anterior</td>
+                                <td>
+                                    @c.Anterior
+                                    @if (c.Actual != null)
+                                    {
+                                        <div class="pf-valor-actual small">Hoy: @c.Actual</div>
+                                    }
+                                </td>
                                 <td>@c.Nuevo</td>
                             </tr>
                         }
@@ -124,39 +103,67 @@
             </div>
         </div>
     }
-    else if (esEdicion)
+    else if (Model.EsEdicion)
     {
         <div class="mockup-info-banner mb-4">
-            No se detectaron cambios en los campos @(Model.TipoSolicitud == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
+            No se detectaron cambios en los campos @(s.TipoSolicitud == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
         </div>
     }
 
-    <div class="mb-4">
-        <h5 class="fw-bold text-dark mb-2">Motivo / descripción</h5>
-        <div class="mockup-info-banner mb-0">
-            @motivo
+    @if (Model.Motivo != null)
+    {
+        <div class="mb-4">
+            <h5 class="fw-bold text-dark mb-2">Motivo de la solicitud</h5>
+            <div class="mockup-info-banner mb-0">@Model.Motivo</div>
         </div>
-    </div>
+    }
 
-    @if (Model.Estado == EstadosSolicitud.Pendiente)
+    @if (s.Estado != EstadosSolicitud.Pendiente)
+    {
+        @* Respuesta del Administrador o Supervisor: quién, cuándo y, si se rechazó, por qué *@
+        <div class="mb-4">
+            <h5 class="fw-bold text-dark mb-2">Respuesta</h5>
+            <div class="bg-white rounded-3 p-3 shadow-sm">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <partial name="_EstadoSolicitud" model="s.Estado" />
+                    <span class="text-dark">
+                        por @(s.UsuarioResponde?.NombreCompleto ?? "un usuario no disponible")
+                        @if (s.FechaRespuesta.HasValue)
+                        {
+                            <text>el @s.FechaRespuesta.Value.ToString("dd/MM/yyyy") a las @s.FechaRespuesta.Value.ToString("HH:mm")</text>
+                        }
+                    </span>
+                </div>
+                @if (s.Estado == EstadosSolicitud.Rechazada)
+                {
+                    <div class="text-secondary small fw-medium mt-3">Motivo del rechazo</div>
+                    <div class="fs-6 text-dark mt-1">@(string.IsNullOrWhiteSpace(s.MotivoRechazo) ? "No especificado" : s.MotivoRechazo)</div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (Model.PuedeResponder)
     {
         <form id="formAccionSolicitud" method="post">
             @Html.AntiForgeryToken()
-            <input type="hidden" name="id" value="@Model.Id" />
+            <input type="hidden" name="id" value="@s.Id" />
 
             <div class="mb-4">
-                <h5 class="fw-bold text-dark mb-2">Comentario de revisión</h5>
-                <textarea name="motivoRechazo" id="txtComentario" class="mockup-input" style="height: 90px;"></textarea>
+                <label class="h5 fw-bold text-dark mb-1" for="txtMotivoRechazo">Motivo del rechazo</label>
+                <div class="form-text small mt-0 mb-2" id="ayudaMotivoRechazo">Obligatorio solo si la rechaza. El solicitante lo verá.</div>
+                <textarea name="motivoRechazo" id="txtMotivoRechazo" class="mockup-input" style="height: 90px;" maxlength="400"
+                          aria-describedby="ayudaMotivoRechazo"></textarea>
             </div>
 
             <div class="d-flex flex-wrap gap-3">
-                <button type="submit" formaction="@Url.Action("Aprobar")" class="btn-pf-blue" style="background-color: #84CC16;">
+                <button type="submit" formaction="@Url.Action("Aprobar")" class="btn-pf-green" data-aprobar>
                     Aprobar solicitud
                 </button>
-                <button type="submit" formaction="@Url.Action("Rechazar")" class="btn-pf-blue" style="background-color: #EF4444;">
+                <button type="submit" formaction="@Url.Action("Rechazar")" class="btn-pf-red" data-rechazar>
                     Rechazar solicitud
                 </button>
-                <a asp-action="Index" class="btn-pf-gray ms-auto">
+                <a asp-action="@Model.AccionVolver" class="btn-pf-gray ms-auto">
                     Volver
                 </a>
             </div>
@@ -164,13 +171,25 @@
     }
     else
     {
-        <div class="mockup-alert-warning mb-4">
-            Esta solicitud ya fue atendida con estado: <strong>@Model.Estado</strong>
-        </div>
         <div>
-            <a asp-action="Index" class="btn-pf-gray">
+            <a asp-action="@Model.AccionVolver" class="btn-pf-gray">
                 Volver
             </a>
         </div>
     }
 </div>
+
+@section Scripts {
+    @if (Model.PuedeResponder)
+    {
+        <script>
+            (function () {
+                var form = document.getElementById('formAccionSolicitud');
+                var motivo = document.getElementById('txtMotivoRechazo');
+                // El motivo solo es obligatorio al rechazar: el navegador lo pide antes de enviar
+                form.querySelector('[data-rechazar]').addEventListener('click', function () { motivo.required = true; });
+                form.querySelector('[data-aprobar]').addEventListener('click', function () { motivo.required = false; });
+            })();
+        </script>
+    }
+}

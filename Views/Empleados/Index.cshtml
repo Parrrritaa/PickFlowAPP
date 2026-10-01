@@ -73,7 +73,7 @@
                                     <form asp-action="Inactivar" method="post" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@emp.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-success">Reactivar</button>
+                                        <button type="submit" class="btn-pf-outline-green">Reactivar</button>
                                     </form>
                                 }
                                 @if (esAdmin)

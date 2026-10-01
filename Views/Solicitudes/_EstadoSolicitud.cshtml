@@ -1,0 +1,3 @@
+@model string
+@* Estado con color y texto (el color nunca va solo): Pendiente, Aprobada o Rechazada *@
+<span class="pf-estado pf-estado--@Model.ToLowerInvariant()">@Model</span>

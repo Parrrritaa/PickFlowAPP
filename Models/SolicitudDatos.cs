@@ -24,6 +24,28 @@ namespace PickingApp.Models
         public const string Pendiente = "Pendiente";
         public const string Aprobada = "Aprobada";
         public const string Rechazada = "Rechazada";
+
+        public static readonly string[] Todos = { Pendiente, Aprobada, Rechazada };
+    }
+
+    // Nombres de los campos en CambioSolicitud.Campo. Quien crea la solicitud los escribe y al aprobarla
+    // se aplican solo los campos que aparecen en la lista de cambios.
+    public static class CamposEmpleado
+    {
+        public const string Nombre = "Nombre completo";
+        public const string Correo = "Correo electrónico";
+        public const string FechaIngreso = "Fecha de ingreso";
+        public const string HoraEntrada = "Hora de entrada";
+        public const string HoraSalida = "Hora de salida";
+    }
+
+    public static class CamposUbicacion
+    {
+        public const string Codigo = "Código de ubicación";
+        public const string Estado = "Estado";
+        public const string Producto = "Producto";
+        public const string CategoriaProductoNuevo = "Categoría del producto nuevo";
+        public const string UnidadesProductoNuevo = "Cantidad máx. por caja del producto nuevo";
     }
 
     // Contenido de Solicitud.DatosJson según el tipo. Los nombres de las propiedades coinciden con el JSON
@@ -102,6 +124,11 @@ namespace PickingApp.Models
         public int UbicacionId { get; set; }
         public int BodegaId { get; set; }
         public string? BodegaCodigo { get; set; }
+
+        // Cómo estaba la ubicación al pedir el cambio; ausentes en solicitudes anteriores
+        public string? CodigoUbicacion { get; set; }
+        public string? Producto { get; set; }
+
         public string Motivo { get; set; } = string.Empty;
         public List<CambioSolicitud> Cambios { get; set; } = new();
         public DatosUbicacionSolicitud NuevosDatos { get; set; } = new();
@@ -112,6 +139,9 @@ namespace PickingApp.Models
         public int UbicacionId { get; set; }
         public string CodigoUbicacion { get; set; } = string.Empty;
         public string? BodegaCodigo { get; set; }
+
+        // Producto que guardaba al pedir la eliminación; ausente en solicitudes anteriores
+        public string? Producto { get; set; }
         public string Motivo { get; set; } = string.Empty;
     }
 }

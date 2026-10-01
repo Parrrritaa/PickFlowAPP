@@ -383,18 +383,29 @@ namespace PickingApp.Controllers
                 }
 
                 var productoAnterior = ubicacionExistente.Producto;
-                AgregarCambio("Código de ubicación", ubicacionExistente.CodigoUbicacion, codigoUbicacionNuevo);
-                AgregarCambio("Estado", ubicacionExistente.Activa ? "Activa" : "Inactiva", model.Activa ? "Activa" : "Inactiva");
-                AgregarCambio("Producto",
-                    productoAnterior != null ? $"{productoAnterior.Codigo} · {productoAnterior.Nombre}" : "-",
+                var textoProductoAnterior = productoAnterior != null ? $"{productoAnterior.Codigo} · {productoAnterior.Nombre}" : "-";
+                AgregarCambio(CamposUbicacion.Codigo, ubicacionExistente.CodigoUbicacion, codigoUbicacionNuevo);
+                AgregarCambio(CamposUbicacion.Estado, ubicacionExistente.Activa ? "Activa" : "Inactiva", model.Activa ? "Activa" : "Inactiva");
+                AgregarCambio(CamposUbicacion.Producto, textoProductoAnterior,
                     $"{producto.Codigo} · {producto.Nombre}{(productoNuevo ? " (nuevo)" : "")}");
                 if (productoNuevo)
                 {
                     var nombreCategoria = producto.CategoriaProductoId.HasValue
                         ? (await _context.CategoriasProducto.FindAsync(producto.CategoriaProductoId.Value))?.Nombre ?? "Sin clasificar"
                         : "Sin clasificar";
-                    AgregarCambio("Categoría del producto nuevo", "-", nombreCategoria);
-                    AgregarCambio("Cantidad máx. por caja del producto nuevo", "-", producto.UnidadesPorCaja.ToString());
+                    AgregarCambio(CamposUbicacion.CategoriaProductoNuevo, "-", nombreCategoria);
+                    AgregarCambio(CamposUbicacion.UnidadesProductoNuevo, "-", producto.UnidadesPorCaja.ToString());
+                }
+
+                // Sin cambios no hay nada que aprobar; una segunda solicitud sobre la misma ubicación
+                // mostraría valores "anteriores" que ya no serían los reales al aprobarla
+                var pendiente = await SolicitudesPendientes.DeUbicacionAsync(_context, ubicacionExistente.Id);
+                if (cambios.Count == 0 || pendiente != null)
+                {
+                    ModelState.AddModelError(string.Empty, cambios.Count == 0
+                        ? "No cambió ningún dato de la ubicación: no hay nada que solicitar."
+                        : SolicitudesPendientes.Mensaje(pendiente!, "esta ubicación"));
+                    return await Reintentar();
                 }
 
                 var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionUbicacion, userId, new SolicitudEdicionUbicacion
@@ -402,6 +413,8 @@ namespace PickingApp.Controllers
                     UbicacionId = ubicacionExistente.Id,
                     BodegaId = ubicacionExistente.BodegaId,
                     BodegaCodigo = ubicacionExistente.Bodega?.Codigo,
+                    CodigoUbicacion = ubicacionExistente.CodigoUbicacion,
+                    Producto = productoAnterior != null ? textoProductoAnterior : "Sin producto",
                     Motivo = motivo,
                     Cambios = cambios,
                     NuevosDatos = new DatosUbicacionSolicitud
@@ -449,6 +462,7 @@ namespace PickingApp.Controllers
         {
             var ubicacion = await _context.Ubicaciones
                 .Include(u => u.Bodega)
+                .Include(u => u.Producto)
                 .Include(u => u.DetallesPedido)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
@@ -478,12 +492,23 @@ namespace PickingApp.Controllers
             // Supervisor: Solicitar Eliminación (CU-20)
             else if (userRole == Roles.Supervisor)
             {
+                motivo = (motivo ?? string.Empty).Trim();
+                var pendiente = await SolicitudesPendientes.DeUbicacionAsync(_context, ubicacion.Id);
+                if (motivo.Length == 0 || pendiente != null)
+                {
+                    TempData["ErrorMessage"] = motivo.Length == 0
+                        ? "Debe indicar el motivo de la eliminación."
+                        : SolicitudesPendientes.Mensaje(pendiente!, $"la ubicación '{ubicacion.CodigoUbicacion}'");
+                    return RedirectToAction(nameof(Detalle), new { id = ubicacion.BodegaId });
+                }
+
                 var solicitud = Solicitud.Nueva(TiposSolicitud.EliminacionUbicacion, userId, new SolicitudEliminacionUbicacion
                 {
                     UbicacionId = ubicacion.Id,
                     CodigoUbicacion = ubicacion.CodigoUbicacion,
                     BodegaCodigo = ubicacion.Bodega?.Codigo,
-                    Motivo = motivo ?? "Solicitud de eliminación por cambio operativo"
+                    Producto = ubicacion.Producto != null ? $"{ubicacion.Producto.Codigo} · {ubicacion.Producto.Nombre}" : "Sin producto",
+                    Motivo = motivo
                 });
 
                 _context.Solicitudes.Add(solicitud);
