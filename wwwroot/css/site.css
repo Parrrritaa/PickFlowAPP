@@ -1,4 +1,4 @@
-﻿/* Tema de PickFlow (basado en el mockup)
+/* Tema de PickFlow (basado en el mockup)
    Colores de la aplicación: se definen una vez aquí y se usan con var(--pf-...).
    Cambiar un valor aquí cambia ese color en todas las pantallas. */
 :root {
@@ -282,8 +282,11 @@ body {
     transition: margin-left var(--pf-duration-sidebar) var(--pf-ease-out);
 }
 
-/* Barra superior (encabezado) */
+/* Barra superior (encabezado fija al hacer scroll) */
 .pf-header {
+    position: sticky;
+    top: 0;
+    z-index: 990;
     height: 56px;
     border-bottom: 1px solid #E5E7EB;
     display: flex;
@@ -291,6 +294,7 @@ body {
     justify-content: flex-end;
     padding: 0 40px;
     background-color: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .pf-user-badge {
@@ -1303,6 +1307,43 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     padding: 3px;
     border-radius: 10px;
     background-color: #E5E7EB;
+    isolation: isolate;
+}
+
+/* Pastilla deslizante: se traslada con animación fluida entre las opciones */
+.pf-segmented::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc((100% - 6px - 2px) / 2);
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.05);
+    z-index: 1;
+    pointer-events: none;
+    transform: translateX(0);
+    transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.05);
+}
+
+/* Desplazamiento a la primera opción */
+.pf-segmented:has(.pf-seg-input:first-of-type:checked)::before {
+    transform: translateX(0);
+}
+
+/* Desplazamiento a la segunda opción */
+.pf-segmented:has(.pf-seg-input:nth-of-type(2):checked)::before {
+    transform: translateX(calc(100% + 2px));
+}
+
+/* Compatibilidad para 3 opciones si llegaran a existir */
+.pf-segmented:has(.pf-seg-input:nth-of-type(3))::before {
+    width: calc((100% - 6px - 4px) / 3);
+}
+
+.pf-segmented:has(.pf-seg-input:nth-of-type(3):checked)::before {
+    transform: translateX(calc((100% + 2px) * 2));
 }
 
 .pf-seg-input {
@@ -1312,6 +1353,8 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 }
 
 .pf-segmented label {
+    position: relative;
+    z-index: 2;
     flex: 1;
     margin: 0;
     padding: 7px 10px;
@@ -1321,24 +1364,43 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     font-weight: 600;
     color: #4B5563;
     cursor: pointer;
-    transition: background-color var(--pf-duration-base) var(--pf-ease),
-                color var(--pf-duration-base) var(--pf-ease),
-                box-shadow var(--pf-duration-base) var(--pf-ease);
+    background-color: transparent;
+    user-select: none;
+    transition: color var(--pf-duration-base) var(--pf-ease),
+                transform var(--pf-duration-fast) var(--pf-ease);
 }
 
 .pf-segmented label:hover {
     color: var(--pf-text-dark);
 }
 
+.pf-segmented label:active {
+    transform: scale(0.98);
+}
+
 .pf-seg-input:checked + label {
-    background-color: #FFFFFF;
     color: var(--pf-text-dark);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.pf-seg-input:disabled + label {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .pf-seg-input:focus-visible + label {
     outline: 2px solid var(--pf-blue);
     outline-offset: 2px;
+}
+
+/* Fallback para navegadores antiguos sin soporte de :has */
+@supports not selector(:has(*)) {
+    .pf-segmented::before {
+        display: none;
+    }
+    .pf-seg-input:checked + label {
+        background-color: #FFFFFF;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+    }
 }
 
 .pf-dependiente {
