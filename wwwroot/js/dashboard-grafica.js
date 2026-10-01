@@ -1,29 +1,40 @@
-// Gráfico configurable del dashboard (Views/Home/Index.cshtml). Pide los datos a HomeController.DatosGrafica
-// cada vez que cambia un filtro y los dibuja con Chart.js en el tipo de gráfica elegido.
+// Dashboard (Views/Home/Index.cshtml): franja de estados, gráfica configurable y descarga del PDF.
+// La gráfica pide los datos a HomeController.DatosGrafica cada vez que cambia un filtro y los dibuja con Chart.js.
 (function () {
     const raiz = document.getElementById('pfGrafica');
     if (!raiz || typeof Chart === 'undefined') return;
 
-    // El color sigue a la categoría, no a su posición: los estados mantienen los colores de las tarjetas
+    // El color sigue a la categoría, no a su posición: los estados mantienen los colores de la franja de arriba
     const COLOR_ESTADO = { Pendiente: '#3B71CA', Asignado: '#EB7D26', Completado: '#52A447', Cancelado: '#DC2626', Reasignado: '#1F2937' };
     const CATEGORICA = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
     const COLOR_UNICO = '#3B71CA';
     const TITULOS = { estado: 'Pedidos por estado', prioridad: 'Pedidos por prioridad', bodega: 'Pedidos por bodega', empleado: 'Pedidos por empleado (top 8)', dia: 'Pedidos cargados por día' };
+    const ESTADO_EN_FRASE = { Pendiente: 'pendientes', Asignado: 'en proceso', Completado: 'completados', Cancelado: 'cancelados', Reasignado: 'reasignados' };
+    const CAMBIO_MS = 160; // fundido al cambiar de tipo de gráfica
 
     const el = id => document.getElementById(id);
+    const sinMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const kpis = [...document.querySelectorAll('.pf-kpi')];
     const estado = { tipo: 'doughnut', tabla: false, datos: null };
     let grafica = null;
+    let dibujada = null; // tipo y agrupación de la gráfica en pantalla: si no cambian, se actualiza en el sitio
     let peticion = 0;
 
-    const esCircular = () => estado.tipo === 'doughnut' || estado.tipo === 'pie';
+    const esCircular = tipo => tipo === 'doughnut' || tipo === 'pie';
+    const pedidos = n => n === 1 ? '1 pedido' : n + ' pedidos';
+    const porcentaje = (v, total) => total ? Math.round(v * 100 / total) : 0;
+
+    function estadosVisibles() {
+        return kpis.filter(k => k.getAttribute('aria-pressed') === 'true').map(k => k.dataset.estado);
+    }
 
     function filtros() {
-        const activos = [...raiz.querySelectorAll('.pf-chip.active')].map(c => c.dataset.estado);
+        const activos = estadosVisibles();
         const p = new URLSearchParams({ agrupar: el('pfAgrupar').value, dias: el('pfDias').value });
         if (el('pfBodega').value) p.set('bodegaId', el('pfBodega').value);
         if (el('pfPrioridad').value) p.set('prioridad', el('pfPrioridad').value);
-        // Con los cinco activos no se filtra; con ninguno se envía un valor que no coincide con nada
-        if (activos.length < 5) p.set('estados', activos.length ? activos.join(',') : '-');
+        // Con los cinco visibles no se filtra; con ninguno se envía un valor que no coincide con nada
+        if (activos.length < kpis.length) p.set('estados', activos.length ? activos.join(',') : '-');
         return p;
     }
 
@@ -47,35 +58,71 @@
         return cats.map((_, i) => CATEGORICA[i % CATEGORICA.length]);
     }
 
+    // Una frase con lo más importante de la gráfica, debajo del título
+    function resumen(datos, agrupar) {
+        if (datos.error) return 'No se pudieron cargar los datos.';
+        if (datos.total === 0) return 'Sin pedidos con estos filtros';
+        const mayor = datos.categorias.reduce((a, c) => c.valor > a.valor ? c : a, datos.categorias[0]);
+        const pct = porcentaje(mayor.valor, datos.total);
+        const frase = {
+            estado: () => pct + ' % ' + ESTADO_EN_FRASE[mayor.clave],
+            prioridad: () => pct + ' % de prioridad ' + mayor.etiqueta.toLowerCase(),
+            bodega: () => pct + ' % en ' + mayor.etiqueta,
+            empleado: () => 'más pedidos: ' + mayor.etiqueta + ' (' + mayor.valor + ')',
+            dia: () => 'día con más carga: ' + mayor.etiqueta + ' (' + mayor.valor + ')'
+        }[agrupar];
+        return pedidos(datos.total) + ' · ' + frase();
+    }
+
     function dibujar() {
         const { datos } = estado;
         const agrupar = el('pfAgrupar').value;
         const cats = datos.categorias;
         const vacio = datos.total === 0;
+        const circ = esCircular(estado.tipo);
+        const cols = colores(cats, agrupar);
 
+        // Resumen y, si hay estados ocultos desde la franja, cuántos y cómo volver a verlos
+        const ocultos = kpis.length - estadosVisibles().length;
+        el('pfResumen').textContent = resumen(datos, agrupar);
+        if (ocultos > 0) {
+            const nota = document.createElement('span');
+            nota.textContent = '· ' + (ocultos === 1 ? '1 estado oculto' : ocultos + ' estados ocultos');
+            const mostrar = document.createElement('button');
+            mostrar.type = 'button';
+            mostrar.className = 'pf-link-btn';
+            mostrar.textContent = 'Mostrar todos';
+            mostrar.addEventListener('click', () => {
+                kpis.forEach(k => k.setAttribute('aria-pressed', 'true'));
+                cargar();
+            });
+            el('pfResumen').append(nota, mostrar);
+        }
         el('pfVacio').hidden = !vacio;
         el('pfVacio').textContent = datos.error ? 'No se pudieron cargar los datos.' : 'No hay pedidos con estos filtros.';
         el('pfVerTabla').hidden = vacio;
+        el('pfVerTabla').textContent = estado.tabla ? 'Ver como gráfica' : 'Ver como tabla';
         el('pfTabla').hidden = vacio || !estado.tabla;
         raiz.querySelector('.pf-chart-canvas').hidden = vacio || estado.tabla;
-        el('pfVerTabla').textContent = estado.tabla ? 'Ver gráfica' : 'Ver tabla';
+        el('pfCuerpo').classList.toggle('con-leyenda', circ && !vacio && !estado.tabla);
 
-        const circ = esCircular();
-        const porPunto = circ || agrupar === 'estado';
-        const cols = colores(cats, agrupar);
-
-        // Leyenda propia (con valor y porcentaje) solo cuando el color identifica la categoría
+        // Leyenda al lado de la dona o el pastel (con valor y porcentaje); en barras y líneas lo dicen los ejes
         const leyenda = el('pfLeyenda');
         leyenda.innerHTML = '';
-        if (!vacio && (circ || agrupar === 'estado')) {
+        leyenda.hidden = !circ || vacio || estado.tabla;
+        if (!leyenda.hidden) {
+            const visibles = estadosVisibles();
             cats.forEach((c, i) => {
-                const it = document.createElement('span');
+                // Un estado oculto desde la franja no se lista: su 0 % no es un dato, es un filtro
+                if (agrupar === 'estado' && !visibles.includes(c.clave)) return;
+                const it = document.createElement('div');
                 it.className = 'pf-legend-item' + (c.valor === 0 ? ' is-zero' : '');
-                const pct = datos.total ? Math.round(c.valor * 100 / datos.total) : 0;
-                it.innerHTML = '<i></i><b></b><span></span>';
+                it.style.animationDelay = (i * 35) + 'ms';
+                it.innerHTML = '<i></i><b></b><span class="pf-legend-valor"></span><span class="pf-legend-pct"></span>';
                 it.querySelector('i').style.background = cols[i];
                 it.querySelector('b').textContent = c.etiqueta;
-                it.querySelector('span').textContent = c.valor + ' · ' + pct + '%';
+                it.querySelector('.pf-legend-valor').textContent = c.valor;
+                it.querySelector('.pf-legend-pct').textContent = porcentaje(c.valor, datos.total) + ' %';
                 leyenda.appendChild(it);
             });
         }
@@ -92,26 +139,53 @@
                 const tr = document.createElement('tr');
                 const a = document.createElement('td'); a.textContent = c.etiqueta;
                 const b = document.createElement('td'); b.className = 'text-end'; b.textContent = c.valor;
-                const d = document.createElement('td'); d.className = 'text-end'; d.textContent = (datos.total ? Math.round(c.valor * 100 / datos.total) : 0) + '%';
+                const d = document.createElement('td'); d.className = 'text-end'; d.textContent = porcentaje(c.valor, datos.total) + '%';
                 tr.append(a, b, d); tb.appendChild(tr);
             });
             t.appendChild(tb); tabla.appendChild(t);
         }
 
         el('pfCentro').innerHTML = estado.tipo === 'doughnut' && !vacio && !estado.tabla
-            ? '<strong>' + datos.total + '</strong><span>pedidos</span>' : '';
+            ? '<strong>' + datos.total + '</strong><span>' + (datos.total === 1 ? 'pedido' : 'pedidos') + '</span>' : '';
 
-        if (grafica) { grafica.destroy(); grafica = null; }
-        if (vacio || estado.tabla) return;
+        if (vacio || estado.tabla) {
+            if (grafica) { grafica.destroy(); grafica = null; dibujada = null; }
+            return;
+        }
 
-        grafica = new Chart(el('detallesChart'), configGrafica(estado.tipo, datos, agrupar, false));
+        // Mismo tipo y misma agrupación: se cambian los datos y Chart.js anima de los valores viejos a los nuevos
+        const clave = estado.tipo + '|' + agrupar;
+        if (grafica && dibujada === clave) {
+            const nueva = configGrafica(estado.tipo, datos, agrupar, false);
+            grafica.data.labels = nueva.data.labels;
+            Object.assign(grafica.data.datasets[0], nueva.data.datasets[0]);
+            grafica.options.plugins.tooltip = nueva.options.plugins.tooltip;
+            grafica.update();
+            return;
+        }
+
+        // Otro tipo u otra agrupación: la gráfica vieja se desvanece y la nueva entra con su animación
+        const lienzo = raiz.querySelector('.pf-chart-canvas');
+        const crear = () => {
+            if (grafica) grafica.destroy();
+            grafica = new Chart(el('detallesChart'), configGrafica(estado.tipo, datos, agrupar, false));
+            dibujada = clave;
+            lienzo.classList.remove('is-cambiando');
+        };
+        if (grafica && !sinMovimiento.matches) {
+            lienzo.classList.add('is-cambiando');
+            clearTimeout(dibujar.espera);
+            dibujar.espera = setTimeout(crear, CAMBIO_MS);
+        } else {
+            crear();
+        }
     }
 
     // Configuración de Chart.js para un tipo de gráfica. Con exportar = true sirve para la imagen del PDF:
     // sin animación, leyenda dibujada en el propio lienzo y el total en el centro de la dona.
     function configGrafica(tipo, datos, agrupar, exportar) {
         const cats = datos.categorias;
-        const circ = tipo === 'doughnut' || tipo === 'pie';
+        const circ = esCircular(tipo);
         const porPunto = circ || agrupar === 'estado';
         const cols = colores(cats, agrupar);
         const horizontal = tipo === 'hbar';
@@ -124,6 +198,7 @@
             dataset.backgroundColor = cols;
             dataset.borderColor = borde;
             dataset.borderWidth = 2;
+            dataset.borderRadius = tipo === 'doughnut' ? 6 : 0;
             dataset.hoverOffset = exportar ? 0 : 8;
         } else if (linea) {
             dataset.borderColor = COLOR_UNICO;
@@ -144,7 +219,7 @@
         }
 
         const grid = { color: 'rgba(31,41,55,0.08)' };
-        const ejes = { ticks: { color: '#6B7280', precision: 0 }, grid, border: { display: false }, beginAtZero: true };
+        const ejes = { ticks: { color: '#4B5563', precision: 0 }, grid, border: { display: false }, beginAtZero: true };
         const ejeCat = { ticks: { color: '#4B5563', maxRotation: 0, autoSkip: true }, grid: { display: false }, border: { color: 'rgba(31,41,55,0.2)' } };
 
         // Total en el centro de la dona: en pantalla es HTML superpuesto; en el PDF se dibuja en el lienzo
@@ -166,6 +241,10 @@
             }
         };
 
+        // Entrada suave: la dona gira y crece desde el centro; las barras y líneas suben desde el eje
+        const animacion = exportar || sinMovimiento.matches ? false
+            : { duration: 650, easing: 'easeOutQuart', animateScale: circ, animateRotate: true };
+
         return {
             type: tipoChart,
             data: { labels: cats.map(c => c.etiqueta), datasets: [dataset] },
@@ -175,8 +254,9 @@
                 maintainAspectRatio: false,
                 devicePixelRatio: exportar ? 2 : undefined,
                 indexAxis: horizontal ? 'y' : 'x',
-                cutout: tipo === 'doughnut' ? '64%' : undefined,
-                animation: exportar ? false : { duration: 450 },
+                cutout: tipo === 'doughnut' ? '68%' : undefined,
+                animation: animacion,
+                layout: { padding: circ ? 8 : 0 },
                 interaction: circ ? undefined : { mode: 'index', intersect: false },
                 scales: circ ? {} : (horizontal ? { x: ejes, y: ejeCat } : { x: ejeCat, y: ejes }),
                 plugins: {
@@ -188,8 +268,7 @@
                         callbacks: {
                             label: ctx => {
                                 const v = ctx.parsed.y ?? ctx.parsed.x ?? ctx.parsed;
-                                const pct = datos.total ? Math.round(v * 100 / datos.total) : 0;
-                                return ' ' + v + (v === 1 ? ' pedido' : ' pedidos') + ' (' + pct + '%)';
+                                return ' ' + pedidos(v) + ' (' + porcentaje(v, datos.total) + '%)';
                             }
                         }
                     }
@@ -200,7 +279,7 @@
 
     // Descarga del PDF del dashboard: se dibuja la gráfica actual en un lienzo aparte (con su leyenda) y se envía
     // como imagen junto a los filtros; el servidor recalcula los números con esos mismos filtros.
-    const btnPdf = document.getElementById('pfExportarPdf');
+    const btnPdf = el('pfExportarPdf');
     if (btnPdf) {
         const textoBtn = btnPdf.querySelector('span');
         const original = textoBtn.textContent;
@@ -210,7 +289,7 @@
             textoBtn.textContent = 'Generando…';
             let copia = null;
             try {
-                const form = document.getElementById('pfPdfForm');
+                const form = el('pfPdfForm');
                 const datos = estado.datos;
                 let imagen = '';
                 if (datos && datos.total > 0) {
@@ -246,63 +325,86 @@
         });
     }
 
-    // Controles
-    // La píldora del selector se coloca con la medida real del botón activo (sigue funcionando si cambia el tamaño)
-    const selector = el('pfTipos');
-    const thumb = document.createElement('span');
-    thumb.className = 'pf-seg-thumb';
-    thumb.setAttribute('aria-hidden', 'true');
-    selector.prepend(thumb);
-
-    function moverPildora() {
-        const b = selector.querySelector('.pf-seg-btn.active');
-        if (!b) return;
-        thumb.style.width = b.offsetWidth + 'px';
-        thumb.style.transform = 'translateX(' + b.offsetLeft + 'px)';
-    }
+    // Tipo de gráfica: el botón copia el icono y el nombre de la opción elegida en el menú
+    const tipos = el('pfTipos');
     function elegirTipo(b) {
         estado.tipo = b.dataset.tipo;
-        selector.querySelectorAll('.pf-seg-btn').forEach(x => {
+        tipos.querySelectorAll('.pf-tipo').forEach(x => {
             x.classList.toggle('active', x === b);
             x.setAttribute('aria-pressed', x === b);
         });
-        moverPildora();
-        dibujar();
+        el('pfTipoIcono').innerHTML = b.querySelector('svg').outerHTML;
+        el('pfTipoNombre').textContent = b.querySelector('span').textContent;
+        el('pfTipoBtn').setAttribute('aria-label', 'Tipo de gráfica: ' + b.querySelector('span').textContent);
+        if (estado.datos) dibujar();
     }
-    selector.addEventListener('click', e => {
-        const b = e.target.closest('.pf-seg-btn');
+    tipos.addEventListener('click', e => {
+        const b = e.target.closest('.pf-tipo');
         if (b) elegirTipo(b);
     });
-    // Flechas izquierda/derecha para recorrer los tipos con el teclado
-    selector.addEventListener('keydown', e => {
-        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-        const bs = [...selector.querySelectorAll('.pf-seg-btn')];
-        const i = bs.indexOf(document.activeElement);
-        if (i < 0) return;
-        const sig = bs[(i + (e.key === 'ArrowRight' ? 1 : bs.length - 1)) % bs.length];
-        sig.focus();
-        elegirTipo(sig);
-        e.preventDefault();
-    });
-    moverPildora();
-    requestAnimationFrame(() => requestAnimationFrame(() => selector.classList.add('is-ready'))); // sin animar la colocación inicial
-    window.addEventListener('resize', moverPildora);
-    el('pfEstados').addEventListener('click', e => {
-        const c = e.target.closest('.pf-chip');
-        if (!c) return;
-        c.classList.toggle('active');
-        c.setAttribute('aria-pressed', c.classList.contains('active'));
+
+    // Filtros del menú: el botón cuenta los que se apartan de su valor inicial
+    const camposFiltro = ['pfDias', 'pfBodega', 'pfPrioridad'].map(el);
+    function contarFiltros() {
+        const n = camposFiltro.filter(c => c.selectedIndex > 0).length;
+        const cuenta = el('pfFiltrosCuenta');
+        cuenta.hidden = n === 0;
+        cuenta.textContent = n;
+        el('pfLimpiar').disabled = n === 0;
+        el('pfFiltrosBtn').setAttribute('aria-label', n ? 'Filtros, ' + n + ' activos' : 'Filtros');
+    }
+    camposFiltro.forEach(c => c.addEventListener('change', () => { contarFiltros(); cargar(); }));
+    el('pfLimpiar').addEventListener('click', () => {
+        camposFiltro.forEach(c => { c.selectedIndex = 0; });
+        contarFiltros();
         cargar();
     });
-    ['pfAgrupar', 'pfDias', 'pfBodega', 'pfPrioridad'].forEach(id => el(id).addEventListener('change', () => {
+
+    // El selector del título mide lo que dice la opción elegida, así la flecha queda pegada al texto
+    const medidor = document.createElement('canvas').getContext('2d');
+    function ajustarAgrupar() {
+        const s = el('pfAgrupar');
+        medidor.font = getComputedStyle(s).font;
+        s.style.width = Math.ceil(medidor.measureText(s.options[s.selectedIndex].text).width) + 34 + 'px';
+    }
+
+    el('pfAgrupar').addEventListener('change', () => {
+        ajustarAgrupar();
         // Por día solo tiene sentido como serie en el tiempo: se pasa a líneas si estaba en un gráfico circular
-        if (id === 'pfAgrupar' && el('pfAgrupar').value === 'dia' && esCircular()) {
-            elegirTipo(selector.querySelector('[data-tipo="line"]'));
+        if (el('pfAgrupar').value === 'dia' && esCircular(estado.tipo)) {
+            elegirTipo(tipos.querySelector('[data-tipo="line"]'));
         }
         cargar();
-    }));
+    });
+
+    // Franja de estados: cada uno muestra u oculta su estado en la gráfica
+    el('pfEstados').addEventListener('click', e => {
+        const k = e.target.closest('.pf-kpi');
+        if (!k) return;
+        k.setAttribute('aria-pressed', k.getAttribute('aria-pressed') !== 'true');
+        cargar();
+    });
+
     el('pfVerTabla').addEventListener('click', () => { estado.tabla = !estado.tabla; dibujar(); });
 
-    raiz.querySelectorAll('.pf-chip').forEach(c => c.setAttribute('aria-pressed', 'true'));
+    // Los números de la franja cuentan desde cero al abrir el dashboard (una vez, y nunca con movimiento reducido)
+    if (!sinMovimiento.matches) {
+        const valores = kpis.map(k => k.querySelector('.pf-kpi-valor'));
+        const finales = valores.map(v => Number(v.dataset.valor) || 0);
+        const inicio = performance.now();
+        const DURACION = 700;
+        const paso = ahora => {
+            const t = Math.min((ahora - inicio) / DURACION, 1);
+            const suave = 1 - Math.pow(1 - t, 3);
+            valores.forEach((v, i) => { v.textContent = Math.round(finales[i] * suave); });
+            if (t < 1) requestAnimationFrame(paso);
+        };
+        requestAnimationFrame(paso);
+    }
+
+    ajustarAgrupar();
+    document.fonts?.ready.then(ajustarAgrupar);
+    elegirTipo(tipos.querySelector('.pf-tipo.active'));
+    contarFiltros();
     cargar();
 })();

@@ -1,138 +1,203 @@
 @model IEnumerable<PickingApp.Models.Pedido>
 @{
     ViewData["Title"] = "Dashboard";
+
+    // Franja de estados (los números llegan en ViewBag desde HomeController.Index); el color es el mismo de la gráfica
+    var estados = new (string Clave, string Nombre, int Total, string Color)[]
+    {
+        (PickingApp.Models.PedidoEstados.Pendiente, "Pendientes", (int)ViewBag.TotalPendientes, "#3B71CA"),
+        (PickingApp.Models.PedidoEstados.Asignado, "En proceso", (int)ViewBag.TotalEnProceso, "#EB7D26"),
+        (PickingApp.Models.PedidoEstados.Completado, "Completados", (int)ViewBag.TotalCompletados, "#52A447"),
+        (PickingApp.Models.PedidoEstados.Cancelado, "Cancelados", (int)ViewBag.TotalCancelados, "#DC2626"),
+        (PickingApp.Models.PedidoEstados.Reasignado, "Reasignados", (int)ViewBag.TotalReasignados, "#1F2937")
+    };
+    var porAtender = (int)ViewBag.TotalPendientes + (int)ViewBag.TotalEnProceso + (int)ViewBag.TotalReasignados;
+    var hoy = DateTime.Now.ToString("dddd d 'de' MMMM", System.Globalization.CultureInfo.GetCultureInfo("es-CO"));
+    hoy = char.ToUpper(hoy[0]) + hoy[1..];
+
+    var coloresEstado = estados.ToDictionary(e => e.Clave, e => e.Color);
 }
 
 <div class="pf-dash-head">
-    <h1 class="pf-page-title mb-0">Dashboard</h1>
+    <div>
+        <h1 class="pf-page-title">Dashboard</h1>
+        <p class="pf-dash-sub">
+            @hoy ·
+            @(porAtender == 0 ? "no hay pedidos por atender" : porAtender == 1 ? "1 pedido por atender" : $"{porAtender} pedidos por atender")
+        </p>
+    </div>
     <!-- Descarga el dashboard completo en PDF (wwwroot/js/dashboard-grafica.js → HomeController.ExportarDashboardPdf) -->
     <form id="pfPdfForm" method="post" asp-controller="Home" asp-action="ExportarDashboardPdf" class="m-0">
         <button type="button" id="pfExportarPdf" class="pf-pdf-btn">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>Descargar PDF</span>
+            <i class="bi bi-arrow-down-circle" aria-hidden="true"></i>
+            <span>Exportar PDF</span>
         </button>
     </form>
 </div>
 
-<!-- 5 tarjetas de métricas (diapositiva 5): los números llegan en ViewBag desde HomeController.Index -->
-<div class="row g-3 mb-4">
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Pedidos pendientes</span>
-            <span class="metric-value val-blue">@ViewBag.TotalPendientes</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">En proceso</span>
-            <span class="metric-value val-orange">@ViewBag.TotalEnProceso</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Completados</span>
-            <span class="metric-value val-green">@ViewBag.TotalCompletados</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Cancelados</span>
-            <span class="metric-value val-red">@ViewBag.TotalCancelados</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Reasignados</span>
-            <span class="metric-value val-dark">@ViewBag.TotalReasignados</span>
-        </div>
-    </div>
+<!-- Estados: cada uno muestra u oculta su estado en la gráfica -->
+<div class="pf-kpis" id="pfEstados" role="group" aria-label="Pedidos por estado. Pulse un estado para mostrarlo u ocultarlo en la gráfica">
+    @foreach (var e in estados)
+    {
+        <button type="button" class="pf-kpi @(e.Total == 0 ? "is-zero" : "")" data-estado="@e.Clave" aria-pressed="true"
+                title="Mostrar u ocultar en la gráfica">
+            <span class="pf-kpi-label">
+                <i class="pf-kpi-dot" style="--dot: @e.Color" aria-hidden="true"></i>@e.Nombre
+                <i class="bi bi-eye-slash pf-kpi-oculto" aria-hidden="true"></i>
+            </span>
+            <span class="pf-kpi-valor" data-valor="@e.Total">@e.Total</span>
+        </button>
+    }
 </div>
 
-<!-- Sección inferior: gráfico y pedidos recientes (diapositiva 5) -->
 <div class="row g-4">
-    <!-- Gráfico configurable: tipo de gráfica, agrupación y filtros (wwwroot/js/dashboard-grafica.js, datos de HomeController.DatosGrafica) -->
+    <!-- Gráfica configurable (wwwroot/js/dashboard-grafica.js, datos de HomeController.DatosGrafica) -->
     <div class="col-lg-7">
         <div class="mockup-card h-100 pf-chart-card" id="pfGrafica" data-url="@Url.Action("DatosGrafica", "Home")">
             <div class="pf-chart-head">
-                <h4 class="fw-bold mb-0" style="color: #4B5563;">Detalles</h4>
-                <div class="pf-seg" role="group" aria-label="Tipo de gráfica" id="pfTipos">
-                    <button type="button" class="pf-seg-btn active" data-tipo="doughnut" title="Dona" aria-label="Dona"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="4"/></svg></button>
-                    <button type="button" class="pf-seg-btn" data-tipo="pie" title="Pastel" aria-label="Pastel"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z" fill="currentColor"/></svg></button>
-                    <button type="button" class="pf-seg-btn" data-tipo="bar" title="Barras" aria-label="Barras"><svg viewBox="0 0 24 24"><path d="M4 20V11h4v9zM10 20V4h4v16zM16 20v-6h4v6z" fill="currentColor"/></svg></button>
-                    <button type="button" class="pf-seg-btn" data-tipo="hbar" title="Barras horizontales" aria-label="Barras horizontales"><svg viewBox="0 0 24 24"><path d="M4 4h9v4H4zM4 10h16v4H4zM4 16h6v4H4z" fill="currentColor"/></svg></button>
-                    <button type="button" class="pf-seg-btn" data-tipo="line" title="Líneas" aria-label="Líneas"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 8-9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                    <button type="button" class="pf-seg-btn" data-tipo="area" title="Área" aria-label="Área"><svg viewBox="0 0 24 24"><path d="M3 19V13l5-5 4 3 8-7v15z" fill="currentColor"/></svg></button>
+                <div class="pf-chart-titulo">
+                    <h2 class="pf-chart-h">
+                        <label for="pfAgrupar">Pedidos por</label>
+                        <span class="pf-select-titulo">
+                            <select id="pfAgrupar">
+                                <option value="estado">estado</option>
+                                <option value="prioridad">prioridad</option>
+                                <option value="bodega">bodega</option>
+                                <option value="empleado">empleado</option>
+                                <option value="dia">día de carga</option>
+                            </select>
+                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                        </span>
+                    </h2>
+                    <p class="pf-chart-resumen" id="pfResumen" aria-live="polite">&nbsp;</p>
+                </div>
+
+                <div class="pf-chart-tools">
+                    <!-- Tipo de gráfica: el botón muestra la elegida; el menú, todas con una vista previa -->
+                    <div class="dropdown">
+                        <button type="button" class="pf-tool-btn" id="pfTipoBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="pf-tipo-icono" id="pfTipoIcono" aria-hidden="true"></span>
+                            <span id="pfTipoNombre">Dona</span>
+                            <i class="bi bi-chevron-down pf-tool-chevron" aria-hidden="true"></i>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end pf-pop" aria-labelledby="pfTipoBtn">
+                            <div class="pf-pop-titulo">Tipo de gráfica</div>
+                            <div class="pf-tipos" id="pfTipos">
+                                <button type="button" class="pf-tipo active" data-tipo="doughnut" aria-pressed="true">
+                                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                                        <circle cx="16" cy="16" r="10" fill="none" stroke="#3B71CA" stroke-width="6" stroke-dasharray="34 63" transform="rotate(-90 16 16)" />
+                                        <circle cx="16" cy="16" r="10" fill="none" stroke="#EB7D26" stroke-width="6" stroke-dasharray="17 63" stroke-dashoffset="-35" transform="rotate(-90 16 16)" />
+                                        <circle cx="16" cy="16" r="10" fill="none" stroke="#52A447" stroke-width="6" stroke-dasharray="10 63" stroke-dashoffset="-53" transform="rotate(-90 16 16)" />
+                                    </svg>
+                                    <span>Dona</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="pie" aria-pressed="false">
+                                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                                        <path d="M16 16V4a12 12 0 0 1 10.4 18z" fill="#3B71CA" />
+                                        <path d="M16 16l10.4 6A12 12 0 0 1 6.4 23.2z" fill="#EB7D26" />
+                                        <path d="M16 16L6.4 23.2A12 12 0 0 1 16 4z" fill="#52A447" />
+                                    </svg>
+                                    <span>Pastel</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="bar" aria-pressed="false">
+                                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                                        <rect x="5" y="14" width="6" height="13" rx="2" fill="#3B71CA" />
+                                        <rect x="13" y="6" width="6" height="21" rx="2" fill="#EB7D26" />
+                                        <rect x="21" y="18" width="6" height="9" rx="2" fill="#52A447" />
+                                    </svg>
+                                    <span>Barras</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="hbar" aria-pressed="false">
+                                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                                        <rect x="5" y="5" width="14" height="6" rx="2" fill="#3B71CA" />
+                                        <rect x="5" y="13" width="22" height="6" rx="2" fill="#EB7D26" />
+                                        <rect x="5" y="21" width="9" height="6" rx="2" fill="#52A447" />
+                                    </svg>
+                                    <span>Horizontal</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="line" aria-pressed="false">
+                                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                                        <path d="M4 23l7-8 6 4 11-12" fill="none" stroke="#3B71CA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+                                        <circle cx="11" cy="15" r="2.4" fill="#3B71CA" />
+                                        <circle cx="17" cy="19" r="2.4" fill="#3B71CA" />
+                                    </svg>
+                                    <span>Líneas</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="area" aria-pressed="false">
+                                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                                        <path d="M4 27V21l7-8 6 4 11-11v21z" fill="#3B71CA" fill-opacity="0.28" />
+                                        <path d="M4 21l7-8 6 4 11-11" fill="none" stroke="#3B71CA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <span>Área</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros secundarios: el número dice cuántos hay activos -->
+                    <div class="dropdown">
+                        <button type="button" class="pf-tool-btn" id="pfFiltrosBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                            <i class="bi bi-sliders" aria-hidden="true"></i>
+                            <span>Filtros</span>
+                            <span class="pf-tool-cuenta" id="pfFiltrosCuenta" hidden></span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end pf-pop pf-pop-filtros" aria-labelledby="pfFiltrosBtn">
+                            <label class="pf-pop-campo">Periodo
+                                <select id="pfDias" class="form-select form-select-sm">
+                                    <option value="0">Todo</option>
+                                    <option value="7">Últimos 7 días</option>
+                                    <option value="30">Últimos 30 días</option>
+                                    <option value="90">Últimos 90 días</option>
+                                </select>
+                            </label>
+                            <label class="pf-pop-campo">Bodega
+                                <select id="pfBodega" class="form-select form-select-sm">
+                                    <option value="">Todas</option>
+                                    @foreach (var b in (List<PickingApp.Models.Bodega>)(ViewBag.Bodegas ?? new List<PickingApp.Models.Bodega>()))
+                                    {
+                                        <option value="@b.Id">@b.Nombre</option>
+                                    }
+                                </select>
+                            </label>
+                            <label class="pf-pop-campo">Prioridad
+                                <select id="pfPrioridad" class="form-select form-select-sm">
+                                    <option value="">Todas</option>
+                                    <option>Alta</option>
+                                    <option>Media</option>
+                                    <option>Baja</option>
+                                </select>
+                            </label>
+                            <button type="button" class="pf-link-btn" id="pfLimpiar" disabled>Limpiar filtros</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="pf-chart-filters">
-                <label>Agrupar por
-                    <select id="pfAgrupar" class="form-select form-select-sm">
-                        <option value="estado">Estado</option>
-                        <option value="prioridad">Prioridad</option>
-                        <option value="bodega">Bodega</option>
-                        <option value="empleado">Empleado</option>
-                        <option value="dia">Día de carga</option>
-                    </select>
-                </label>
-                <label>Periodo
-                    <select id="pfDias" class="form-select form-select-sm">
-                        <option value="0">Todo</option>
-                        <option value="7">Últimos 7 días</option>
-                        <option value="30">Últimos 30 días</option>
-                        <option value="90">Últimos 90 días</option>
-                    </select>
-                </label>
-                <label>Bodega
-                    <select id="pfBodega" class="form-select form-select-sm">
-                        <option value="">Todas</option>
-                        @foreach (var b in (List<PickingApp.Models.Bodega>)(ViewBag.Bodegas ?? new List<PickingApp.Models.Bodega>()))
-                        {
-                            <option value="@b.Id">@b.Nombre</option>
-                        }
-                    </select>
-                </label>
-                <label>Prioridad
-                    <select id="pfPrioridad" class="form-select form-select-sm">
-                        <option value="">Todas</option>
-                        <option>Alta</option>
-                        <option>Media</option>
-                        <option>Baja</option>
-                    </select>
-                </label>
-            </div>
-
-            <div class="pf-chips" id="pfEstados" role="group" aria-label="Filtrar por estado">
-                <button type="button" class="pf-chip active" data-estado="Pendiente"><i style="background:#3B71CA"></i>Pendientes</button>
-                <button type="button" class="pf-chip active" data-estado="Asignado"><i style="background:#EB7D26"></i>En proceso</button>
-                <button type="button" class="pf-chip active" data-estado="Completado"><i style="background:#52A447"></i>Completados</button>
-                <button type="button" class="pf-chip active" data-estado="Cancelado"><i style="background:#DC2626"></i>Cancelados</button>
-                <button type="button" class="pf-chip active" data-estado="Reasignado"><i style="background:#1F2937"></i>Reasignados</button>
-            </div>
-
-            <div class="pf-chart-body">
+            <div class="pf-chart-body" id="pfCuerpo">
                 <div class="pf-chart-canvas"><canvas id="detallesChart" role="img" aria-label="Gráfica de pedidos"></canvas><div class="pf-chart-center" id="pfCentro"></div></div>
+                <div class="pf-legend" id="pfLeyenda"></div>
                 <div class="pf-chart-empty" id="pfVacio" hidden>No hay pedidos con estos filtros.</div>
                 <div class="pf-chart-table" id="pfTabla" hidden></div>
             </div>
 
             <div class="pf-chart-foot">
-                <div class="pf-legend" id="pfLeyenda"></div>
-                <button type="button" class="pf-link-btn" id="pfVerTabla">Ver tabla</button>
+                <button type="button" class="pf-link-btn" id="pfVerTabla">Ver como tabla</button>
             </div>
         </div>
     </div>
 
-    <!-- Tabla: pedidos recientes (el modelo que envía HomeController.Index) -->
+    <!-- Últimos pedidos cargados (el modelo que envía HomeController.Index) -->
     <div class="col-lg-5">
         <div class="mockup-card h-100">
-            <h4 class="fw-bold mb-3" style="color: #111827;">Pedidos recientes</h4>
+            <div class="pf-card-head">
+                <h2 class="pf-card-h">Pedidos recientes</h2>
+                <a asp-controller="Pedidos" asp-action="Index" class="pf-link-btn">Ver todos <i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+            </div>
             <div class="table-responsive">
-                <table class="mockup-table">
+                <table class="mockup-table pf-recientes">
                     <thead>
                         <tr>
                             <th>Pedido</th>
-                            <th>Prioridad</th>
                             <th>Estado</th>
                             <th>Empleado</th>
                         </tr>
@@ -144,20 +209,20 @@
                             {
                                 <tr>
                                     <td>
-                                        <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@pedido.Id" class="text-decoration-none fw-semibold" style="color: #111827;">
-                                            @pedido.CodigoPedido
-                                        </a>
+                                        <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@pedido.Id" class="pf-recientes-codigo">@pedido.CodigoPedido</a>
+                                        <div class="pf-recientes-prioridad">Prioridad @pedido.Prioridad.ToLowerInvariant()</div>
                                     </td>
-                                    <td>@pedido.Prioridad</td>
-                                    <td>@pedido.Estado</td>
-                                    <td>@(pedido.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                    <td>
+                                        <span class="pf-pedido-estado" style="--dot: @(coloresEstado.GetValueOrDefault(pedido.Estado, "#6B7280"))">@pedido.Estado</span>
+                                    </td>
+                                    <td class="@(pedido.Empleado == null ? "pf-sin-asignar" : "")">@(pedido.Empleado?.NombreCompleto ?? "Sin asignar")</td>
                                 </tr>
                             }
                         }
                         else
                         {
                             <tr>
-                                <td colspan="4" class="text-center text-muted py-4">No hay pedidos registrados</td>
+                                <td colspan="3" class="text-center text-muted py-4">No hay pedidos registrados</td>
                             </tr>
                         }
                     </tbody>

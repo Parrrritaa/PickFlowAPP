@@ -63,7 +63,7 @@ namespace PickingApp.Controllers
             .Include(p => p.Bodega)
             .Include(p => p.Empleado)
             .OrderByDescending(p => p.FechaCarga)
-            .Take(6)
+            .Take(5)
             .ToListAsync();
 
         // Datos del gráfico del dashboard: pedidos de trabajo agrupados por una dimensión y filtrados.
