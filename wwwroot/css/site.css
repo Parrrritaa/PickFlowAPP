@@ -2428,6 +2428,10 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     .pf-reporte-general-iconos { display: none; }
 }
 
+/* Diálogo con desplazamiento cuyo contenido va dentro de un <form>: el form también debe poder encogerse,
+   si no, el cuerpo no se desplaza y el pie (Cancelar / Generar PDF) queda cortado en pantallas bajas */
+.modal-dialog-scrollable .modal-content > form { display: flex; flex-direction: column; min-height: 0; }
+
 /* Diálogo: opciones a la izquierda, vista previa fija a la derecha */
 .pf-rg { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); gap: 24px; align-items: start; }
 .pf-rg-vista {
