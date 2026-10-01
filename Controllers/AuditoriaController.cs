@@ -255,10 +255,11 @@ namespace PickingApp.Controllers
 
             await _auditService.RegistrarAsync("Cargar Datos de Demostración", "Mantenimiento",
                 $"Se simularon {DatosDemostracion.DiasSimulados} días de uso: {r.Pedidos} pedidos ({r.Completados} completados, {r.Cancelados} cancelados, " +
-                $"{r.EnCurso} en curso, {r.Pendientes} pendientes), {r.Novedades} novedades y {r.Solicitudes} solicitudes.");
+                $"{r.EnCurso} en curso, {r.Pendientes} pendientes) en {string.Join(", ", r.Bodegas)}, {r.Novedades} novedades y {r.Solicitudes} solicitudes.");
 
             TempData["SuccessMessage"] = $"Se cargaron {DatosDemostracion.DiasSimulados} días de uso: {r.Pedidos} pedidos " +
-                $"({r.Completados} completados, {r.EnCurso} en curso, {r.Pendientes} pendientes y {r.Cancelados} cancelados), " +
+                $"({r.Completados} completados, {r.EnCurso} en curso, {r.Pendientes} pendientes y {r.Cancelados} cancelados) " +
+                $"repartidos en {(r.Bodegas.Count == 1 ? "la bodega" : $"{r.Bodegas.Count} bodegas:")} {string.Join(", ", r.Bodegas)}; " +
                 $"{r.Novedades} novedades y {r.Solicitudes} solicitudes.";
             return RedirectToAction(nameof(Configuracion));
         }

@@ -6,7 +6,7 @@ namespace PickingApp.Services
 {
     // Lo que se creó al cargar los datos de demostración (para el mensaje y la auditoría)
     public record ResumenDemostracion(int Pedidos, int Completados, int Cancelados, int EnCurso, int Pendientes,
-        int Novedades, int Solicitudes);
+        int Novedades, int Solicitudes, List<string> Bodegas);
 
     // Simula unos días de uso del sistema para mostrarlo funcionando (Configuración → Datos de demostración).
     // Las cantidades, empleados, productos y tiempos son aleatorios, pero siempre aparece cada caso: pedidos pendientes,
@@ -69,20 +69,22 @@ namespace PickingApp.Services
                 return "Ya hay pedidos registrados. Borre primero el historial de pedidos para cargar la demostración desde cero.";
             if (await _context.Empleados.CountAsync(e => e.Activo) < MinimoEmpleados)
                 return $"Se necesitan al menos {MinimoEmpleados} empleados activos.";
-            if (!(await UbicacionesPorBodegaAsync()).Any())
-                return $"Se necesita una bodega activa con al menos {MinimoUbicaciones} ubicaciones activas que tengan producto.";
+            if ((await UbicacionesPorBodegaAsync()).Sum(b => b.Count) < MinimoUbicaciones)
+                return $"Se necesitan al menos {MinimoUbicaciones} ubicaciones activas con producto en bodegas activas.";
             return null;
         }
 
+        // Ubicaciones de donde pueden salir pedidos, agrupadas por bodega: toda bodega activa con al menos una
+        // ubicación activa que tenga producto recibe pedidos (las que tienen pocas, pedidos de pocas líneas)
         private async Task<List<List<Ubicacion>>> UbicacionesPorBodegaAsync()
         {
             var ubicaciones = await _context.Ubicaciones
                 .Include(u => u.Producto)
+                .Include(u => u.Bodega)
                 .Where(u => u.Activa && u.Producto != null && u.Bodega!.Activa)
                 .ToListAsync();
             return ubicaciones.GroupBy(u => u.BodegaId)
                 .Select(g => g.ToList())
-                .Where(g => g.Count >= MinimoUbicaciones)
                 .ToList();
         }
 
@@ -104,7 +106,8 @@ namespace PickingApp.Services
             await using var transaccion = await _context.Database.BeginTransactionAsync();
 
             // 1. Pedidos de cada día; se guardan primero para tener su Id y calcular su tiempo estándar
-            var pedidos = CrearPedidos(sim, await UbicacionesPorBodegaAsync());
+            var bodegas = await UbicacionesPorBodegaAsync();
+            var pedidos = CrearPedidos(sim, bodegas);
             _context.Pedidos.AddRange(pedidos.Where(p => p.PedidoPadre == null)); // las partes entran con su pedido original
             await _context.SaveChangesAsync();
 
@@ -144,7 +147,8 @@ namespace PickingApp.Services
                 EnCurso: trabajo.Count(p => p.EstaEnCurso),
                 Pendientes: trabajo.Count(p => p.Estado == PedidoEstados.Pendiente),
                 Novedades: novedades.Count,
-                Solicitudes: solicitudes.Count);
+                Solicitudes: solicitudes.Count,
+                Bodegas: bodegas.Select(b => b[0].Bodega!.Nombre).OrderBy(n => n).ToList());
         }
 
         // Una o dos cargas de Excel por día (las de hoy, solo si ya pasaron) y, al final, una carga reciente que queda
