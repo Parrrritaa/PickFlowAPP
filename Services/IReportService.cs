@@ -28,6 +28,36 @@ namespace PickingApp.Services
         public double Porcentaje { get; set; }
     }
 
+    public class DashboardCategoriaItem
+    {
+        public string Etiqueta { get; set; } = string.Empty;
+        public int Valor { get; set; }
+        public double Porcentaje { get; set; }
+    }
+
+    // Todo lo que muestra el PDF del dashboard: tarjetas, gráfica con sus filtros y pedidos recientes
+    public class DashboardPdfDatos
+    {
+        public int Pendientes { get; set; }
+        public int EnProceso { get; set; }
+        public int Completados { get; set; }
+        public int Cancelados { get; set; }
+        public int Reasignados { get; set; }
+        public int Total => Pendientes + EnProceso + Completados + Cancelados + Reasignados;
+
+        public string TituloGrafica { get; set; } = string.Empty;
+        public string TipoGrafica { get; set; } = string.Empty;
+        public string Periodo { get; set; } = string.Empty;
+        public string Filtros { get; set; } = string.Empty;
+        public int TotalGrafica { get; set; }
+        public List<DashboardCategoriaItem> Categorias { get; set; } = new();
+
+        // PNG de la gráfica tal como la ve el usuario; null si no hay datos o la imagen recibida no era válida
+        public byte[]? ImagenGrafica { get; set; }
+
+        public List<Pedido> Recientes { get; set; } = new();
+    }
+
     // Periodo de un reporte. Sin fechas = todo el historial; con solo "Desde" o solo "Hasta" queda abierto por un lado.
     public class PeriodoReporte
     {
@@ -75,6 +105,7 @@ namespace PickingApp.Services
 
         byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
         byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
+        byte[] GenerarReporteDashboardPdf(DashboardPdfDatos datos);
         byte[] GenerarReporteLogSistemaPdf(List<LogSistema> logs, string? modulo, string? usuario, DateTime fechaDesde, DateTime fechaHasta);
     }
 }

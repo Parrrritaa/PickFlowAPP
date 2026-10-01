@@ -1,14 +1,18 @@
 @model IEnumerable<PickingApp.Models.Pedido>
 @{
     ViewData["Title"] = "Dashboard";
-    var pendientes = (int)(ViewBag.TotalPendientes ?? 0);
-    var enProceso = (int)(ViewBag.TotalEnProceso ?? 0);
-    var completados = (int)(ViewBag.TotalCompletados ?? 0);
-    var cancelados = (int)(ViewBag.TotalCancelados ?? 0);
-    var reasignados = (int)(ViewBag.TotalReasignados ?? 0);
 }
 
-<h1 class="pf-page-title">Dashboard</h1>
+<div class="pf-dash-head">
+    <h1 class="pf-page-title mb-0">Dashboard</h1>
+    <!-- Descarga el dashboard completo en PDF (wwwroot/js/dashboard-grafica.js → HomeController.ExportarDashboardPdf) -->
+    <form id="pfPdfForm" method="post" asp-controller="Home" asp-action="ExportarDashboardPdf" class="m-0">
+        <button type="button" id="pfExportarPdf" class="pf-pdf-btn">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Descargar PDF</span>
+        </button>
+    </form>
+</div>
 
 <!-- 5 tarjetas de métricas (diapositiva 5): los números llegan en ViewBag desde HomeController.Index -->
 <div class="row g-3 mb-4">
@@ -46,27 +50,76 @@
 
 <!-- Sección inferior: gráfico y pedidos recientes (diapositiva 5) -->
 <div class="row g-4">
-    <!-- Gráfico de pedidos por estado -->
+    <!-- Gráfico configurable: tipo de gráfica, agrupación y filtros (wwwroot/js/dashboard-grafica.js, datos de HomeController.DatosGrafica) -->
     <div class="col-lg-7">
-        <div class="mockup-card h-100 d-flex flex-column align-items-center justify-content-between">
-            <h4 class="fw-bold mb-3" style="color: #4B5563;">Detalles</h4>
-            @if (pendientes + enProceso + completados + cancelados + reasignados == 0)
-            {
-                <div class="text-center text-muted py-5">No hay pedidos registrados todavía.</div>
-            }
-            else
-            {
-                <div style="width: 100%; max-width: 380px; height: 260px; position: relative;" class="d-flex align-items-center justify-content-center">
-                    <canvas id="detallesChart"></canvas>
+        <div class="mockup-card h-100 pf-chart-card" id="pfGrafica" data-url="@Url.Action("DatosGrafica", "Home")">
+            <div class="pf-chart-head">
+                <h4 class="fw-bold mb-0" style="color: #4B5563;">Detalles</h4>
+                <div class="pf-seg" role="group" aria-label="Tipo de gráfica" id="pfTipos">
+                    <button type="button" class="pf-seg-btn active" data-tipo="doughnut" title="Dona" aria-label="Dona"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="4"/></svg></button>
+                    <button type="button" class="pf-seg-btn" data-tipo="pie" title="Pastel" aria-label="Pastel"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z" fill="currentColor"/></svg></button>
+                    <button type="button" class="pf-seg-btn" data-tipo="bar" title="Barras" aria-label="Barras"><svg viewBox="0 0 24 24"><path d="M4 20V11h4v9zM10 20V4h4v16zM16 20v-6h4v6z" fill="currentColor"/></svg></button>
+                    <button type="button" class="pf-seg-btn" data-tipo="hbar" title="Barras horizontales" aria-label="Barras horizontales"><svg viewBox="0 0 24 24"><path d="M4 4h9v4H4zM4 10h16v4H4zM4 16h6v4H4z" fill="currentColor"/></svg></button>
+                    <button type="button" class="pf-seg-btn" data-tipo="line" title="Líneas" aria-label="Líneas"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 8-9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    <button type="button" class="pf-seg-btn" data-tipo="area" title="Área" aria-label="Área"><svg viewBox="0 0 24 24"><path d="M3 19V13l5-5 4 3 8-7v15z" fill="currentColor"/></svg></button>
                 </div>
-                <div class="d-flex flex-wrap justify-content-center gap-3 mt-3 small text-muted">
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #3B71CA; display: inline-block; margin-right: 5px;"></span> pedidos pendientes</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #EB7D26; display: inline-block; margin-right: 5px;"></span> en proceso</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #52A447; display: inline-block; margin-right: 5px;"></span> completados</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #DC2626; display: inline-block; margin-right: 5px;"></span> cancelados</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #1F2937; display: inline-block; margin-right: 5px;"></span> reasignados</span>
-                </div>
-            }
+            </div>
+
+            <div class="pf-chart-filters">
+                <label>Agrupar por
+                    <select id="pfAgrupar" class="form-select form-select-sm">
+                        <option value="estado">Estado</option>
+                        <option value="prioridad">Prioridad</option>
+                        <option value="bodega">Bodega</option>
+                        <option value="empleado">Empleado</option>
+                        <option value="dia">Día de carga</option>
+                    </select>
+                </label>
+                <label>Periodo
+                    <select id="pfDias" class="form-select form-select-sm">
+                        <option value="0">Todo</option>
+                        <option value="7">Últimos 7 días</option>
+                        <option value="30">Últimos 30 días</option>
+                        <option value="90">Últimos 90 días</option>
+                    </select>
+                </label>
+                <label>Bodega
+                    <select id="pfBodega" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        @foreach (var b in (List<PickingApp.Models.Bodega>)(ViewBag.Bodegas ?? new List<PickingApp.Models.Bodega>()))
+                        {
+                            <option value="@b.Id">@b.Nombre</option>
+                        }
+                    </select>
+                </label>
+                <label>Prioridad
+                    <select id="pfPrioridad" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        <option>Alta</option>
+                        <option>Media</option>
+                        <option>Baja</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="pf-chips" id="pfEstados" role="group" aria-label="Filtrar por estado">
+                <button type="button" class="pf-chip active" data-estado="Pendiente"><i style="background:#3B71CA"></i>Pendientes</button>
+                <button type="button" class="pf-chip active" data-estado="Asignado"><i style="background:#EB7D26"></i>En proceso</button>
+                <button type="button" class="pf-chip active" data-estado="Completado"><i style="background:#52A447"></i>Completados</button>
+                <button type="button" class="pf-chip active" data-estado="Cancelado"><i style="background:#DC2626"></i>Cancelados</button>
+                <button type="button" class="pf-chip active" data-estado="Reasignado"><i style="background:#1F2937"></i>Reasignados</button>
+            </div>
+
+            <div class="pf-chart-body">
+                <div class="pf-chart-canvas"><canvas id="detallesChart" role="img" aria-label="Gráfica de pedidos"></canvas><div class="pf-chart-center" id="pfCentro"></div></div>
+                <div class="pf-chart-empty" id="pfVacio" hidden>No hay pedidos con estos filtros.</div>
+                <div class="pf-chart-table" id="pfTabla" hidden></div>
+            </div>
+
+            <div class="pf-chart-foot">
+                <div class="pf-legend" id="pfLeyenda"></div>
+                <button type="button" class="pf-link-btn" id="pfVerTabla">Ver tabla</button>
+            </div>
         </div>
     </div>
 
@@ -116,40 +169,5 @@
 
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const ctx = document.getElementById('detallesChart');
-            if (ctx) {
-                const dataValues = [@pendientes, @enProceso, @completados, @cancelados, @reasignados];
-
-                new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: ['pedidos pendientes', 'en proceso', 'completados', 'cancelados', 'reasignados'],
-                        datasets: [{
-                            data: dataValues,
-                            backgroundColor: [
-                                '#3B71CA',
-                                '#EB7D26',
-                                '#52A447',
-                                '#DC2626',
-                                '#1F2937'
-                            ],
-                            borderWidth: 1,
-                            borderColor: '#FFFFFF'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
-                    }
-                });
-            }
-        });
-    </script>
+    <script src="~/js/dashboard-grafica.js" asp-append-version="true"></script>
 }

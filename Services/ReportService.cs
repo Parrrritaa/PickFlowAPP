@@ -412,6 +412,151 @@ namespace PickingApp.Services
             return document.GeneratePdf();
         }
 
+        public byte[] GenerarReporteDashboardPdf(DashboardPdfDatos datos)
+        {
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(1.5f, Unit.Centimetre);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Lato"));
+
+                    page.Header().Element(c => ComposeHeader(c, "Dashboard de Pedidos", datos.Periodo, datos.Filtros));
+
+                    page.Content().PaddingVertical(10).Column(col =>
+                    {
+                        col.Spacing(14);
+
+                        // 1) Tarjetas: totales generales, no dependen de los filtros de la gráfica
+                        col.Item().ShowEntire().Column(sec =>
+                        {
+                            sec.Item().Element(c => TituloSeccion(c, "Resumen general", "Totales actuales de los pedidos de trabajo (un pedido dividido cuenta por sus partes)."));
+                            sec.Item().PaddingTop(6).Row(row =>
+                            {
+                                row.Spacing(6);
+                                TarjetaMetrica(row.RelativeItem(), "Total", datos.Total, "#4B5563");
+                                TarjetaMetrica(row.RelativeItem(), "Pendientes", datos.Pendientes, "#3B71CA");
+                                TarjetaMetrica(row.RelativeItem(), "En proceso", datos.EnProceso, "#EB7D26");
+                                TarjetaMetrica(row.RelativeItem(), "Completados", datos.Completados, "#52A447");
+                                TarjetaMetrica(row.RelativeItem(), "Cancelados", datos.Cancelados, "#DC2626");
+                                TarjetaMetrica(row.RelativeItem(), "Reasignados", datos.Reasignados, "#1F2937");
+                            });
+                        });
+
+                        // 2) Gráfica con los filtros que tenía el usuario en pantalla
+                        col.Item().Element(c => TituloSeccion(c, datos.TituloGrafica,
+                            $"Gráfica: {datos.TipoGrafica} · {datos.TotalGrafica} {(datos.TotalGrafica == 1 ? "pedido" : "pedidos")} con los filtros aplicados."));
+
+                        if (datos.TotalGrafica == 0)
+                        {
+                            col.Item().Element(c => FilaSinDatos(c, "No hay pedidos con los filtros seleccionados."));
+                        }
+                        else
+                        {
+                            if (datos.ImagenGrafica != null)
+                            {
+                                col.Item().ShowEntire().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(6)
+                                   .Height(235).AlignCenter().AlignMiddle().Image(datos.ImagenGrafica).FitArea();
+                            }
+
+                            col.Item().Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(4);
+                                    columns.RelativeColumn(1.5f);
+                                    columns.RelativeColumn(1.5f);
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(CellStyleHeader).Text("Categoría");
+                                    header.Cell().Element(CellStyleHeader).AlignRight().Text("Pedidos");
+                                    header.Cell().Element(CellStyleHeader).AlignRight().Text("%");
+                                });
+
+                                foreach (var item in datos.Categorias)
+                                {
+                                    table.Cell().Element(CellStyleRow).Text(item.Etiqueta);
+                                    table.Cell().Element(CellStyleRow).AlignRight().Text(item.Valor.ToString());
+                                    table.Cell().Element(CellStyleRow).AlignRight().Text($"{item.Porcentaje:0.#}%");
+                                }
+
+                                table.Cell().Element(CellStyleRow).Text("Total").SemiBold();
+                                table.Cell().Element(CellStyleRow).AlignRight().Text(datos.TotalGrafica.ToString()).SemiBold();
+                                table.Cell().Element(CellStyleRow).AlignRight().Text("");
+                            });
+                        }
+
+                        // 3) Pedidos recientes (la misma tabla del dashboard, con bodega y fecha de carga)
+                        col.Item().EnsureSpace(120).Element(c => TituloSeccion(c, "Pedidos recientes", "Los últimos pedidos cargados."));
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(1.5f);
+                                columns.RelativeColumn(2.4f);
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(1.7f);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellStyleHeader).Text("Pedido");
+                                header.Cell().Element(CellStyleHeader).Text("Prioridad");
+                                header.Cell().Element(CellStyleHeader).Text("Estado");
+                                header.Cell().Element(CellStyleHeader).Text("Empleado");
+                                header.Cell().Element(CellStyleHeader).Text("Bodega");
+                                header.Cell().Element(CellStyleHeader).Text("Cargado");
+                            });
+
+                            foreach (var p in datos.Recientes)
+                            {
+                                table.Cell().Element(CellStyleRow).Text(p.CodigoPedido);
+                                table.Cell().Element(CellStyleRow).Text(p.Prioridad);
+                                table.Cell().Element(CellStyleRow).Text(p.Estado);
+                                table.Cell().Element(CellStyleRow).Text(p.Empleado?.NombreCompleto ?? "Sin asignar");
+                                table.Cell().Element(CellStyleRow).Text(p.Bodega?.Nombre ?? "—");
+                                table.Cell().Element(CellStyleRow).Text(p.FechaCarga.ToString("dd/MM/yyyy HH:mm"));
+                            }
+
+                            if (!datos.Recientes.Any())
+                            {
+                                table.Cell().ColumnSpan(6).Element(celda => FilaSinDatos(celda, "No hay pedidos registrados."));
+                            }
+                        });
+                    });
+
+                    page.Footer().Element(ComposeFooter);
+                });
+            });
+
+            return document.GeneratePdf();
+        }
+
+        private static void TituloSeccion(IContainer container, string titulo, string subtitulo)
+        {
+            container.Column(c =>
+            {
+                c.Item().Text(titulo).FontSize(12).SemiBold().FontColor("#1C3A6B");
+                c.Item().Text(subtitulo).FontSize(8).FontColor(Colors.Grey.Darken1);
+            });
+        }
+
+        // Tarjeta del resumen: cifra grande del color del estado, igual que las tarjetas del dashboard
+        private static void TarjetaMetrica(IContainer container, string etiqueta, int valor, string color)
+        {
+            container.Background("#F4F6F8").BorderTop(3).BorderColor(color).PaddingVertical(8).PaddingHorizontal(6).Column(c =>
+            {
+                c.Item().AlignCenter().Text(valor.ToString()).FontSize(20).Bold().FontColor(color);
+                c.Item().AlignCenter().Text(etiqueta).FontSize(8).FontColor(Colors.Grey.Darken2);
+            });
+        }
+
         private static void ComposeHeader(IContainer container, string titulo, string periodo, string? filtro)
         {
             // Ruta absoluta al logo en wwwroot

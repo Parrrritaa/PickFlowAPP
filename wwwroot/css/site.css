@@ -2246,3 +2246,79 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
+/* Gráfico configurable del Dashboard */
+.pf-chart-card { display: flex; flex-direction: column; gap: 14px; }
+.pf-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pf-seg { position: relative; isolation: isolate; display: inline-flex; background: rgba(255, 255, 255, 0.7); border-radius: 12px; padding: 3px; gap: 2px; box-shadow: var(--pf-shadow-control); }
+.pf-seg-btn {
+    width: 36px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 9px;
+    background: transparent; color: var(--pf-text-muted); cursor: pointer;
+    transition: background-color var(--pf-duration-base) var(--pf-ease), color var(--pf-duration-base) var(--pf-ease), transform var(--pf-duration-fast) var(--pf-ease);
+}
+.pf-seg-btn svg { width: 18px; height: 18px; }
+.pf-seg-btn:hover { color: var(--pf-text-dark); background: rgba(0, 0, 0, 0.05); }
+.pf-seg-btn:active { transform: scale(0.94); }
+.pf-seg-btn { position: relative; z-index: 1; }
+.pf-seg-btn.active, .pf-seg-btn.active:hover { background: transparent; color: #fff; }
+/* Píldora que se desliza hasta el botón elegido; su posición la fija dashboard-grafica.js */
+.pf-seg-thumb {
+    position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 0; width: 0; border-radius: 9px;
+    background: var(--pf-navy); box-shadow: 0 2px 6px rgba(0, 32, 74, 0.28); pointer-events: none; opacity: 0;
+}
+.pf-seg.is-ready .pf-seg-thumb {
+    opacity: 1;
+    transition: transform 0.38s cubic-bezier(0.34, 1.35, 0.64, 1), width 0.38s cubic-bezier(0.34, 1.35, 0.64, 1);
+}
+.pf-seg-btn:focus-visible, .pf-chip:focus-visible, .pf-link-btn:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 2px; }
+
+.pf-chart-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.pf-chart-filters label { font-size: 0.75rem; color: var(--pf-text-secondary); font-weight: 600; display: flex; flex-direction: column; gap: 4px; }
+.pf-chart-filters .form-select { border-radius: var(--pf-radius-control); border-color: var(--pf-gray-border); font-weight: 400; }
+
+.pf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 0.78rem;
+    border: 1px solid var(--pf-gray-border); background: transparent; color: var(--pf-text-muted); cursor: pointer;
+    transition: background-color var(--pf-duration-base) var(--pf-ease), color var(--pf-duration-base) var(--pf-ease), border-color var(--pf-duration-base) var(--pf-ease);
+}
+.pf-chip i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; opacity: 0.4; }
+.pf-chip.active { background: #fff; color: var(--pf-text-dark); border-color: #fff; box-shadow: var(--pf-shadow-control); }
+.pf-chip.active i { opacity: 1; }
+
+.pf-chart-body { position: relative; flex: 1; min-height: 280px; display: flex; flex-direction: column; justify-content: center; }
+.pf-chart-canvas { position: relative; width: 100%; height: 280px; }
+.pf-chart-canvas[hidden], .pf-chart-empty[hidden], .pf-chart-table[hidden] { display: none; }
+.pf-chart-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.pf-chart-center strong { font-size: 1.9rem; line-height: 1; color: var(--pf-text-dark); }
+.pf-chart-center span { font-size: 0.78rem; color: var(--pf-text-muted); }
+.pf-chart-empty { text-align: center; color: var(--pf-text-muted); padding: 48px 0; }
+.pf-chart-table { max-height: 280px; overflow: auto; }
+
+.pf-chart-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pf-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.8rem; color: var(--pf-text-secondary); }
+.pf-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.pf-legend-item i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.pf-legend-item b { font-weight: 600; }
+.pf-legend-item span { color: var(--pf-text-muted); }
+.pf-legend-item.is-zero { opacity: 0.45; }
+.pf-link-btn { border: 0; background: none; color: var(--pf-blue); font-size: 0.8rem; font-weight: 600; white-space: nowrap; padding: 2px 4px; border-radius: 6px; cursor: pointer; }
+.pf-link-btn:hover { color: var(--pf-blue-hover); text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) {
+    .pf-seg-btn, .pf-chip, .pf-seg.is-ready .pf-seg-thumb { transition: none; }
+}
+/* Botón de descarga del PDF del Dashboard */
+.pf-dash-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.pf-dash-head .pf-page-title { margin-bottom: 0; }
+.pf-pdf-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border: 0; border-radius: var(--pf-radius-control);
+    background: var(--pf-navy); color: #fff; font-weight: 600; font-size: 0.9rem; cursor: pointer; box-shadow: var(--pf-shadow-control);
+    transition: background-color var(--pf-duration-base) var(--pf-ease), transform var(--pf-duration-fast) var(--pf-ease), opacity var(--pf-duration-base) var(--pf-ease);
+}
+.pf-pdf-btn svg { width: 18px; height: 18px; }
+.pf-pdf-btn:hover:not(:disabled) { background: var(--pf-navy-dark); }
+.pf-pdf-btn:active:not(:disabled) { transform: scale(0.97); }
+.pf-pdf-btn:disabled { opacity: 0.7; cursor: progress; }
+.pf-pdf-btn:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .pf-pdf-btn { transition: none; } }
