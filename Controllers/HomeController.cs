@@ -98,8 +98,9 @@ namespace PickingApp.Controllers
             ["area"] = "área"
         };
 
-        // PDF con todo lo que muestra el dashboard. La gráfica llega como imagen PNG (la que el usuario está viendo);
-        // los números y las tablas se vuelven a calcular aquí con los mismos filtros, así el PDF no depende de lo que mande el navegador.
+        // Reporte general del dashboard (se configura en Reportes: wwwroot/js/reporte-dashboard.js). La gráfica llega como
+        // imagen PNG (la de la vista previa); los números y las tablas se vuelven a calcular aquí con los mismos filtros,
+        // así el PDF no depende de lo que mande el navegador.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ExportarDashboardPdf(string agrupar = "estado", int dias = 0, int? bodegaId = null, string? prioridad = null,
@@ -146,11 +147,11 @@ namespace PickingApp.Controllers
                 Recientes = await UltimosPedidosAsync()
             };
 
-            await _auditService.RegistrarAsync("Exportar PDF Dashboard", "Dashboard",
+            await _auditService.RegistrarAsync("Exportar PDF Reporte General Dashboard", "Reportes",
                 $"{datos.TituloGrafica} ({datos.TipoGrafica}), {datos.Periodo}. {datos.Filtros}.");
 
             var pdf = _reportService.GenerarReporteDashboardPdf(datos);
-            return File(pdf, "application/pdf", $"Dashboard_PickFlow_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
+            return File(pdf, "application/pdf", $"Reporte_General_Dashboard_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
         }
 
         // La imagen la envía el navegador, así que no se confía en ella: solo se acepta un PNG de tamaño razonable

@@ -423,7 +423,7 @@ namespace PickingApp.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Lato"));
 
-                    page.Header().Element(c => ComposeHeader(c, "Dashboard de Pedidos", datos.Periodo, datos.Filtros));
+                    page.Header().Element(c => ComposeHeader(c, "Reporte general del dashboard", datos.Periodo, datos.Filtros));
 
                     page.Content().PaddingVertical(10).Column(col =>
                     {

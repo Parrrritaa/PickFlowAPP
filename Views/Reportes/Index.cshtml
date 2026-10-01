@@ -38,6 +38,25 @@
 <h1 class="pf-page-title">Reportes</h1>
 
 <div class="row g-4">
+    <!-- Tarjeta destacada: reporte general del dashboard (cifras, gráfica configurable y pedidos recientes) -->
+    <div class="col-lg-8">
+        <div class="mockup-report-card pf-reporte-general">
+            <div class="pf-reporte-general-texto">
+                <h3>Reporte general del dashboard</h3>
+                <p>Las cifras por estado, la gráfica que elijas con sus filtros y los últimos pedidos cargados.</p>
+                <button type="button" class="btn-pf-blue py-2 px-4" data-bs-toggle="modal" data-bs-target="#modalReporteGeneral">
+                    Configurar y generar PDF
+                </button>
+            </div>
+            <div class="pf-reporte-general-iconos" aria-hidden="true">
+                @foreach (var tipo in new[] { "doughnut", "bar", "line", "pie", "hbar", "area" })
+                {
+                    <span><partial name="_IconoTipoGrafica" model="tipo" /></span>
+                }
+            </div>
+        </div>
+    </div>
+
     <!-- Tarjeta 1: tiempos por empleado -->
     <div class="col-lg-4 col-md-6">
         <div class="mockup-report-card">
@@ -100,6 +119,121 @@
 </div>
 
 <!-- ===== Diálogos de configuración de cada reporte ===== -->
+
+<!-- Reporte general: las opciones de la izquierda se ven en vivo en la vista previa de la derecha (wwwroot/js/reporte-dashboard.js) -->
+<div class="modal fade" id="modalReporteGeneral" tabindex="-1" aria-labelledby="tituloReporteGeneral" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form id="formReporteGeneral" method="post" asp-controller="Home" asp-action="ExportarDashboardPdf"
+                  data-datos="@Url.Action("DatosGrafica", "Home")">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="tituloReporteGeneral">Reporte general del dashboard</h5>
+                        <p class="pf-reporte-desc">Elige cómo se ve la gráfica del PDF. Las cifras por estado y los pedidos recientes siempre se incluyen.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="pf-rg">
+                        <div class="pf-rg-opciones">
+                            <fieldset class="pf-campo">
+                                <legend class="pf-campo-titulo">Tipo de gráfica</legend>
+                                <div class="pf-tipos pf-tipos--ancho" role="radiogroup" aria-label="Tipo de gráfica">
+                                    @foreach (var (tipo, nombre) in new[] { ("doughnut", "Dona"), ("pie", "Pastel"), ("bar", "Barras"), ("hbar", "Horizontal"), ("line", "Líneas"), ("area", "Área") })
+                                    {
+                                        <label class="pf-tipo">
+                                            <input type="radio" class="visually-hidden" name="tipo" value="@tipo" checked="@(tipo == "doughnut")" />
+                                            <partial name="_IconoTipoGrafica" model="tipo" />
+                                            <span>@nombre</span>
+                                        </label>
+                                    }
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="pf-campo">
+                                <legend class="pf-campo-titulo">Agrupar por</legend>
+                                <div class="pf-pildoras" role="radiogroup" aria-label="Agrupar por">
+                                    @foreach (var (valor, nombre) in new[] { ("estado", "Estado"), ("prioridad", "Prioridad"), ("bodega", "Bodega"), ("empleado", "Empleado"), ("dia", "Día de carga") })
+                                    {
+                                        <label class="pf-pildora">
+                                            <input type="radio" class="visually-hidden" name="agrupar" value="@valor" checked="@(valor == "estado")" />
+                                            <span>@nombre</span>
+                                        </label>
+                                    }
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="pf-campo">
+                                <legend class="pf-campo-titulo">Estados incluidos</legend>
+                                <div class="pf-pildoras">
+                                    @foreach (var (valor, nombre, color) in new[]
+                                    {
+                                        (PedidoEstados.Pendiente, "Pendientes", "#3B71CA"), (PedidoEstados.Asignado, "En proceso", "#EB7D26"),
+                                        (PedidoEstados.Completado, "Completados", "#52A447"), (PedidoEstados.Cancelado, "Cancelados", "#DC2626"),
+                                        (PedidoEstados.Reasignado, "Reasignados", "#1F2937")
+                                    })
+                                    {
+                                        <label class="pf-pildora">
+                                            <input type="checkbox" class="visually-hidden" data-estado value="@valor" checked />
+                                            <span><i class="pf-kpi-dot" style="--dot: @color" aria-hidden="true"></i>@nombre</span>
+                                        </label>
+                                    }
+                                </div>
+                            </fieldset>
+
+                            <div class="row g-2">
+                                <div class="col-sm-4">
+                                    <label class="pf-campo-titulo d-block" for="rgDias">Periodo</label>
+                                    <select class="form-select" id="rgDias" name="dias">
+                                        <option value="0">Todo</option>
+                                        <option value="7">Últimos 7 días</option>
+                                        <option value="30">Últimos 30 días</option>
+                                        <option value="90">Últimos 90 días</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="pf-campo-titulo d-block" for="rgBodega">Bodega</label>
+                                    <select class="form-select" id="rgBodega" name="bodegaId">
+                                        <option value="">Todas</option>
+                                        @foreach (var b in bodegas)
+                                        {
+                                            <option value="@b.Id">@b.Nombre</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="pf-campo-titulo d-block" for="rgPrioridad">Prioridad</label>
+                                    <select class="form-select" id="rgPrioridad" name="prioridad">
+                                        <option value="">Todas</option>
+                                        <option>Alta</option>
+                                        <option>Media</option>
+                                        <option>Baja</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <section class="pf-rg-vista" aria-labelledby="rgVistaTitulo">
+                            <div class="pf-rg-vista-etiqueta">Vista previa</div>
+                            <h6 class="pf-rg-vista-titulo" id="rgVistaTitulo">Pedidos por estado</h6>
+                            <p class="pf-rg-vista-resumen" id="rgResumen" aria-live="polite">&nbsp;</p>
+                            <div class="pf-rg-lienzo">
+                                <canvas id="rgGrafica" role="img" aria-label="Vista previa de la gráfica del reporte"></canvas>
+                                <div class="pf-chart-center" id="rgCentro"></div>
+                            </div>
+                            <div class="pf-chart-empty" id="rgVacio" hidden>No hay pedidos con estos filtros.</div>
+                        </section>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <p class="pf-rg-error me-auto" id="rgError" role="alert" hidden></p>
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue" id="rgGenerar"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Generar PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="modalReporteEmpleados" tabindex="-1" aria-labelledby="tituloReporteEmpleados" aria-hidden="true">
     <div class="modal-dialog">
@@ -251,6 +385,9 @@
 </div>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="~/js/grafica-pedidos.js" asp-append-version="true"></script>
+    <script src="~/js/reporte-dashboard.js" asp-append-version="true"></script>
     <script>
         // Diálogos de reportes: el segmento "individual" revela su campo; los campos ocultos van deshabilitados
         // (no se envían ni se validan). La descarga no cambia de página, así que el diálogo se cierra solo.
