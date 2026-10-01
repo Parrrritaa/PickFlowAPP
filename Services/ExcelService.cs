@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
@@ -112,6 +113,7 @@ namespace PickingApp.Services
 
                     var ubi = ubicacionesDb.FirstOrDefault(u => u.BodegaId == bodega.Id && MismaPosicion(u, pasillo, estante, nivel));
                     productosDb.TryGetValue(codProducto, out var producto);
+                    var fila = new FilaExcel(filaNum, codPedido, codProducto, nomProducto, bodega, pasillo, estante, nivel);
 
                     // Fila correcta: el producto existe y está en esa ubicación activa. Si no, la fila queda
                     // en una incidencia y se recoge de donde decidió el usuario (null mientras no decida).
@@ -123,8 +125,16 @@ namespace PickingApp.Services
                         else if (tipo == TiposIncidenciaExcel.ProductoIncorrecto || tipo == TiposIncidenciaExcel.UbicacionVacia) result.FilasConProductoIncorrecto++;
                         else result.FilasConUbicacionNoRegistrada++;
 
-                        destino = incidencias.Registrar(tipo,
-                            new FilaExcel(filaNum, codPedido, codProducto, nomProducto, bodega, pasillo, estante, nivel), producto, ubi);
+                        destino = incidencias.Registrar(tipo, fila, producto, ubi);
+                    }
+
+                    // El nombre del archivo debe ser el del producto registrado con ese código. Si no coincide,
+                    // el usuario confirma que se cargue con el nombre registrado o corrige el código en el archivo.
+                    var nombreConfirmado = true;
+                    if (producto != null && !MismoNombre(nomProducto, producto.Nombre))
+                    {
+                        result.FilasConNombreDistinto++;
+                        nombreConfirmado = incidencias.RegistrarNombre(fila, producto);
                     }
 
                     // Varias filas con el mismo código forman un solo pedido con varias líneas (Detalles)
@@ -158,14 +168,15 @@ namespace PickingApp.Services
                         pedidosDict[codPedido] = pedido;
                     }
 
-                    if (destino == null) continue;
+                    if (destino == null || !nombreConfirmado) continue;
 
                     // Ubicacion (navegación) enlaza también las ubicaciones nuevas, que aún no tienen Id:
-                    // EF Core las inserta antes que el detalle y completa UbicacionId al guardar
+                    // EF Core las inserta antes que el detalle y completa UbicacionId al guardar.
+                    // Código y nombre son siempre los del producto registrado (o el que se registra en esta carga).
                     pedido.Detalles.Add(new DetallePedido
                     {
-                        CodigoProducto = codProducto,
-                        NombreProducto = string.IsNullOrWhiteSpace(nomProducto) ? codProducto : nomProducto,
+                        CodigoProducto = destino.Producto?.Codigo ?? codProducto,
+                        NombreProducto = destino.Producto?.Nombre ?? (string.IsNullOrWhiteSpace(nomProducto) ? codProducto : nomProducto),
                         Cantidad = cantidad,
                         UbicacionId = destino.Id,
                         Ubicacion = destino
@@ -214,6 +225,13 @@ namespace PickingApp.Services
                 ? a == b
                 : guardado.Equals(delExcel, StringComparison.OrdinalIgnoreCase);
 
+        // Mayúsculas, tildes y espacios repetidos no cuentan: "teclado  mecanico" es "Teclado Mecánico".
+        // Una celda vacía tampoco es un nombre distinto: se usa el registrado.
+        private static bool MismoNombre(string delExcel, string registrado) =>
+            string.IsNullOrWhiteSpace(delExcel) ||
+            string.Compare(Regex.Replace(delExcel.Trim(), @"\s+", " "), Regex.Replace(registrado.Trim(), @"\s+", " "),
+                CultureInfo.InvariantCulture, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) == 0;
+
         private static bool EsNumero(string? valor) => valor != null && Regex.IsMatch(valor, @"^\d{1,9}$");
 
         // "01" → "1"; lo que no es número se deja en mayúsculas (sirve para agrupar filas en la misma incidencia)
@@ -237,6 +255,8 @@ namespace PickingApp.Services
             private readonly Dictionary<string, IncidenciaExcel> _incidencias = new();
             // Clave → ubicación donde se recogen sus filas (null: falta decidir o la decisión no es válida)
             private readonly Dictionary<string, Ubicacion?> _destinos = new();
+            // Clave de un nombre distinto → si el usuario confirmó cargarlo con el nombre registrado
+            private readonly Dictionary<string, bool> _nombresConfirmados = new();
             private readonly List<Ubicacion> _nuevas = new();
 
             public GestorIncidencias(IReadOnlyList<ResolucionExcel> resoluciones, List<Bodega> bodegas, List<Ubicacion> ubicaciones,
@@ -255,7 +275,7 @@ namespace PickingApp.Services
 
             public List<IncidenciaExcel> Lista => _incidencias.Values.ToList();
 
-            public bool TodasResueltas => _destinos.Values.All(d => d != null);
+            public bool TodasResueltas => _destinos.Values.All(d => d != null) && _nombresConfirmados.Values.All(c => c);
 
             public Ubicacion? Registrar(string tipo, FilaExcel fila, Producto? producto, Ubicacion? ubi)
             {
@@ -272,9 +292,54 @@ namespace PickingApp.Services
                     _destinos[clave] = Resolver(incidencia, producto, ubi);
                 }
 
+                AgregarFila(incidencia, fila);
+                return _destinos[clave];
+            }
+
+            // Nombre distinto al registrado: no cambia de dónde se recoge la fila, solo pide confirmar
+            // que se carga con el nombre registrado. Agrupa las filas del mismo producto con el mismo nombre.
+            public bool RegistrarNombre(FilaExcel fila, Producto producto)
+            {
+                var clave = $"nombre|{producto.Codigo.ToUpperInvariant()}|{fila.NombreProducto.Trim().ToUpperInvariant()}";
+
+                if (!_incidencias.TryGetValue(clave, out var incidencia))
+                {
+                    incidencia = new IncidenciaExcel
+                    {
+                        Clave = clave,
+                        Tipo = TiposIncidenciaExcel.NombreDistinto,
+                        Titulo = $"El nombre no coincide con {producto.Codigo}",
+                        Detalle = $"El archivo dice «{fila.NombreProducto}», pero {producto.Codigo} está registrado como «{producto.Nombre}». " +
+                                  "Si el código del archivo es el equivocado, corríjalo y vuelva a validar.",
+                        CodigoProducto = producto.Codigo,
+                        NombreProducto = producto.Nombre,
+                        BodegaId = fila.Bodega.Id
+                    };
+                    _incidencias[clave] = incidencia;
+                    _nombresConfirmados[clave] = ConfirmarNombre(incidencia);
+                }
+
+                AgregarFila(incidencia, fila);
+                return _nombresConfirmados[clave];
+            }
+
+            private bool ConfirmarNombre(IncidenciaExcel incidencia)
+            {
+                if (!_resoluciones.TryGetValue(incidencia.Clave, out var r) || string.IsNullOrWhiteSpace(r.Opcion))
+                {
+                    if (_resoluciones.Count > 0) Error(incidencia, "Confirme con qué nombre se cargan estas filas.");
+                    return false;
+                }
+                if (r.Opcion == ResolucionExcel.OpcionNombreRegistrado) return true;
+
+                Error(incidencia, "Esa opción no está disponible. Elija otra.");
+                return false;
+            }
+
+            private static void AgregarFila(IncidenciaExcel incidencia, FilaExcel fila)
+            {
                 incidencia.Filas.Add(fila.Numero);
                 if (!incidencia.Pedidos.Contains(fila.Pedido)) incidencia.Pedidos.Add(fila.Pedido);
-                return _destinos[clave];
             }
 
             private IncidenciaExcel Crear(string clave, string tipo, FilaExcel fila, Producto? producto, Ubicacion? ubi)

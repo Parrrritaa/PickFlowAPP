@@ -111,6 +111,7 @@ namespace PickingApp.Controllers
                 filasConProductoNoRegistrado = v.FilasConProductoNoRegistrado,
                 filasConUbicacionNoRegistrada = v.FilasConUbicacionNoRegistrada,
                 filasConProductoIncorrecto = v.FilasConProductoIncorrecto,
+                filasConNombreDistinto = v.FilasConNombreDistinto,
                 filasConPedidoDuplicado = v.FilasConPedidoDuplicado,
                 totalPedidos = v.TotalPedidos,
                 totalFilas = v.TotalFilas,

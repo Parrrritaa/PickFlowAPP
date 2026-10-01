@@ -148,6 +148,7 @@
                     ['filasConCantidadInvalida', 'Cantidades válidas'],
                     ['filasConBodegaNoRegistrada', 'Bodegas registradas'],
                     ['filasConProductoNoRegistrado', 'Productos registrados', 'decidir'],
+                    ['filasConNombreDistinto', 'Nombres coinciden con el código', 'decidir'],
                     ['filasConUbicacionNoRegistrada', 'Ubicaciones registradas y activas', 'decidir'],
                     ['filasConProductoIncorrecto', 'Productos corresponden a su ubicación', 'decidir'],
                     ['filasConPedidoDuplicado', 'Pedidos no registrados previamente']
@@ -279,6 +280,7 @@
                 var prefijo = 'resoluciones[' + i + '].';
                 var id = 'incidencia' + i;
                 var productoNuevo = inc.tipo === 'producto-no-registrado';
+                var nombreDistinto = inc.tipo === 'nombre-distinto';
 
                 var card = elemento('section', 'pf-incidencia');
                 card.setAttribute('aria-labelledby', id + '-titulo');
@@ -292,7 +294,8 @@
                 var cabecera = elemento('div', 'pf-incidencia-cabecera');
                 var icono = elemento('span', 'pf-incidencia-icono');
                 icono.setAttribute('aria-hidden', 'true');
-                icono.appendChild(elemento('i', 'bi ' + (productoNuevo ? 'bi-box-seam' : inc.tipo === 'ubicacion-inactiva' ? 'bi-slash-circle' : 'bi-geo-alt')));
+                icono.appendChild(elemento('i', 'bi ' + (productoNuevo ? 'bi-box-seam' : nombreDistinto ? 'bi-tag'
+                    : inc.tipo === 'ubicacion-inactiva' ? 'bi-slash-circle' : 'bi-geo-alt')));
                 var textos = elemento('div');
                 var titulo = elemento('h6', 'pf-incidencia-titulo', inc.titulo);
                 titulo.id = id + '-titulo';
@@ -305,8 +308,13 @@
                 if (productoNuevo) card.appendChild(camposProducto(inc, prefijo, id, datos));
 
                 var opciones = elemento('fieldset', 'pf-opciones');
-                opciones.appendChild(elemento('legend', 'mockup-label', productoNuevo ? '¿Dónde se guarda?' : '¿De dónde se recoge?'));
+                opciones.appendChild(elemento('legend', 'mockup-label',
+                    nombreDistinto ? '¿Con qué nombre se carga?' : productoNuevo ? '¿Dónde se guarda?' : '¿De dónde se recoge?'));
                 var lista = elemento('div', 'pf-opciones-lista');
+                if (nombreDistinto) {
+                    lista.appendChild(opcion(prefijo, id, 'nombre-registrado', 'Cargar como ' + inc.codigoProducto + ' · ' + inc.nombreProducto,
+                        'Se usa el nombre registrado en el sistema'));
+                }
                 inc.ubicaciones.forEach(function (u) {
                     lista.appendChild(opcion(prefijo, id, String(u.id), 'Recoger de ' + u.codigo,
                         u.bodega + (u.bodegaId === inc.bodegaId ? '' : ' · otra bodega')));
@@ -314,10 +322,12 @@
                 if (inc.textoCorregir) {
                     lista.appendChild(opcion(prefijo, id, 'corregir', inc.textoCorregir, 'Se modifica esa ubicación al confirmar la carga'));
                 }
-                var nueva = opcion(prefijo, id, 'nueva', productoNuevo ? 'En una ubicación nueva' : 'Crear una ubicación nueva',
-                    'Elija la bodega y la posición');
-                nueva.appendChild(camposUbicacion(inc, prefijo, id, datos));
-                lista.appendChild(nueva);
+                if (!nombreDistinto) {
+                    var nueva = opcion(prefijo, id, 'nueva', productoNuevo ? 'En una ubicación nueva' : 'Crear una ubicación nueva',
+                        'Elija la bodega y la posición');
+                    nueva.appendChild(camposUbicacion(inc, prefijo, id, datos));
+                    lista.appendChild(nueva);
+                }
                 opciones.appendChild(lista);
                 card.appendChild(opciones);
 
@@ -326,9 +336,9 @@
                 error.hidden = true;
                 card.appendChild(error);
 
-                // Una sola opción posible: se deja elegida
+                // Una sola opción posible: se deja elegida. Un nombre distinto se confirma siempre a mano.
                 var radios = lista.querySelectorAll('input[type="radio"]');
-                if (radios.length === 1) radios[0].checked = true;
+                if (radios.length === 1 && !nombreDistinto) radios[0].checked = true;
 
                 function actualizar() {
                     lista.querySelectorAll('.pf-opcion-fila').forEach(function (fila) {

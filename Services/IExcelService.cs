@@ -24,6 +24,7 @@ namespace PickingApp.Services
         public int FilasConProductoNoRegistrado { get; set; }
         public int FilasConUbicacionNoRegistrada { get; set; }
         public int FilasConProductoIncorrecto { get; set; }
+        public int FilasConNombreDistinto { get; set; }
 
         public List<IncidenciaExcel> Incidencias { get; set; } = new();
 
@@ -41,6 +42,8 @@ namespace PickingApp.Services
         public const string UbicacionVacia = "ubicacion-vacia";
         public const string ProductoIncorrecto = "producto-incorrecto";
         public const string UbicacionInactiva = "ubicacion-inactiva";
+        // El producto existe, pero el nombre del archivo no es el registrado para ese código
+        public const string NombreDistinto = "nombre-distinto";
     }
 
     // Filas del Excel que comparten un mismo problema de producto o ubicación y se resuelven con una sola decisión.
@@ -86,10 +89,11 @@ namespace PickingApp.Services
     {
         public const string OpcionNueva = "nueva";
         public const string OpcionCorregir = "corregir";
+        public const string OpcionNombreRegistrado = "nombre-registrado";
 
         public string? Clave { get; set; }
 
-        // Id de una ubicación del producto, "nueva" o "corregir"
+        // Id de una ubicación del producto, "nueva" o "corregir" ("nombre-registrado" en un nombre distinto)
         public string? Opcion { get; set; }
 
         // Ubicación nueva
