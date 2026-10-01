@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
@@ -310,7 +310,7 @@ namespace PickingApp.Services
                         Tipo = TiposIncidenciaExcel.NombreDistinto,
                         Titulo = $"El nombre no coincide con {producto.Codigo}",
                         Detalle = $"El archivo dice «{fila.NombreProducto}», pero {producto.Codigo} está registrado como «{producto.Nombre}». " +
-                                  "Si el código del archivo es el equivocado, corríjalo y vuelva a validar.",
+                                  "Si el código del producto es el equivocado, corríjalo y vuelva a validar.",
                         CodigoProducto = producto.Codigo,
                         NombreProducto = producto.Nombre,
                         BodegaId = fila.Bodega.Id
