@@ -38,6 +38,7 @@ builder.Services.AddScoped<IExcelService, ExcelService>();
 builder.Services.AddScoped<IPickingEngine, PickingEngine>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<DatosDemostracion>();
 
 // Configuración de Autenticación por Cookies (RNF-06: cierre por inactividad).
 // La duración real la fija el inicio de sesión con el parámetro MinutosInactividadSesion;

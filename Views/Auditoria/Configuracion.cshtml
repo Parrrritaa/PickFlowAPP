@@ -117,9 +117,39 @@
                     </div>
                 </div>
             </div>
+
+            @* Demostración: simula unos días de uso (Services/DatosDemostracion.cs) sobre un historial vacío *@
+            <div class="card border-0 shadow-sm rounded-4 mt-4">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-stars me-1" aria-hidden="true"></i> Datos de demostración</h6>
+                    <p class="text-secondary small mb-3">
+                        Simula @PickingApp.Services.DatosDemostracion.DiasSimulados días de uso hasta hoy: cargas de Excel, pedidos asignados,
+                        reasignados, completados, cancelados y divididos, novedades y solicitudes. Las cantidades y los tiempos cambian
+                        cada vez, pero siempre aparece cada caso. Para quitarlos, borre el historial de pedidos (las solicitudes se conservan).
+                    </p>
+                    <form asp-action="CargarDatosDemostracion" method="post" id="formDemostracion"
+                          class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <span class="small @(Model.MotivoSinDemostracion == null ? "fw-semibold" : "text-secondary")">
+                            @(Model.MotivoSinDemostracion ?? "Listo para cargar.")
+                        </span>
+                        <button type="submit" class="btn btn-outline-primary" disabled="@(Model.MotivoSinDemostracion != null)">
+                            Cargar datos de demostración
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    // Generar la demostración tarda unos segundos: el botón lo indica y evita un doble envío
+    document.getElementById('formDemostracion').addEventListener('submit', function (e) {
+        var boton = e.target.querySelector('[type="submit"]');
+        boton.disabled = true;
+        boton.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>Cargando…';
+    });
+</script>
 
 @if (Model.TotalPedidos > 0)
 {

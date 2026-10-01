@@ -16,12 +16,15 @@ namespace PickingApp.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
         private readonly IReportService _reportService;
+        private readonly DatosDemostracion _datosDemostracion;
 
-        public AuditoriaController(ApplicationDbContext context, IAuditService auditService, IReportService reportService)
+        public AuditoriaController(ApplicationDbContext context, IAuditService auditService, IReportService reportService,
+            DatosDemostracion datosDemostracion)
         {
             _context = context;
             _auditService = auditService;
             _reportService = reportService;
+            _datosDemostracion = datosDemostracion;
         }
 
         private const int MaxRegistrosPantalla = 200;
@@ -138,7 +141,8 @@ namespace PickingApp.Controllers
                 LogHabilitado = await ParametrosSistema.LogHabilitadoAsync(_context),
                 Valores = await ParametrosSistema.ObtenerTodosAsync(_context),
                 TotalPedidos = await _context.Pedidos.CountAsync(),
-                PedidosEnCurso = await _context.Pedidos.CountAsync(p => PedidoEstados.EnCurso.Contains(p.Estado))
+                PedidosEnCurso = await _context.Pedidos.CountAsync(p => PedidoEstados.EnCurso.Contains(p.Estado)),
+                MotivoSinDemostracion = await _datosDemostracion.MotivoNoDisponibleAsync()
             });
         }
 
@@ -231,6 +235,31 @@ namespace PickingApp.Controllers
                 $"Se eliminaron los {total} pedidos del sistema con sus productos y novedades. Los autoincrementos de esas tablas se reiniciaron.");
 
             TempData["SuccessMessage"] = $"Se borraron {total} pedidos. Los próximos pedidos empiezan de nuevo desde el número 1.";
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        // Simula unos días de uso (Services/DatosDemostracion.cs) para mostrar el sistema con datos.
+        // Solo con el historial de pedidos vacío, para no mezclar la demostración con pedidos reales.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CargarDatosDemostracion()
+        {
+            var motivo = await _datosDemostracion.MotivoNoDisponibleAsync();
+            if (motivo != null)
+            {
+                TempData["ErrorMessage"] = motivo;
+                return RedirectToAction(nameof(Configuracion));
+            }
+
+            var r = await _datosDemostracion.GenerarAsync(int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+
+            await _auditService.RegistrarAsync("Cargar Datos de Demostración", "Mantenimiento",
+                $"Se simularon {DatosDemostracion.DiasSimulados} días de uso: {r.Pedidos} pedidos ({r.Completados} completados, {r.Cancelados} cancelados, " +
+                $"{r.EnCurso} en curso, {r.Pendientes} pendientes), {r.Novedades} novedades y {r.Solicitudes} solicitudes.");
+
+            TempData["SuccessMessage"] = $"Se cargaron {DatosDemostracion.DiasSimulados} días de uso: {r.Pedidos} pedidos " +
+                $"({r.Completados} completados, {r.EnCurso} en curso, {r.Pendientes} pendientes y {r.Cancelados} cancelados), " +
+                $"{r.Novedades} novedades y {r.Solicitudes} solicitudes.";
             return RedirectToAction(nameof(Configuracion));
         }
 
