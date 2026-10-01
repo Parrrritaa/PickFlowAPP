@@ -360,13 +360,26 @@
         cargar();
     });
 
-    // El selector del título mide lo que dice la opción elegida, así la flecha queda pegada al texto
-    const medidor = document.createElement('canvas').getContext('2d');
+    // El título muestra la agrupación elegida en un botón con menú propio (el select oculto guarda el valor)
     function ajustarAgrupar() {
         const s = el('pfAgrupar');
-        medidor.font = getComputedStyle(s).font;
-        s.style.width = Math.ceil(medidor.measureText(s.options[s.selectedIndex].text).width) + 34 + 'px';
+        el('pfAgruparTexto').textContent = s.options[s.selectedIndex].text;
+        el('pfAgruparMenu').querySelectorAll('.pf-opcion').forEach(o => {
+            o.classList.toggle('active', o.dataset.valor === s.value);
+            o.setAttribute('aria-pressed', o.dataset.valor === s.value);
+        });
     }
+
+    el('pfAgruparMenu').addEventListener('click', e => {
+        const o = e.target.closest('.pf-opcion');
+        if (!o) return;
+        const s = el('pfAgrupar');
+        if (s.value !== o.dataset.valor) {
+            s.value = o.dataset.valor;
+            s.dispatchEvent(new Event('change'));
+        }
+        bootstrap.Dropdown.getOrCreateInstance(el('pfAgruparBtn')).hide();
+    });
 
     el('pfAgrupar').addEventListener('change', () => {
         ajustarAgrupar();

@@ -2274,14 +2274,29 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 .pf-chart-h label { margin: 0; font: inherit; }
 /* El título elige la agrupación: "Pedidos por [estado ▾]" */
 .pf-select-titulo { position: relative; display: inline-flex; align-items: center; }
-.pf-select-titulo select {
-    appearance: none; border: 0; margin: 0; padding: 0 26px 0 6px; border-radius: 8px;
+.pf-agrupar-btn {
+    display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 0 8px; border: 0; border-radius: 8px;
     background: transparent; font: inherit; color: var(--pf-blue-hover); cursor: pointer;
-    transition: background-color var(--pf-duration-base) var(--pf-ease), width 0.3s var(--pf-ease-out);
+    transition: background-color var(--pf-duration-base) var(--pf-ease), transform var(--pf-duration-fast) var(--pf-ease);
 }
-.pf-select-titulo select:hover { background: rgba(59, 113, 202, 0.1); }
-.pf-select-titulo select:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 1px; }
-.pf-select-titulo i { position: absolute; right: 6px; font-size: 13px; color: var(--pf-blue-hover); pointer-events: none; -webkit-text-stroke: 0.6px; }
+.pf-agrupar-btn:hover, .pf-agrupar-btn[aria-expanded="true"] { background: rgba(59, 113, 202, 0.1); }
+.pf-agrupar-btn:active { transform: scale(0.97); }
+.pf-agrupar-btn:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: 1px; }
+.pf-agrupar-btn i { font-size: 13px; -webkit-text-stroke: 0.6px; transition: rotate 0.3s var(--pf-ease-out); }
+.pf-agrupar-btn[aria-expanded="true"] i { rotate: 180deg; }
+/* Menú de opciones: filas redondeadas, la elegida resaltada con una marca */
+.pf-opciones { min-width: 190px; padding: 6px; transform-origin: top left; }
+.pf-opcion {
+    position: relative; display: block; width: 100%; padding: 8px 34px 8px 12px; border: 0; border-radius: 10px;
+    background: transparent; text-align: left; font-size: 15px; font-weight: 500; color: var(--pf-text-dark); cursor: pointer;
+    transition: background-color var(--pf-duration-fast) var(--pf-ease);
+}
+.pf-opcion:hover { background: var(--pf-gray-light); }
+.pf-opcion:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: -2px; }
+.pf-opcion.active { color: var(--pf-blue-hover); font-weight: 600; }
+.pf-opcion.active::after {
+    content: "\F26E"; font-family: "bootstrap-icons"; position: absolute; right: 12px; top: 50%; translate: 0 -50%; font-size: 15px;
+}
 .pf-chart-resumen { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: 2px 0 0; font-size: 14px; color: var(--pf-text-secondary); }
 .pf-chart-resumen .pf-link-btn { padding: 0 4px; font-size: 13px; }
 

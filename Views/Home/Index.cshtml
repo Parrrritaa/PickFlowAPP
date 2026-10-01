@@ -58,15 +58,26 @@
                 <div class="pf-chart-titulo">
                     <h2 class="pf-chart-h">
                         <label for="pfAgrupar">Pedidos por</label>
-                        <span class="pf-select-titulo">
-                            <select id="pfAgrupar">
+                        <span class="pf-select-titulo dropdown">
+                            <!-- El select guarda el valor que lee el script; el menú es solo la cara visible -->
+                            <select id="pfAgrupar" hidden>
                                 <option value="estado">estado</option>
                                 <option value="prioridad">prioridad</option>
                                 <option value="bodega">bodega</option>
                                 <option value="empleado">empleado</option>
                                 <option value="dia">día de carga</option>
                             </select>
-                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                            <button type="button" class="pf-agrupar-btn" id="pfAgruparBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span id="pfAgruparTexto">estado</span>
+                                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                            </button>
+                            <div class="dropdown-menu pf-pop pf-opciones" id="pfAgruparMenu" aria-labelledby="pfAgruparBtn">
+                                <button type="button" class="pf-opcion" data-valor="estado">estado</button>
+                                <button type="button" class="pf-opcion" data-valor="prioridad">prioridad</button>
+                                <button type="button" class="pf-opcion" data-valor="bodega">bodega</button>
+                                <button type="button" class="pf-opcion" data-valor="empleado">empleado</button>
+                                <button type="button" class="pf-opcion" data-valor="dia">día de carga</button>
+                            </div>
                         </span>
                     </h2>
                     <p class="pf-chart-resumen" id="pfResumen" aria-live="polite">&nbsp;</p>
