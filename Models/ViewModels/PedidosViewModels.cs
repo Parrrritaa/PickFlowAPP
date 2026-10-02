@@ -5,7 +5,9 @@ namespace PickingApp.Models.ViewModels
     // Views/Pedidos/Index.cshtml: lista de pedidos con los filtros aplicados y las opciones de cada filtro
     public class PedidosIndexViewModel
     {
+        // Solo la página actual; el total con los filtros está en Paginacion.TotalRegistros
         public List<Pedido> Pedidos { get; init; } = new();
+        public Paginacion Paginacion { get; init; } = null!;
         public List<Bodega> Bodegas { get; init; } = new();
         public List<Empleado> Empleados { get; init; } = new();
 

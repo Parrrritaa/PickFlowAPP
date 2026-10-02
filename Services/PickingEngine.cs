@@ -10,9 +10,14 @@ namespace PickingApp.Services
     {
         private readonly ApplicationDbContext _context;
 
-        public PickingEngine(ApplicationDbContext context)
+        // Hora actual para las reglas de jornada. En la aplicación es el reloj del sistema (Program.cs);
+        // las pruebas pasan una hora fija para que el resultado no dependa de cuándo se ejecutan.
+        private readonly TimeProvider _reloj;
+
+        public PickingEngine(ApplicationDbContext context, TimeProvider reloj)
         {
             _context = context;
+            _reloj = reloj;
         }
 
         // Tiempo estándar = Σ (unidades × minutos por unidad de la categoría del producto ÷ unidades por caja del producto)
@@ -197,7 +202,7 @@ namespace PickingApp.Services
                     .CountAsync(),
                 MesesMinimos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MesesExperienciaAdvertencia),
                 MaxUbicaciones = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxUbicacionesAdvertencia),
-                HoraActual = DateTime.Now.TimeOfDay
+                HoraActual = _reloj.GetLocalNow().TimeOfDay
             };
             var rendimientos = await CalcularRendimientosAsync(ids);
 

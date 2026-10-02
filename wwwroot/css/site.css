@@ -2556,3 +2556,142 @@ label.pf-tipo { margin: 0; }
 /* Estado sin marcar: el punto queda vacío, igual que en la franja del Dashboard */
 .pf-pildora input[type="checkbox"]:not(:checked) + span .pf-kpi-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--dot); }
 
+
+/* Paginación de listas largas (Views/Shared/_Paginacion.cshtml): pedidos y LOG */
+.pf-paginacion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.pf-paginacion__resumen {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--pf-text-muted);
+}
+
+.pf-paginacion ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pf-paginacion a,
+.pf-paginacion span.actual,
+.pf-paginacion span.deshabilitado,
+.pf-paginacion span.salto {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: var(--pf-radius-control);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.pf-paginacion a {
+    color: var(--pf-text-secondary);
+    background-color: #FFFFFF;
+    border: 1px solid var(--pf-gray-border);
+    transition: background-color var(--pf-duration-fast) var(--pf-ease), border-color var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-paginacion a:hover {
+    color: var(--pf-blue);
+    border-color: var(--pf-blue);
+    background-color: var(--pf-gray-light);
+}
+
+.pf-paginacion a:focus-visible {
+    outline: 2px solid var(--pf-blue);
+    outline-offset: 2px;
+}
+
+.pf-paginacion span.actual {
+    color: #FFFFFF;
+    background-color: var(--pf-blue);
+    border: 1px solid var(--pf-blue);
+}
+
+.pf-paginacion span.deshabilitado {
+    color: var(--pf-gray-border);
+    border: 1px solid var(--pf-gray-bg);
+}
+
+.pf-paginacion span.salto {
+    min-width: 20px;
+    padding: 0;
+    color: var(--pf-text-muted);
+}
+
+/* ===== Historial de un empleado (Views/Empleados/Historial.cshtml) ===== */
+.pf-link-volver,
+.pf-link-historial {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--pf-blue-hover);
+    text-decoration: none;
+}
+
+.pf-link-volver { margin-bottom: 8px; }
+.pf-link-historial { margin-top: 4px; font-size: 13px; }
+.pf-link-volver:hover,
+.pf-link-historial:hover { color: var(--pf-navy); text-decoration: underline; }
+
+/* Frase que resume la tendencia, encima de las cifras */
+.pf-historial-resumen {
+    margin: -8px 0 16px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--pf-text-dark);
+}
+
+/* La franja de cifras del Dashboard, sin botones: solo informa */
+.pf-kpis--fijo { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pf-kpis--fijo .pf-kpi { cursor: default; }
+.pf-kpis--fijo .pf-kpi:hover { background: transparent; }
+.pf-kpis--fijo .pf-kpi:hover::before,
+.pf-kpis--fijo .pf-kpi:hover + .pf-kpi::before { opacity: 1; }
+.pf-kpis--fijo .pf-kpi:active { transform: none; }
+.pf-kpi-nota { font-size: 13px; color: var(--pf-text-secondary); }
+.pf-kpi-nota .pf-rendimiento { margin-top: 6px; }
+.pf-kpi-valor--vacio { color: var(--pf-text-muted); }
+
+.pf-tendencia { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; }
+.pf-tendencia i { font-size: 0.85em; }
+.pf-tendencia--masrapido { color: #2F6B27; }
+.pf-tendencia--maslento { color: var(--pf-attention); }
+.pf-tendencia--sindatos { color: var(--pf-text-muted); }
+
+/* Real frente a estimado: el signo (+/−) dice la dirección; el color solo la refuerza */
+.pf-desvio { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pf-desvio--rapido { color: #2F6B27; }
+.pf-desvio--lento { color: var(--pf-attention); }
+.pf-kpi-valor.pf-desvio--rapido { color: #2F6B27; }
+.pf-kpi-valor.pf-desvio--lento { color: var(--pf-attention); }
+
+/* Pedidos anteriores al último reinicio de rendimiento: se ven, pero atenuados */
+.pf-fila-no-cuenta td { color: var(--pf-text-muted); }
+
+/* Estado vacío: mismo bloque que Notificaciones, en azul (no es un "todo bien") */
+.pf-historial-vacio .pf-notif-empty-icon {
+    color: var(--pf-blue-hover);
+    background-color: rgba(59, 113, 202, 0.12);
+}
+
+@media (max-width: 991.98px) {
+    .pf-kpis--fijo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pf-kpis--fijo .pf-kpi::before { display: none; }
+}

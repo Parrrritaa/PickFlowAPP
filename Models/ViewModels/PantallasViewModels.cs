@@ -28,6 +28,44 @@ namespace PickingApp.Models.ViewModels
         public Dictionary<int, RendimientoEmpleado> Rendimientos { get; init; } = new();
     }
 
+    // Views/Empleados/Historial.cshtml: tiempos reales contra estimados de los pedidos que completó un empleado
+    public class EmpleadoHistorialViewModel
+    {
+        public Empleado Empleado { get; init; } = null!;
+        public bool Ocupado { get; init; }
+        public RendimientoEmpleado Rendimiento { get; init; } = null!;
+        public TendenciaRendimiento Tendencia { get; init; } = null!;
+
+        public int TotalCompletados { get; init; }
+        // Los anteriores al último "Reiniciar rendimiento" se muestran pero no cuentan
+        public int CompletadosQueCuentan { get; init; }
+
+        // Σ real ÷ Σ estimado - 1 de los pedidos con estimación guardada: 0,1 = tardó 10 % más de lo estimado.
+        // null si ningún pedido tiene estimación
+        public double? DesvioSobreEstimado { get; init; }
+
+        // Gráfica: los últimos pedidos, del más antiguo al más reciente
+        public List<HistorialPedidoFila> Grafica { get; init; } = new();
+
+        // Tabla: una página, del más reciente al más antiguo
+        public List<HistorialPedidoFila> Pedidos { get; init; } = new();
+        public Paginacion Paginacion { get; init; } = null!;
+    }
+
+    public class HistorialPedidoFila
+    {
+        public int PedidoId { get; init; }
+        public string CodigoPedido { get; init; } = string.Empty;
+        public DateTime Finalizado { get; init; }
+        public double Estandar { get; init; }
+        public double? Estimado { get; init; }
+        public double Real { get; init; }
+        public bool CuentaParaRendimiento { get; init; }
+
+        // Real frente a estimado: 0,25 = tardó 25 % más; null sin estimación
+        public double? Desvio => Estimado > 0 ? Real / Estimado.Value - 1 : null;
+    }
+
     // Views/Productos/Index.cshtml: categorías arriba y tabla de productos abajo
     public class ProductosIndexViewModel
     {
@@ -46,10 +84,9 @@ namespace PickingApp.Models.ViewModels
     // Views/Auditoria/Index.cshtml (LOG del sistema)
     public class AuditoriaIndexViewModel
     {
-        // Los más recientes, hasta MaxRegistros
+        // Solo la página actual, del más reciente al más antiguo; el total con los filtros está en Paginacion.TotalRegistros
         public List<LogSistema> Registros { get; init; } = new();
-        public int TotalFiltrado { get; init; }
-        public int MaxRegistros { get; init; }
+        public Paginacion Paginacion { get; init; } = null!;
 
         public string? ModuloFiltro { get; init; }
         public string? UsuarioFiltro { get; init; }

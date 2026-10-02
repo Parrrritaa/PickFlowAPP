@@ -1,0 +1,73 @@
+@model PickingApp.Models.ViewModels.Paginacion
+@using Microsoft.AspNetCore.Http.Extensions
+@{
+    // Cada enlace repite la URL actual (con sus filtros) cambiando solo "pagina"; la página 1 va sin el parámetro
+    string Url(int pagina)
+    {
+        var query = new QueryBuilder(Context.Request.Query
+            .Where(q => !string.Equals(q.Key, "pagina", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string>(q.Key, v ?? ""))));
+        if (pagina > 1) query.Add("pagina", pagina.ToString());
+        return Context.Request.PathBase + Context.Request.Path + query.ToQueryString();
+    }
+
+    // Primera, última y dos a cada lado de la actual; null marca un salto ("…")
+    var paginas = new List<int?>();
+    for (var i = 1; i <= Model.TotalPaginas; i++)
+    {
+        if (i == 1 || i == Model.TotalPaginas || Math.Abs(i - Model.Pagina) <= 2)
+        {
+            paginas.Add(i);
+        }
+        else if (paginas.LastOrDefault() != null)
+        {
+            paginas.Add(null);
+        }
+    }
+}
+
+@if (Model.TotalPaginas > 1)
+{
+    <nav class="pf-paginacion" aria-label="Páginas">
+        <span class="pf-paginacion__resumen">@Model.Desde a @Model.Hasta de @Model.TotalRegistros</span>
+        <ul>
+            <li>
+                @if (Model.Pagina > 1)
+                {
+                    <a href="@Url(Model.Pagina - 1)" aria-label="Página anterior"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
+                }
+                else
+                {
+                    <span class="deshabilitado" aria-hidden="true"><i class="bi bi-chevron-left"></i></span>
+                }
+            </li>
+            @foreach (var p in paginas)
+            {
+                <li>
+                    @if (p == null)
+                    {
+                        <span class="salto" aria-hidden="true">…</span>
+                    }
+                    else if (p == Model.Pagina)
+                    {
+                        <span class="actual" aria-current="page">@p</span>
+                    }
+                    else
+                    {
+                        <a href="@Url(p.Value)" aria-label="Página @p">@p</a>
+                    }
+                </li>
+            }
+            <li>
+                @if (Model.Pagina < Model.TotalPaginas)
+                {
+                    <a href="@Url(Model.Pagina + 1)" aria-label="Página siguiente"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                }
+                else
+                {
+                    <span class="deshabilitado" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
+                }
+            </li>
+        </ul>
+    </nav>
+}

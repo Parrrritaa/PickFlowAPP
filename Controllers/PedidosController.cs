@@ -31,10 +31,12 @@ namespace PickingApp.Controllers
             _auditService = auditService;
         }
 
+        private const int PedidosPorPagina = 25;
+
         // CU-24: Consultar pedidos con filtros
         // vista = "divididos" muestra aparte los pedidos divididos con sus partes, para no saturar la lista principal
         public async Task<IActionResult> Index(string? estado, string? prioridad, int? bodegaId, string? busqueda,
-            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta, string? vista)
+            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta, string? vista, int? pagina)
         {
             var verDivididos = vista == "divididos";
 
@@ -103,16 +105,24 @@ namespace PickingApp.Controllers
                 query = query.Where(p => p.FechaCarga < hastaExclusivo);
             }
 
-            // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes
+            // Solo se trae la página pedida: primero se cuenta el total con los filtros y luego Skip/Take
+            var paginacion = new Paginacion(pagina, PedidosPorPagina, await query.CountAsync());
+
+            // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes.
+            // El Id al final deja el orden fijo, para que un pedido no salte de una página a otra.
             var pedidos = await query
                 .OrderByDescending(p => p.Prioridad == "Alta")
                 .ThenByDescending(p => p.FechaCarga)
                 .ThenBy(p => p.CodigoPedido)
+                .ThenBy(p => p.Id)
+                .Skip(paginacion.Saltar)
+                .Take(paginacion.TamanoPagina)
                 .ToListAsync();
 
             return View(new PedidosIndexViewModel
             {
                 Pedidos = pedidos,
+                Paginacion = paginacion,
                 // Se listan todas las bodegas (no solo las activas) para poder consultar pedidos históricos de bodegas desactivadas
                 Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync(),
                 Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync(),

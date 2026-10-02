@@ -19,7 +19,7 @@ namespace PickingApp.Services
     // El paso a paso de cada día está en SimulacionDemostracion.
     public class DatosDemostracion
     {
-        public const int DiasSimulados = 6;
+        public const int DiasSimulados = 8;
         public const int MinimoEmpleados = 2;
         public const int MinimoUbicaciones = 3;
 

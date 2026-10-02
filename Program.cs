@@ -33,6 +33,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Cada interfaz se asocia a su implementación: quien pide IPickingEngine en su constructor recibe un PickingEngine.
 // AddScoped crea una instancia por petición HTTP.
 builder.Services.AddHttpContextAccessor();
+// Reloj del sistema: PickingEngine lo recibe para las reglas de jornada (las pruebas usan uno fijo)
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IExcelService, ExcelService>();
 builder.Services.AddScoped<IPickingEngine, PickingEngine>();

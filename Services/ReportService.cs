@@ -10,10 +10,25 @@ namespace PickingApp.Services
     // desde ReportesController, que devuelve los bytes al navegador como archivo descargable.
     public class ReportService : IReportService
     {
-        public ReportService()
+        // Logo del encabezado, o null si el archivo no está (el PDF sale igual, solo con el nombre)
+        private readonly byte[]? _logo;
+
+        public ReportService(IWebHostEnvironment env, ILogger<ReportService> logger)
         {
             // Licencia gratuita de QuestPDF para proyectos pequeños y académicos
             QuestPDF.Settings.License = LicenseType.Community;
+
+            // WebRootPath apunta a wwwroot tanto con "dotnet run" (carpeta del proyecto) como publicado
+            // (carpeta de publicación); la carpeta bin no tiene copia de wwwroot
+            var logoPath = Path.Combine(env.WebRootPath, "images", "pickflow-logo.jpg");
+            if (File.Exists(logoPath))
+            {
+                _logo = File.ReadAllBytes(logoPath);
+            }
+            else
+            {
+                logger.LogWarning("No se encontró el logo de los reportes en {Ruta}; los PDF saldrán sin logo.", logoPath);
+            }
         }
 
         public byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo)
@@ -557,11 +572,8 @@ namespace PickingApp.Services
             });
         }
 
-        private static void ComposeHeader(IContainer container, string titulo, string periodo, string? filtro)
+        private void ComposeHeader(IContainer container, string titulo, string periodo, string? filtro)
         {
-            // Ruta absoluta al logo en wwwroot
-            var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "images", "pickflow-logo.jpg");
-
             container.Column(column =>
             {
                 column.Item().Row(row =>
@@ -569,9 +581,9 @@ namespace PickingApp.Services
                     // Logo + nombre de marca
                     row.ConstantItem(160).Row(brand =>
                     {
-                        if (File.Exists(logoPath))
+                        if (_logo != null)
                         {
-                            brand.ConstantItem(52).Image(logoPath).FitArea();
+                            brand.ConstantItem(52).Image(_logo).FitArea();
                         }
                         brand.RelativeItem().PaddingLeft(6).Column(txt =>
                         {

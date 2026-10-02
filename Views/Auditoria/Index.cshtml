@@ -6,8 +6,7 @@
     var usuario = Model.UsuarioFiltro;
     var fechaDesde = Model.FechaDesdeFiltro;
     var fechaHasta = Model.FechaHastaFiltro;
-    var totalFiltrado = Model.TotalFiltrado;
-    var maxRegistros = Model.MaxRegistros;
+    var totalFiltrado = Model.Paginacion.TotalRegistros;
     var hayFiltroFecha = !string.IsNullOrEmpty(fechaDesde) || !string.IsNullOrEmpty(fechaHasta);
     var hoy = DateTime.Today.ToString("yyyy-MM-dd");
 }
@@ -27,14 +26,7 @@
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <span class="text-muted small fw-semibold">
-            @if (totalFiltrado > maxRegistros)
-            {
-                @($"Mostrando los {maxRegistros} más recientes de {totalFiltrado} registros. Use el PDF para ver el rango completo.")
-            }
-            else
-            {
-                @($"{totalFiltrado} registro(s){(hayFiltroFecha ? " en el rango seleccionado" : "")}")
-            }
+            @($"{totalFiltrado} registro(s){(hayFiltroFecha ? " en el rango seleccionado" : "")}")
         </span>
         @if (hayFiltroFecha)
         {
@@ -94,6 +86,8 @@
             </tbody>
         </table>
     </div>
+
+    <partial name="_Paginacion" model="Model.Paginacion" />
 </div>
 
 <!-- Modal Exportar LOG a PDF: pide el rango de fechas a exportar -->

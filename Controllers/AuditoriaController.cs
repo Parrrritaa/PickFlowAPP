@@ -27,25 +27,27 @@ namespace PickingApp.Controllers
             _datosDemostracion = datosDemostracion;
         }
 
-        private const int MaxRegistrosPantalla = 200;
+        private const int RegistrosPorPagina = 50;
 
         // CU-38: Consultar LOG del sistema
-        public async Task<IActionResult> Index(string? modulo, string? usuario, DateTime? fechaDesde, DateTime? fechaHasta)
+        public async Task<IActionResult> Index(string? modulo, string? usuario, DateTime? fechaDesde, DateTime? fechaHasta, int? pagina)
         {
             var query = FiltrarLogs(modulo, usuario, fechaDesde, fechaHasta);
 
-            var totalFiltrado = await query.CountAsync();
+            // Solo se trae la página pedida; el Id desempata registros del mismo instante para que no cambien de página
+            var paginacion = new Paginacion(pagina, RegistrosPorPagina, await query.CountAsync());
             var logs = await query
                 .OrderByDescending(l => l.FechaHora)
-                .Take(MaxRegistrosPantalla)
+                .ThenByDescending(l => l.Id)
+                .Skip(paginacion.Saltar)
+                .Take(paginacion.TamanoPagina)
                 .ToListAsync();
             await ReemplazarCorreosEnDetalleAsync(logs);
 
             return View(new AuditoriaIndexViewModel
             {
                 Registros = logs,
-                TotalFiltrado = totalFiltrado,
-                MaxRegistros = MaxRegistrosPantalla,
+                Paginacion = paginacion,
                 ModuloFiltro = modulo,
                 UsuarioFiltro = usuario,
                 FechaDesdeFiltro = fechaDesde?.ToString("yyyy-MM-dd"),

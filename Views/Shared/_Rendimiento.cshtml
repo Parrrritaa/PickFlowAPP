@@ -1,0 +1,10 @@
+@model PickingApp.Services.RendimientoEmpleado
+@{
+    // Verde si tarda menos que el estándar, ámbar si tarda más, neutro sin historial o al ritmo estándar.
+    // El texto dice lo mismo que el color ("Tarda 15 % menos"), así no depende solo de él.
+    var clase = !Model.TieneHistorialSuficiente || Math.Abs(1 - Model.Factor) < 0.05 ? "pf-rendimiento--neutro"
+        : Model.Factor < 1 ? "pf-rendimiento--rapido"
+        : "pf-rendimiento--lento";
+}
+<span class="pf-rendimiento @clase">@Model.Descripcion</span>
+<div class="small text-muted">@Model.Detalle</div>

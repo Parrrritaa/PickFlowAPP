@@ -47,11 +47,11 @@
         <span class="text-muted fw-semibold">
             @if (verDivididos)
             {
-                @($"{pedidos.Count} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+                @($"{Model.Paginacion.TotalRegistros} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
             }
             else
             {
-                @($"{pedidos.Count} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+                @($"{Model.Paginacion.TotalRegistros} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
             }
         </span>
         <div>
@@ -294,6 +294,8 @@
             </table>
         </div>
     </form>
+
+    <partial name="_Paginacion" model="Model.Paginacion" />
 </div>
 
 @section Scripts {

@@ -50,9 +50,12 @@
                                 <td>
                                     @if (rendimientos.TryGetValue(emp.Id, out var rendimiento))
                                     {
-                                        <span class="pf-rendimiento @ClaseRendimiento(rendimiento)">@rendimiento.Descripcion</span>
-                                        <div class="small text-muted">@rendimiento.Detalle</div>
+                                        <partial name="_Rendimiento" model="rendimiento" />
                                     }
+                                    <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
+                                        Ver historial<span class="visually-hidden"> de @emp.NombreCompleto</span>
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
                                 </td>
                             }
                             <td>@emp.JornadaLaboral</td>
@@ -154,13 +157,4 @@
             </div>
         </div>
     </div>
-}
-
-@functions {
-    // Verde si tarda menos que el estándar, ámbar si tarda más, neutro sin historial o al ritmo estándar
-    string ClaseRendimiento(PickingApp.Services.RendimientoEmpleado r)
-    {
-        if (!r.TieneHistorialSuficiente || Math.Abs(1 - r.Factor) < 0.05) return "pf-rendimiento--neutro";
-        return r.Factor < 1 ? "pf-rendimiento--rapido" : "pf-rendimiento--lento";
-    }
 }

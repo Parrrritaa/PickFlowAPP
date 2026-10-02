@@ -46,6 +46,68 @@ namespace PickingApp.Controllers
             });
         }
 
+        private const int HistorialPorPagina = 20;
+        private const int PedidosEnGrafica = 30;
+
+        // Ficha de historial: tiempo real contra estimado de cada pedido completado y la tendencia del empleado.
+        // Solo Administrador y Supervisor, los mismos que ven el rendimiento en la lista.
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
+        public async Task<IActionResult> Historial(int id, int? pagina)
+        {
+            var empleado = await _context.Empleados.FindAsync(id);
+            if (empleado == null) return NotFound();
+
+            var completados = await _context.Pedidos
+                .Where(p => p.EmpleadoId == id && p.Estado == PedidoEstados.Completado && p.TiempoProcesamientoMinutos != null)
+                .OrderBy(p => p.FechaFinalizacion).ThenBy(p => p.Id)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.CodigoPedido,
+                    Finalizado = p.FechaFinalizacion ?? p.FechaCarga,
+                    p.TiempoEstandarMinutos,
+                    p.TiempoEstimadoMinutos,
+                    Real = p.TiempoProcesamientoMinutos!.Value
+                })
+                .ToListAsync();
+
+            // Pedidos completados antes de que se guardara el tiempo estándar: se calcula como en el rendimiento
+            var estandarCalculado = await _pickingEngine.CalcularTiemposEstandarAsync(
+                completados.Where(p => p.TiempoEstandarMinutos == null).Select(p => p.Id).ToList());
+
+            // Del más antiguo al más reciente. Misma regla que PickingEngine.CalcularRendimientosAsync:
+            // lo completado antes del último reinicio no cuenta
+            var reinicio = empleado.FechaReinicioPromedio;
+            var filas = completados.Select(p => new HistorialPedidoFila
+            {
+                PedidoId = p.Id,
+                CodigoPedido = p.CodigoPedido,
+                Finalizado = p.Finalizado,
+                Estandar = p.TiempoEstandarMinutos ?? estandarCalculado.GetValueOrDefault(p.Id),
+                Estimado = p.TiempoEstimadoMinutos,
+                Real = p.Real,
+                CuentaParaRendimiento = reinicio == null || p.Finalizado > reinicio
+            }).ToList();
+
+            var cuentan = filas.Where(f => f.CuentaParaRendimiento).ToList();
+            var conEstimado = filas.Where(f => f.Estimado > 0).ToList();
+            var paginacion = new Paginacion(pagina, HistorialPorPagina, filas.Count);
+
+            return View(new EmpleadoHistorialViewModel
+            {
+                Empleado = empleado,
+                Ocupado = await _context.Pedidos.AnyAsync(p => p.EmpleadoId == id && PedidoEstados.EnCurso.Contains(p.Estado)),
+                Rendimiento = (await _pickingEngine.CalcularRendimientosAsync(new[] { id }))[id],
+                Tendencia = TendenciaRendimiento.Calcular(cuentan.Select(f => (f.Real, f.Estandar)).ToList()),
+                TotalCompletados = filas.Count,
+                CompletadosQueCuentan = cuentan.Count,
+                DesvioSobreEstimado = conEstimado.Any() ? conEstimado.Sum(f => f.Real) / conEstimado.Sum(f => f.Estimado!.Value) - 1 : null,
+                Grafica = filas.TakeLast(PedidosEnGrafica).ToList(),
+                Pedidos = Enumerable.Reverse(filas).Skip(paginacion.Saltar).Take(paginacion.TamanoPagina).ToList(),
+                Paginacion = paginacion
+            });
+        }
+
         // CU-06 y CU-07: Registrar Empleado
         [HttpGet]
         public IActionResult Crear()
