@@ -49,13 +49,13 @@
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Home" ? "active" : "")" asp-controller="Home" asp-action="Index">
                             <i class="bi bi-grid-1x2 pf-nav-icon" aria-hidden="true"></i>
-                            Dashboard
+                            <span class="pf-nav-text">Dashboard</span>
                         </a>
                     </li>
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Pedidos" && currentAction != "CargarExcel" ? "active" : "")" asp-controller="Pedidos" asp-action="Index">
                             <i class="bi bi-clipboard-check pf-nav-icon" aria-hidden="true"></i>
-                            Pedidos
+                            <span class="pf-nav-text">Pedidos</span>
                         </a>
                     </li>
                     @* Cada opción solo se muestra a los roles que pueden usarla; el controlador también lo valida con [Authorize] *@
@@ -64,14 +64,14 @@
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Pedidos" && currentAction == "CargarExcel" ? "active" : "")" asp-controller="Pedidos" asp-action="CargarExcel">
                                 <i class="bi bi-file-earmark-spreadsheet pf-nav-icon" aria-hidden="true"></i>
-                                Cargar Excel
+                                <span class="pf-nav-text">Cargar Excel</span>
                             </a>
                         </li>
                     }
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Empleados" ? "active" : "")" asp-controller="Empleados" asp-action="Index">
                             <i class="bi bi-people pf-nav-icon" aria-hidden="true"></i>
-                            Empleados
+                            <span class="pf-nav-text">Empleados</span>
                         </a>
                     </li>
                     <li class="pf-nav-item">
@@ -79,14 +79,14 @@
                         {
                             <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="MisSolicitudes">
                                 <i class="bi bi-inbox pf-nav-icon" aria-hidden="true"></i>
-                                Solicitudes
+                                <span class="pf-nav-text">Solicitudes</span>
                             </a>
                         }
                         else
                         {
                             <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="Index">
                                 <i class="bi bi-inbox pf-nav-icon" aria-hidden="true"></i>
-                                Solicitudes
+                                <span class="pf-nav-text">Solicitudes</span>
                                 @await Component.InvokeAsync("MenuBadges", new { tipo = "solicitudes" })
                             </a>
                         }
@@ -94,13 +94,13 @@
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Reportes" ? "active" : "")" asp-controller="Reportes" asp-action="Index">
                             <i class="bi bi-bar-chart-line pf-nav-icon" aria-hidden="true"></i>
-                            Reportes
+                            <span class="pf-nav-text">Reportes</span>
                         </a>
                     </li>
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Notificaciones" ? "active" : "")" asp-controller="Notificaciones" asp-action="Index">
                             <i class="bi bi-bell pf-nav-icon" aria-hidden="true"></i>
-                            Notificaciones
+                            <span class="pf-nav-text">Notificaciones</span>
                             @await Component.InvokeAsync("MenuBadges", new { tipo = "notificaciones" })
                         </a>
                     </li>
@@ -110,7 +110,7 @@
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Usuarios" ? "active" : "")" asp-controller="Usuarios" asp-action="Index">
                                 <i class="bi bi-person-gear pf-nav-icon" aria-hidden="true"></i>
-                                Usuarios y roles
+                                <span class="pf-nav-text">Usuarios y roles</span>
                             </a>
                         </li>
                     }
@@ -118,7 +118,7 @@
                     <li class="pf-nav-item">
                         <a class="pf-nav-link @(currentController == "Bodegas" ? "active" : "")" asp-controller="Bodegas" asp-action="Index">
                             <i class="bi bi-building pf-nav-icon" aria-hidden="true"></i>
-                            Bodegas
+                            <span class="pf-nav-text">Bodegas</span>
                         </a>
                     </li>
 
@@ -127,7 +127,7 @@
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Productos" ? "active" : "")" asp-controller="Productos" asp-action="Index">
                                 <i class="bi bi-box-seam pf-nav-icon" aria-hidden="true"></i>
-                                Productos
+                                <span class="pf-nav-text">Productos</span>
                             </a>
                         </li>
                     }
@@ -137,13 +137,13 @@
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Auditoria" && currentAction != "Configuracion" ? "active" : "")" asp-controller="Auditoria" asp-action="Index">
                                 <i class="bi bi-journal-text pf-nav-icon" aria-hidden="true"></i>
-                                Log del sistema
+                                <span class="pf-nav-text">Log del sistema</span>
                             </a>
                         </li>
                         <li class="pf-nav-item">
                             <a class="pf-nav-link @(currentController == "Auditoria" && currentAction == "Configuracion" ? "active" : "")" asp-controller="Auditoria" asp-action="Configuracion">
                                 <i class="bi bi-gear pf-nav-icon" aria-hidden="true"></i>
-                                Configuración
+                                <span class="pf-nav-text">Configuración</span>
                             </a>
                         </li>
                     }
@@ -154,7 +154,8 @@
                 <form asp-controller="Account" asp-action="Logout" method="post" id="pf-logout-form">
                     @Html.AntiForgeryToken()
                     <button type="submit" class="btn-pf-logout">
-                        Cerrar Sesión
+                        <i class="bi bi-box-arrow-right pf-logout-icon" aria-hidden="true"></i>
+                        <span class="pf-logout-text">Cerrar Sesión</span>
                     </button>
                 </form>
             </div>

@@ -189,7 +189,19 @@ document.addEventListener('show.bs.modal', function (e) {
             : !root.classList.contains('pf-sidebar-collapsed');
     }
 
+    // Con solo los íconos a la vista, el nombre de cada opción sale como tooltip
+    function actualizarTooltips() {
+        var soloIconos = !pantallaAngosta.matches && root.classList.contains('pf-sidebar-collapsed');
+        sidebar.querySelectorAll('.pf-nav-link, .btn-pf-logout').forEach(function (el) {
+            var t = el.querySelector('.pf-nav-text, .pf-logout-text');
+            if (!t) return;
+            if (soloIconos) el.title = t.textContent.trim();
+            else el.removeAttribute('title');
+        });
+    }
+
     function sincronizarBoton() {
+        actualizarTooltips();
         var visible = menuVisible();
         var texto = visible ? 'Ocultar menú' : 'Mostrar menú';
         botones.forEach(function (b) {
@@ -208,8 +220,8 @@ document.addEventListener('show.bs.modal', function (e) {
         }
         sincronizarBoton();
 
-        // El foco pasa al botón que queda visible, para no perderlo al esconderse el que se pulsó
-        var destino = visible ? btnMenu : btnHeader;
+        // El foco pasa al botón que queda visible: en pantallas anchas el menú nunca desaparece (queda la barra de íconos)
+        var destino = (visible || !pantallaAngosta.matches) ? btnMenu : btnHeader;
         if (destino) destino.focus({ preventScroll: true });
     }
 

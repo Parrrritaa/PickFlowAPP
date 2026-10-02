@@ -677,22 +677,117 @@ body {
 
 /* ===== Menú lateral desplegable =====
    Con reducir movimiento activo, la regla global deja las transiciones en ~0 ms (cambio instantáneo). */
-/* Oculto: fuera de pantalla y sin foco de teclado (visibility cambia al terminar el deslizamiento) */
-html.pf-sidebar-collapsed .pf-sidebar {
-    translate: -100% 0;
-    visibility: hidden;
-    transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
-                visibility 0s linear var(--pf-duration-sidebar);
+/* Textos del menú: se recortan (sin salir del árbol de accesibilidad) cuando el menú queda como barra de íconos */
+.pf-nav-text,
+.pf-logout-text {
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 200px;
+    transition: opacity var(--pf-duration-base) var(--pf-ease),
+                max-width var(--pf-duration-sidebar) var(--pf-ease-out);
 }
 
-html.pf-sidebar-collapsed .pf-main-wrapper {
-    margin-left: 0;
+.pf-logout-icon {
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    font-size: 20px;
+    line-height: 1;
+    transition: opacity var(--pf-duration-base) var(--pf-ease),
+                max-width var(--pf-duration-sidebar) var(--pf-ease-out);
+}
+
+.pf-nav-link { position: relative; }
+
+.pf-sidebar-brand {
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 200px;
+    transition: opacity var(--pf-duration-base) var(--pf-ease),
+                max-width var(--pf-duration-sidebar) var(--pf-ease-out),
+                padding-left var(--pf-duration-sidebar) var(--pf-ease-out);
+}
+
+.pf-nav-icon { transition: margin-right var(--pf-duration-sidebar) var(--pf-ease-out); }
+.pf-sidebar-top { transition: padding-right var(--pf-duration-sidebar) var(--pf-ease-out); }
+
+/* Pantallas anchas: al ocultar el menú queda una barra angosta con solo los íconos (el ancho se anima).
+   Los íconos no se mueven al contraer: el menú se recoge y recorta los textos. */
+@media (min-width: 992px) {
+    .pf-sidebar {
+        overflow: hidden;
+        transition: translate var(--pf-duration-sidebar) var(--pf-ease-out),
+                    width var(--pf-duration-sidebar) var(--pf-ease-out),
+                    visibility 0s linear 0s;
+    }
+
+    html.pf-sidebar-collapsed .pf-sidebar {
+        width: 84px;
+    }
+
+    html.pf-sidebar-collapsed .pf-main-wrapper {
+        margin-left: 84px;
+    }
+
+    html.pf-sidebar-collapsed .pf-sidebar-brand {
+        max-width: 0;
+        padding-left: 0;
+        opacity: 0;
+    }
+
+    /* El botón de tres líneas queda centrado sobre la columna de íconos (52 px de ancho útil, botón de 40) */
+    html.pf-sidebar-collapsed .pf-sidebar-top {
+        padding-right: 6px;
+    }
+
+    html.pf-sidebar-collapsed .pf-nav-text,
+    html.pf-sidebar-collapsed .pf-logout-text {
+        max-width: 0;
+        opacity: 0;
+    }
+
+    html.pf-sidebar-collapsed .pf-nav-icon {
+        margin-right: 0;
+    }
+
+    html.pf-sidebar-collapsed .pf-logout-icon {
+        max-width: 24px;
+        opacity: 1;
+    }
+
+    /* Sin texto, el contador pasa a ser un punto sobre la esquina del ícono */
+    html.pf-sidebar-collapsed .pf-nav-badge {
+        position: absolute;
+        top: 3px;
+        right: 4px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        font-size: 10px;
+    }
+
+    html.pf-sidebar-collapsed .pf-sidebar-scroll {
+        scrollbar-width: none;
+    }
+
+    html.pf-sidebar-collapsed .pf-sidebar-scroll::-webkit-scrollbar {
+        display: none;
+    }
+
+    html.pf-sidebar-collapsed .btn-pf-logout {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 0;
+    }
 }
 
 /* Carga inicial: se aplica el estado guardado sin animar */
 html.pf-sin-transicion .pf-sidebar,
 html.pf-sin-transicion .pf-main-wrapper,
-html.pf-sin-transicion .pf-sidebar-backdrop {
+html.pf-sin-transicion .pf-sidebar-backdrop,
+html.pf-sin-transicion .pf-sidebar *,
+html.pf-sin-transicion .pf-sidebar-top {
     transition: none !important;
 }
 
@@ -753,23 +848,9 @@ html.pf-sin-transicion .pf-sidebar-backdrop {
     outline-color: #FFFFFF;
 }
 
-/* El botón del encabezado solo aparece cuando el menú está escondido */
+/* El botón del encabezado solo se usa en pantallas angostas, donde el menú se superpone */
 .pf-menu-toggle--header {
     display: none;
-}
-
-html.pf-sidebar-collapsed .pf-menu-toggle--header {
-    display: inline-flex;
-    animation: pf-toggle-in var(--pf-duration-sidebar) var(--pf-ease-out) both;
-}
-
-html.pf-sin-transicion .pf-menu-toggle--header {
-    animation: none;
-}
-
-@keyframes pf-toggle-in {
-    from { opacity: 0; translate: -6px 0; }
-    to   { opacity: 1; translate: 0 0; }
 }
 
 .pf-sidebar-backdrop {
