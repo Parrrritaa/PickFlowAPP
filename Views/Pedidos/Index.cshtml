@@ -1,17 +1,18 @@
-@model IEnumerable<PickingApp.Models.Pedido>
+@model PickingApp.Models.ViewModels.PedidosIndexViewModel
 @{
+    var pedidos = Model.Pedidos;
     ViewData["Title"] = "Gestión de pedidos";
-    var bodegas = ViewBag.Bodegas as IEnumerable<PickingApp.Models.Bodega> ?? Enumerable.Empty<PickingApp.Models.Bodega>();
-    var empleados = ViewBag.Empleados as IEnumerable<PickingApp.Models.Empleado> ?? Enumerable.Empty<PickingApp.Models.Empleado>();
-    var filtroEstado = ViewBag.FiltroEstado as string;
-    var filtroPrioridad = ViewBag.FiltroPrioridad as string;
-    var filtroBodegaId = ViewBag.FiltroBodegaId as int?;
-    var filtroEmpleadoId = ViewBag.FiltroEmpleadoId as int?;
-    var filtroFechaDesde = ViewBag.FiltroFechaDesde as string;
-    var filtroFechaHasta = ViewBag.FiltroFechaHasta as string;
-    var busqueda = ViewBag.Busqueda as string;
-    var verDivididos = (ViewBag.Vista as string) == "divididos";
-    var divididosEnCurso = ViewBag.DivididosEnCurso as int? ?? 0;
+    var bodegas = Model.Bodegas;
+    var empleados = Model.Empleados;
+    var filtroEstado = Model.FiltroEstado;
+    var filtroPrioridad = Model.FiltroPrioridad;
+    var filtroBodegaId = Model.FiltroBodegaId;
+    var filtroEmpleadoId = Model.FiltroEmpleadoId;
+    var filtroFechaDesde = Model.FiltroFechaDesde;
+    var filtroFechaHasta = Model.FiltroFechaHasta;
+    var busqueda = Model.Busqueda;
+    var verDivididos = Model.VerDivididos;
+    var divididosEnCurso = Model.DivididosEnCurso;
 
     var activoPedido = !string.IsNullOrWhiteSpace(busqueda);
     var activoFecha = !string.IsNullOrEmpty(filtroFechaDesde) || !string.IsNullOrEmpty(filtroFechaHasta);
@@ -46,11 +47,11 @@
         <span class="text-muted fw-semibold">
             @if (verDivididos)
             {
-                @($"{Model?.Count() ?? 0} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+                @($"{pedidos.Count} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
             }
             else
             {
-                @($"{Model?.Count() ?? 0} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+                @($"{pedidos.Count} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
             }
         </span>
         <div>
@@ -187,9 +188,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (Model != null && Model.Any())
+                    @if (pedidos.Any())
                     {
-                        @foreach (var p in Model)
+                        @foreach (var p in pedidos)
                         {
                             var partesPedido = p.Partes.OrderBy(pa => pa.NumeroParte).ToList();
                             var finalizadas = partesPedido.Count(pa => PickingApp.Models.PedidoEstados.Finalizados.Contains(pa.Estado));

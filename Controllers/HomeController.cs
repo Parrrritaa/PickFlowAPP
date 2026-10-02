@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Middleware;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -30,18 +31,18 @@ namespace PickingApp.Controllers
         {
             var totales = await ContarPorEstadoAsync();
 
-            // ViewBag pasa datos sueltos a la vista (Views/Home/Index.cshtml los muestra en las tarjetas)
-            ViewBag.TotalPendientes = totales.Pendientes;
-            ViewBag.TotalEnProceso = totales.EnProceso;
-            ViewBag.TotalCompletados = totales.Completados;
-            ViewBag.TotalCancelados = totales.Cancelados;
-            ViewBag.TotalReasignados = totales.Reasignados;
-
-            // Opciones del filtro de bodega del gráfico
-            ViewBag.Bodegas = await _context.Bodegas.OrderBy(b => b.Nombre).ToListAsync();
-
-            // La lista se envía como modelo de la vista (@model en Index.cshtml)
-            return View(await UltimosPedidosAsync());
+            // El ViewModel llega como @model a Views/Home/Index.cshtml: totales para las tarjetas,
+            // bodegas para el filtro del gráfico y la lista de últimos pedidos
+            return View(new DashboardViewModel
+            {
+                TotalPendientes = totales.Pendientes,
+                TotalEnProceso = totales.EnProceso,
+                TotalCompletados = totales.Completados,
+                TotalCancelados = totales.Cancelados,
+                TotalReasignados = totales.Reasignados,
+                Bodegas = await _context.Bodegas.OrderBy(b => b.Nombre).ToListAsync(),
+                UltimosPedidos = await UltimosPedidosAsync()
+            });
         }
 
         // Un pedido dividido se cuenta por sus partes, no como un pedido más

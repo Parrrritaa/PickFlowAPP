@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -32,9 +33,11 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> Index()
         {
             // Listas para los reportes individuales (incluye inactivos para consultar su historial)
-            ViewBag.Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync();
-            ViewBag.Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync();
-            return View();
+            return View(new ReportesIndexViewModel
+            {
+                Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync(),
+                Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync()
+            });
         }
 
         // CU-32: Generar reporte de tiempos por empleado (general o de un empleado)

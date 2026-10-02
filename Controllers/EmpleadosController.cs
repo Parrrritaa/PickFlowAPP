@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -31,15 +32,18 @@ namespace PickingApp.Controllers
                 .OrderBy(e => e.NombreCompleto)
                 .ToListAsync();
 
-            // Un empleado está "Ocupado" si tiene un pedido Asignado o Reasignado
-            ViewBag.EmpleadosOcupados = (await _context.Pedidos
-                .Where(p => p.EmpleadoId != null && PedidoEstados.EnCurso.Contains(p.Estado))
-                .Select(p => p.EmpleadoId!.Value)
-                .ToListAsync())
-                .ToHashSet();
-            // Factor de rendimiento de cada empleado (PickingEngine.CalcularRendimientosAsync)
-            ViewBag.Rendimientos = await _pickingEngine.CalcularRendimientosAsync(empleados.Select(e => e.Id).ToList());
-            return View(empleados);
+            return View(new EmpleadosIndexViewModel
+            {
+                Empleados = empleados,
+                // Un empleado está "Ocupado" si tiene un pedido Asignado o Reasignado
+                EmpleadosOcupados = (await _context.Pedidos
+                    .Where(p => p.EmpleadoId != null && PedidoEstados.EnCurso.Contains(p.Estado))
+                    .Select(p => p.EmpleadoId!.Value)
+                    .ToListAsync())
+                    .ToHashSet(),
+                // Factor de rendimiento de cada empleado (PickingEngine.CalcularRendimientosAsync)
+                Rendimientos = await _pickingEngine.CalcularRendimientosAsync(empleados.Select(e => e.Id).ToList())
+            });
         }
 
         // CU-06 y CU-07: Registrar Empleado
@@ -148,7 +152,6 @@ namespace PickingApp.Controllers
 
             if (!ModelState.IsValid)
             {
-                ViewBag.Motivo = motivo;
                 return View(model);
             }
 
@@ -161,7 +164,6 @@ namespace PickingApp.Controllers
             if (error != null)
             {
                 ModelState.AddModelError(error.Campo, error.Mensaje);
-                ViewBag.Motivo = motivo;
                 return View(model);
             }
 
@@ -191,7 +193,6 @@ namespace PickingApp.Controllers
                 if (string.IsNullOrWhiteSpace(motivo))
                 {
                     ModelState.AddModelError(string.Empty, "Debe indicar el motivo de la edición.");
-                    ViewBag.Motivo = motivo;
                     return View(model);
                 }
 
@@ -220,7 +221,6 @@ namespace PickingApp.Controllers
                 if (errorSolicitud != null)
                 {
                     ModelState.AddModelError(string.Empty, errorSolicitud);
-                    ViewBag.Motivo = motivo;
                     return View(model);
                 }
 

@@ -1,11 +1,12 @@
-@model IEnumerable<PickingApp.Models.Bodega>
+@model PickingApp.Models.ViewModels.BodegasIndexViewModel
 @{
     ViewData["Title"] = "Bodegas y ubicaciones";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
-    var filtroEstado = ViewBag.FiltroEstado as string;
-    var busquedaProducto = ViewBag.BusquedaProducto as string;
-    var resultadosProducto = ViewBag.ResultadosProducto as List<PickingApp.Models.Ubicacion>;
-    var ubicacionesPorBodega = ViewBag.UbicacionesPorBodega as Dictionary<int, int> ?? new Dictionary<int, int>();
+    var bodegas = Model.Bodegas;
+    var filtroEstado = Model.FiltroEstado;
+    var busquedaProducto = Model.BusquedaProducto;
+    var resultadosProducto = Model.ResultadosProducto;
+    var ubicacionesPorBodega = Model.UbicacionesPorBodega;
     var activoEstado = !string.IsNullOrEmpty(filtroEstado);
     var hayBusquedaProducto = !string.IsNullOrWhiteSpace(busquedaProducto);
 }
@@ -120,9 +121,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (Model != null && Model.Any())
+                    @if (bodegas.Any())
                     {
-                        @foreach (var b in Model)
+                        @foreach (var b in bodegas)
                         {
                             var ubicacionesCount = ubicacionesPorBodega.GetValueOrDefault(b.Id);
                             var estadoText = b.Activa ? "Activa" : "Inactiva";

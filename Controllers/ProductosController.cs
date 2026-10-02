@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -27,19 +28,19 @@ namespace PickingApp.Controllers
         // Página de Productos: categorías arriba y tabla de productos con su categoría abajo
         public async Task<IActionResult> Index()
         {
-            ViewBag.Categorias = await _context.CategoriasProducto
-                .Include(c => c.Productos)
-                .OrderBy(c => c.MinutosPorUnidad)
-                .ToListAsync();
-            ViewBag.MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion);
-
-            var productos = await _context.Productos
-                .Include(p => p.Categoria)
-                .Include(p => p.Ubicaciones)
-                .OrderBy(p => p.Codigo)
-                .ToListAsync();
-
-            return View(productos);
+            return View(new ProductosIndexViewModel
+            {
+                Categorias = await _context.CategoriasProducto
+                    .Include(c => c.Productos)
+                    .OrderBy(c => c.MinutosPorUnidad)
+                    .ToListAsync(),
+                MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion),
+                Productos = await _context.Productos
+                    .Include(p => p.Categoria)
+                    .Include(p => p.Ubicaciones)
+                    .OrderBy(p => p.Codigo)
+                    .ToListAsync()
+            });
         }
 
         // Crear (id = null) o editar una categoría

@@ -42,13 +42,13 @@ namespace PickingApp.Controllers
 
             if (!validacion.IsValid)
             {
-                // Pasa si algo cambió en el sistema entre la validación previa y la confirmación
-                ViewBag.Errores = validacion.Errors
+                // Pasa si algo cambió en el sistema entre la validación previa y la confirmación.
+                // El modelo de la vista es la lista de observaciones (sin errores, la vista recibe null)
+                TempData["ErrorMessage"] = "El archivo contiene errores de validación. Revise la lista de observaciones y corríjalas antes de reintentar.";
+                return View(validacion.Errors
                     .Concat(validacion.ErroresResolucion.Values)
                     .DefaultIfEmpty("Hay filas con productos o ubicaciones sin resolver. Valide el archivo de nuevo.")
-                    .ToList();
-                TempData["ErrorMessage"] = "El archivo contiene errores de validación. Revise la lista de observaciones y corríjalas antes de reintentar.";
-                return View();
+                    .ToList());
             }
 
             // Registrar pedidos válidos en base de datos (Paso 8 del CU-23)

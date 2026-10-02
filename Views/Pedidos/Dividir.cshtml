@@ -1,18 +1,19 @@
-@model PickingApp.Models.Pedido
+@model PickingApp.Models.ViewModels.DividirPedidoViewModel
 @using System.Text.Json
 @{
-    ViewData["Title"] = $"Dividir pedido {Model.CodigoPedido}";
-    var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
-    var jornadaMinutos = ViewBag.JornadaMinutos as double? ?? 540;
-    var minutosPorLinea = ViewBag.MinutosPorLinea as Dictionary<int, double> ?? new Dictionary<int, double>();
-    var minutosPorUbicacion = ViewBag.MinutosPorUbicacion as double? ?? 1.0;
-    var maxPartes = ViewBag.MaxPartes as int? ?? 2;
-    var partesSugeridas = ViewBag.PartesSugeridas as int? ?? 2;
+    var pedido = Model.Pedido;
+    ViewData["Title"] = $"Dividir pedido {pedido.CodigoPedido}";
+    var tiempoEstandar = Model.TiempoEstandar;
+    var jornadaMinutos = Model.JornadaMinutos;
+    var minutosPorLinea = Model.MinutosPorLinea;
+    var minutosPorUbicacion = Model.MinutosPorUbicacion;
+    var maxPartes = Model.MaxPartes;
+    var partesSugeridas = Model.PartesSugeridas;
 
     static int Orden(string? valor) => int.TryParse(valor, out var n) ? n : int.MaxValue;
 
     // Productos en el orden de la ruta (pasillo, estante, nivel): así cada parte recoge ubicaciones cercanas
-    var lineas = Model.Detalles
+    var lineas = pedido.Detalles
         .OrderBy(d => Orden(d.Ubicacion?.Pasillo))
         .ThenBy(d => Orden(d.Ubicacion?.Estante))
         .ThenBy(d => Orden(d.Ubicacion?.Nivel))
@@ -37,11 +38,11 @@
     };
 }
 
-<h1 class="pf-page-title">Dividir pedido @Model.CodigoPedido</h1>
+<h1 class="pf-page-title">Dividir pedido @pedido.CodigoPedido</h1>
 
 <div class="mockup-card">
     <p class="pf-seccion-desc mb-3">
-        Cada parte será un pedido propio (<strong>@Model.CodigoPedido-P1</strong>, <strong>@Model.CodigoPedido-P2</strong>…) que se asigna, completa o cancela por separado.
+        Cada parte será un pedido propio (<strong>@pedido.CodigoPedido-P1</strong>, <strong>@pedido.CodigoPedido-P2</strong>…) que se asigna, completa o cancela por separado.
         El pedido original queda como <strong>Dividido</strong> y se completa cuando terminen todas sus partes.
     </p>
 
@@ -49,13 +50,13 @@
         <div class="col-6 col-md-3">
             <div class="pf-dato-resumen">
                 <span class="pf-dato-resumen__etiqueta">Unidades</span>
-                <span class="pf-dato-resumen__valor">@Model.Detalles.Sum(d => d.Cantidad)</span>
+                <span class="pf-dato-resumen__valor">@pedido.Detalles.Sum(d => d.Cantidad)</span>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="pf-dato-resumen">
                 <span class="pf-dato-resumen__etiqueta">Ubicaciones</span>
-                <span class="pf-dato-resumen__valor">@Model.Detalles.Select(d => d.UbicacionId).Distinct().Count()</span>
+                <span class="pf-dato-resumen__valor">@pedido.Detalles.Select(d => d.UbicacionId).Distinct().Count()</span>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -74,7 +75,7 @@
 
     <form asp-action="Dividir" method="post" id="formDividir">
         @Html.AntiForgeryToken()
-        <input type="hidden" name="pedidoId" value="@Model.Id" />
+        <input type="hidden" name="pedidoId" value="@pedido.Id" />
 
         <div class="pf-dividir-controles mb-3">
             <div>
@@ -136,7 +137,7 @@
         <div id="mensajeReparto" class="pf-mensaje-reparto mt-3" role="status" aria-live="polite"></div>
 
         <div class="d-flex justify-content-end gap-3 mt-3 flex-wrap">
-            <a asp-action="Detalle" asp-route-id="@Model.Id" class="btn-pf-gray">Cancelar</a>
+            <a asp-action="Detalle" asp-route-id="@pedido.Id" class="btn-pf-gray">Cancelar</a>
             <button type="submit" class="btn-pf-blue" id="btnDividir">Dividir pedido</button>
         </div>
     </form>

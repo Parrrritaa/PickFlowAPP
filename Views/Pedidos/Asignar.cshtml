@@ -1,19 +1,19 @@
-﻿@model IEnumerable<PickingApp.Models.Empleado>
+﻿@model PickingApp.Models.ViewModels.AsignarPedidoViewModel
 @{
-    var pedido = ViewBag.Pedido as PickingApp.Models.Pedido;
-    var totalUbicaciones = pedido?.Detalles.Select(d => d.UbicacionId).Distinct().Count() ?? 0;
-    var validaciones = ViewBag.Validaciones as Dictionary<int, PickingApp.Services.AsignacionValidationResult>
-        ?? new Dictionary<int, PickingApp.Services.AsignacionValidationResult>();
-    var empleadoRecomendadoId = ViewBag.EmpleadoRecomendadoId as int?;
-    var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
+    var pedido = Model.Pedido;
+    var empleados = Model.Empleados;
+    var totalUbicaciones = pedido.Detalles.Select(d => d.UbicacionId).Distinct().Count();
+    var validaciones = Model.Validaciones;
+    var empleadoRecomendadoId = Model.EmpleadoRecomendadoId;
+    var tiempoEstandar = Model.TiempoEstandar;
     var minimoPedidos = validaciones.Values.FirstOrDefault(v => v.Rendimiento != null)?.Rendimiento!.MinimoPedidos ?? 3;
     // CU-27: con un empleado ya asignado, la vista reasigna (motivo obligatorio) en lugar de asignar
-    var empleadoActualId = ViewBag.EmpleadoActualId as int?;
+    var empleadoActualId = Model.EmpleadoActualId;
     // La advertencia de experiencia la decide el motor para cada empleado asignable
-    var conAdvertencia = Model
+    var conAdvertencia = empleados
         .Where(e => e.Id != empleadoActualId && validaciones.TryGetValue(e.Id, out var v) && v.PuedeAsignar && v.GeneraAdvertencia)
         .ToList();
-    var empleadoActualNombre = ViewBag.EmpleadoActualNombre as string;
+    var empleadoActualNombre = Model.EmpleadoActualNombre;
     var esReasignacion = empleadoActualId.HasValue;
     ViewData["Title"] = esReasignacion ? "Reasignar pedido" : "Asignar pedido";
 }
@@ -47,9 +47,9 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model != null && Model.Any())
+                @if (empleados.Any())
                 {
-                    @foreach (var emp in Model)
+                    @foreach (var emp in empleados)
                     {
                         var highlightClass = emp.Id == empleadoRecomendadoId ? "mockup-row-highlight" : "";
                         validaciones.TryGetValue(emp.Id, out var validacion);

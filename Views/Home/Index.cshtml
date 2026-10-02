@@ -1,17 +1,17 @@
-@model IEnumerable<PickingApp.Models.Pedido>
+@model PickingApp.Models.ViewModels.DashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
 
-    // Franja de estados (los números llegan en ViewBag desde HomeController.Index); el color es el mismo de la gráfica
+    // Franja de estados (los números llegan en el DashboardViewModel desde HomeController.Index); el color es el mismo de la gráfica
     var estados = new (string Clave, string Nombre, int Total, string Color)[]
     {
-        (PickingApp.Models.PedidoEstados.Pendiente, "Pendientes", (int)ViewBag.TotalPendientes, "#3B71CA"),
-        (PickingApp.Models.PedidoEstados.Asignado, "En proceso", (int)ViewBag.TotalEnProceso, "#EB7D26"),
-        (PickingApp.Models.PedidoEstados.Completado, "Completados", (int)ViewBag.TotalCompletados, "#52A447"),
-        (PickingApp.Models.PedidoEstados.Cancelado, "Cancelados", (int)ViewBag.TotalCancelados, "#DC2626"),
-        (PickingApp.Models.PedidoEstados.Reasignado, "Reasignados", (int)ViewBag.TotalReasignados, "#1F2937")
+        (PickingApp.Models.PedidoEstados.Pendiente, "Pendientes", Model.TotalPendientes, "#3B71CA"),
+        (PickingApp.Models.PedidoEstados.Asignado, "En proceso", Model.TotalEnProceso, "#EB7D26"),
+        (PickingApp.Models.PedidoEstados.Completado, "Completados", Model.TotalCompletados, "#52A447"),
+        (PickingApp.Models.PedidoEstados.Cancelado, "Cancelados", Model.TotalCancelados, "#DC2626"),
+        (PickingApp.Models.PedidoEstados.Reasignado, "Reasignados", Model.TotalReasignados, "#1F2937")
     };
-    var porAtender = (int)ViewBag.TotalPendientes + (int)ViewBag.TotalEnProceso + (int)ViewBag.TotalReasignados;
+    var porAtender = Model.TotalPendientes + Model.TotalEnProceso + Model.TotalReasignados;
     var hoy = DateTime.Now.ToString("dddd d 'de' MMMM", System.Globalization.CultureInfo.GetCultureInfo("es-CO"));
     hoy = char.ToUpper(hoy[0]) + hoy[1..];
 
@@ -134,7 +134,7 @@
                             <label class="pf-pop-campo">Bodega
                                 <select id="pfBodega" class="form-select form-select-sm">
                                     <option value="">Todas</option>
-                                    @foreach (var b in (List<PickingApp.Models.Bodega>)(ViewBag.Bodegas ?? new List<PickingApp.Models.Bodega>()))
+                                    @foreach (var b in Model.Bodegas)
                                     {
                                         <option value="@b.Id">@b.Nombre</option>
                                     }
@@ -184,9 +184,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @if (Model != null && Model.Any())
+                        @if (Model.UltimosPedidos.Any())
                         {
-                            @foreach (var pedido in Model)
+                            @foreach (var pedido in Model.UltimosPedidos)
                             {
                                 <tr>
                                     <td>

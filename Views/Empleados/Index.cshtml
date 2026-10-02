@@ -1,4 +1,4 @@
-﻿@model IEnumerable<PickingApp.Models.Empleado>
+﻿@model PickingApp.Models.ViewModels.EmpleadosIndexViewModel
 @{
     ViewData["Title"] = "Gestión de empleados";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
@@ -6,8 +6,8 @@
     var esAuxiliar = userRole == Roles.Auxiliar;
     // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
-    var ocupados = ViewBag.EmpleadosOcupados as HashSet<int> ?? new HashSet<int>();
-    var rendimientos = ViewBag.Rendimientos as Dictionary<int, PickingApp.Services.RendimientoEmpleado> ?? new Dictionary<int, PickingApp.Services.RendimientoEmpleado>();
+    var ocupados = Model.EmpleadosOcupados;
+    var rendimientos = Model.Rendimientos;
 }
 
 <h1 class="pf-page-title">Gestión de empleados</h1>
@@ -36,9 +36,9 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model != null && Model.Any())
+                @if (Model.Empleados.Any())
                 {
-                    @foreach (var emp in Model)
+                    @foreach (var emp in Model.Empleados)
                     {
                         var estadoText = PickingApp.Models.Empleado.DescribirEstado(emp.Activo, ocupados.Contains(emp.Id));
                         <tr class="@(emp.Id == destacadoId ? "pf-row-flash" : "")">

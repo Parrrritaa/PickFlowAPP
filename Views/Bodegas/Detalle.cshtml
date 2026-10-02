@@ -1,14 +1,15 @@
-@model PickingApp.Models.Bodega
+@model PickingApp.Models.ViewModels.BodegaDetalleViewModel
 @{
     ViewData["Title"] = "Bodegas y ubicaciones";
-    var todasBodegas = ViewBag.TodasBodegas as IEnumerable<PickingApp.Models.Bodega> ?? new List<PickingApp.Models.Bodega> { Model };
-    var ubicacionesPorBodega = ViewBag.UbicacionesPorBodega as Dictionary<int, int> ?? new Dictionary<int, int>();
+    var bodega = Model.Bodega;
+    var todasBodegas = Model.TodasBodegas;
+    var ubicacionesPorBodega = Model.UbicacionesPorBodega;
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var puedeEliminarUbicacion = userRole == Roles.Administrador || userRole == Roles.Supervisor;
     const int ubicacionesVisibles = 5;
-    var ubicacionesOcultas = Math.Max(0, (Model.Ubicaciones?.Count ?? 0) - ubicacionesVisibles);
-    var filtroUbicacion = ViewBag.FiltroUbicacion as string;
-    var filtroProducto = ViewBag.FiltroProducto as string;
+    var ubicacionesOcultas = Math.Max(0, (bodega.Ubicaciones?.Count ?? 0) - ubicacionesVisibles);
+    var filtroUbicacion = Model.FiltroUbicacion;
+    var filtroProducto = Model.FiltroProducto;
     var activoUbicacion = !string.IsNullOrWhiteSpace(filtroUbicacion);
     var activoProducto = !string.IsNullOrWhiteSpace(filtroProducto);
     var hayFiltros = activoUbicacion || activoProducto;
@@ -24,7 +25,7 @@
             <div class="d-flex flex-column gap-3">
                 @foreach (var b in todasBodegas)
                 {
-                    var isCurrent = b.Id == Model.Id;
+                    var isCurrent = b.Id == bodega.Id;
                     var bgStyle = isCurrent ? "background-color: #DCE7FA; border: 1px solid #BFDBFE;" : "background-color: #FFFFFF;";
                     var count = ubicacionesPorBodega.GetValueOrDefault(b.Id);
 
@@ -43,20 +44,20 @@
         <div class="mockup-card h-100">
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                 <div>
-                    <h4 class="fw-bold text-dark mb-1">@Model.Nombre</h4>
-                    <div class="text-secondary small fw-semibold mb-1">@Model.Codigo</div>
+                    <h4 class="fw-bold text-dark mb-1">@bodega.Nombre</h4>
+                    <div class="text-secondary small fw-semibold mb-1">@bodega.Codigo</div>
                     <div class="text-secondary small">Ubicaciones registradas</div>
                 </div>
                 @if (puedeEliminarUbicacion)
                 {
-                    <a asp-action="CrearUbicacion" asp-route-bodegaId="@Model.Id" class="btn-pf-blue">
+                    <a asp-action="CrearUbicacion" asp-route-bodegaId="@bodega.Id" class="btn-pf-blue">
                         + Crear ubicación
                     </a>
                 }
             </div>
 
             <form method="get" asp-action="Detalle" id="formFiltrosUbicaciones">
-                <input type="hidden" name="id" value="@Model.Id" />
+                <input type="hidden" name="id" value="@bodega.Id" />
                 <div class="table-responsive">
                     <table class="mockup-table" id="tablaUbicaciones">
                         <thead>
@@ -97,7 +98,7 @@
                                         Acción
                                         @if (hayFiltros)
                                         {
-                                            <a asp-action="Detalle" asp-route-id="@Model.Id" class="d-block small fw-semibold text-decoration-none mt-1">
+                                            <a asp-action="Detalle" asp-route-id="@bodega.Id" class="d-block small fw-semibold text-decoration-none mt-1">
                                                 <i class="bi bi-x-circle"></i> Limpiar filtros
                                             </a>
                                         }
@@ -106,10 +107,10 @@
                             </tr>
                         </thead>
                         <tbody>
-                        @if (Model.Ubicaciones != null && Model.Ubicaciones.Any())
+                        @if (bodega.Ubicaciones != null && bodega.Ubicaciones.Any())
                         {
                             var indice = 0;
-                            @foreach (var u in Model.Ubicaciones)
+                            @foreach (var u in bodega.Ubicaciones)
                             {
                                 <tr class="@(indice++ >= ubicacionesVisibles ? "fila-extra d-none" : "")">
                                     <td class="fw-semibold">@u.CodigoUbicacion</td>

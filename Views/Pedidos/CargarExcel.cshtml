@@ -1,6 +1,8 @@
+@* Modelo: observaciones de la última carga rechazada; null si no hubo errores *@
+@model List<string>
 @{
     ViewData["Title"] = "Cargar archivo Excel";
-    var errores = ViewBag.Errores as List<string>;
+    var errores = Model;
 }
 
 <h1 class="pf-page-title">Cargar archivo Excel</h1>

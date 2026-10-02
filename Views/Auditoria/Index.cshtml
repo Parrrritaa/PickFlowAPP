@@ -1,12 +1,13 @@
-﻿@model IEnumerable<PickingApp.Models.LogSistema>
+﻿@model PickingApp.Models.ViewModels.AuditoriaIndexViewModel
 @{
     ViewData["Title"] = "LOG del sistema";
-    var modulo = ViewBag.ModuloFiltro as string;
-    var usuario = ViewBag.UsuarioFiltro as string;
-    var fechaDesde = ViewBag.FechaDesdeFiltro as string;
-    var fechaHasta = ViewBag.FechaHastaFiltro as string;
-    var totalFiltrado = ViewBag.TotalFiltrado as int? ?? 0;
-    var maxRegistros = ViewBag.MaxRegistros as int? ?? 200;
+    var registros = Model.Registros;
+    var modulo = Model.ModuloFiltro;
+    var usuario = Model.UsuarioFiltro;
+    var fechaDesde = Model.FechaDesdeFiltro;
+    var fechaHasta = Model.FechaHastaFiltro;
+    var totalFiltrado = Model.TotalFiltrado;
+    var maxRegistros = Model.MaxRegistros;
     var hayFiltroFecha = !string.IsNullOrEmpty(fechaDesde) || !string.IsNullOrEmpty(fechaHasta);
     var hoy = DateTime.Today.ToString("yyyy-MM-dd");
 }
@@ -72,9 +73,9 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model != null && Model.Any())
+                @if (registros.Any())
                 {
-                    @foreach (var l in Model)
+                    @foreach (var l in registros)
                     {
                         <tr>
                             <td>@l.FechaHora.ToString("dd/MM/yyyy HH:mm")</td>

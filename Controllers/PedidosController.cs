@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -102,19 +103,6 @@ namespace PickingApp.Controllers
                 query = query.Where(p => p.FechaCarga < hastaExclusivo);
             }
 
-            // Se listan todas las bodegas (no solo las activas) para poder consultar pedidos históricos de bodegas desactivadas
-            ViewBag.Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync();
-            ViewBag.Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync();
-            ViewBag.FiltroEstado = estado;
-            ViewBag.FiltroPrioridad = prioridad;
-            ViewBag.FiltroBodegaId = bodegaId;
-            ViewBag.FiltroEmpleadoId = empleadoId;
-            ViewBag.FiltroFechaDesde = fechaDesde?.ToString("yyyy-MM-dd");
-            ViewBag.FiltroFechaHasta = fechaHasta?.ToString("yyyy-MM-dd");
-            ViewBag.Busqueda = busqueda;
-            ViewBag.Vista = verDivididos ? "divididos" : null;
-            ViewBag.DivididosEnCurso = await _context.Pedidos.CountAsync(p => p.Estado == PedidoEstados.Dividido);
-
             // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes
             var pedidos = await query
                 .OrderByDescending(p => p.Prioridad == "Alta")
@@ -122,7 +110,22 @@ namespace PickingApp.Controllers
                 .ThenBy(p => p.CodigoPedido)
                 .ToListAsync();
 
-            return View(pedidos);
+            return View(new PedidosIndexViewModel
+            {
+                Pedidos = pedidos,
+                // Se listan todas las bodegas (no solo las activas) para poder consultar pedidos históricos de bodegas desactivadas
+                Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync(),
+                Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync(),
+                FiltroEstado = estado,
+                FiltroPrioridad = prioridad,
+                FiltroBodegaId = bodegaId,
+                FiltroEmpleadoId = empleadoId,
+                FiltroFechaDesde = fechaDesde?.ToString("yyyy-MM-dd"),
+                FiltroFechaHasta = fechaHasta?.ToString("yyyy-MM-dd"),
+                Busqueda = busqueda,
+                VerDivididos = verDivididos,
+                DivididosEnCurso = await _context.Pedidos.CountAsync(p => p.Estado == PedidoEstados.Dividido)
+            });
         }
 
         // Detalle de Pedido (con ruta de picking de ubicaciones, productos, novedades)
@@ -149,14 +152,16 @@ namespace PickingApp.Controllers
 
             if (pedido == null) return NotFound();
 
-            // Tiempo estándar según las categorías de los productos, comparado con una jornada completa
-            ViewBag.TiempoEstandar = pedido.TiempoEstandarMinutos ?? await _pickingEngine.CalcularTiempoEstandarAsync(pedido.Id);
-            ViewBag.CategoriaPredeterminada = await _context.CategoriasProducto
-                .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync();
-            ViewBag.MaxHorasJornada = await ObtenerMaxHorasJornadaAsync();
-            ViewBag.TiemposPartes = await _pickingEngine.CalcularTiemposEstandarAsync(pedido.Partes.Select(pa => pa.Id).ToList());
-
-            return View(pedido);
+            return View(new PedidoDetalleViewModel
+            {
+                Pedido = pedido,
+                // Tiempo estándar según las categorías de los productos, comparado con una jornada completa
+                TiempoEstandar = pedido.TiempoEstandarMinutos ?? await _pickingEngine.CalcularTiempoEstandarAsync(pedido.Id),
+                CategoriaPredeterminada = await _context.CategoriasProducto
+                    .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "Predeterminada",
+                MaxHorasJornada = await ObtenerMaxHorasJornadaAsync(),
+                TiemposPartes = await _pickingEngine.CalcularTiemposEstandarAsync(pedido.Partes.Select(pa => pa.Id).ToList())
+            });
         }
 
         // CU-28: Marcar pedido como completado

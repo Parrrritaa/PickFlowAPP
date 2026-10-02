@@ -1,12 +1,13 @@
-@model List<PickingApp.Models.Producto>
+@model PickingApp.Models.ViewModels.ProductosIndexViewModel
 @using PickingApp.Services
 @{
     ViewData["Title"] = "Productos y categorías";
-    var categorias = ViewBag.Categorias as List<PickingApp.Models.CategoriaProducto> ?? new List<PickingApp.Models.CategoriaProducto>();
-    var minutosPorUbicacion = ViewBag.MinutosPorUbicacion as double? ?? 1.0;
+    var productos = Model.Productos;
+    var categorias = Model.Categorias;
+    var minutosPorUbicacion = Model.MinutosPorUbicacion;
     var predeterminada = categorias.FirstOrDefault(c => c.EsPredeterminada);
     var nombrePredeterminada = predeterminada?.Nombre ?? "la categoría por defecto";
-    var sinClasificar = Model.Count(p => p.CategoriaProductoId == null);
+    var sinClasificar = productos.Count(p => p.CategoriaProductoId == null);
 }
 
 <h1 class="pf-page-title">Productos y categorías</h1>
@@ -98,7 +99,7 @@
                 <h4 class="fw-bold mb-1 text-dark">Clasificación de productos</h4>
                 <p class="pf-seccion-desc">Los productos sin categoría usan «@nombrePredeterminada» (la categoría por defecto).</p>
             </div>
-            @if (Model.Any())
+            @if (productos.Any())
             {
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <label class="visually-hidden" for="buscarProducto">Buscar producto</label>
@@ -116,7 +117,7 @@
             }
         </div>
 
-        @if (Model.Any())
+        @if (productos.Any())
         {
             <div class="pf-aplicar-lote">
                 <label for="categoriaLote" class="small fw-semibold mb-0">Cambiar los productos visibles a:</label>
@@ -142,7 +143,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var p in Model)
+                        @foreach (var p in productos)
                         {
                             <tr data-buscar="@($"{p.Codigo} {p.Nombre}".ToLowerInvariant())">
                                 <td class="fw-semibold">@p.Codigo</td>

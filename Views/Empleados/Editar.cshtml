@@ -11,7 +11,8 @@
     }
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var esAdministrador = userRole == Roles.Administrador;
-    var motivo = ViewBag.Motivo as string;
+    // Si el POST se rechaza, lo que el usuario escribió en "motivo" vuelve en ModelState
+    var motivo = ViewData.ModelState["motivo"]?.AttemptedValue;
 }
 
 <h1 class="pf-page-title">Editar empleado</h1>

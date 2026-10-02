@@ -34,20 +34,23 @@ namespace PickingApp.Controllers
         {
             var query = FiltrarLogs(modulo, usuario, fechaDesde, fechaHasta);
 
-            ViewBag.TotalFiltrado = await query.CountAsync();
+            var totalFiltrado = await query.CountAsync();
             var logs = await query
                 .OrderByDescending(l => l.FechaHora)
                 .Take(MaxRegistrosPantalla)
                 .ToListAsync();
             await ReemplazarCorreosEnDetalleAsync(logs);
 
-            ViewBag.ModuloFiltro = modulo;
-            ViewBag.UsuarioFiltro = usuario;
-            ViewBag.FechaDesdeFiltro = fechaDesde?.ToString("yyyy-MM-dd");
-            ViewBag.FechaHastaFiltro = fechaHasta?.ToString("yyyy-MM-dd");
-            ViewBag.MaxRegistros = MaxRegistrosPantalla;
-
-            return View(logs);
+            return View(new AuditoriaIndexViewModel
+            {
+                Registros = logs,
+                TotalFiltrado = totalFiltrado,
+                MaxRegistros = MaxRegistrosPantalla,
+                ModuloFiltro = modulo,
+                UsuarioFiltro = usuario,
+                FechaDesdeFiltro = fechaDesde?.ToString("yyyy-MM-dd"),
+                FechaHastaFiltro = fechaHasta?.ToString("yyyy-MM-dd")
+            });
         }
 
         // Exportar LOG del sistema a PDF (CU-38 / CU-36): exige el rango de fechas a exportar

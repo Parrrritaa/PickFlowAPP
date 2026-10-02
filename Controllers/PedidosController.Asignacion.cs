@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -45,14 +46,17 @@ namespace PickingApp.Controllers
                 .ThenByDescending(e => e.MesesExperiencia)
                 .ToList();
 
-            ViewBag.Pedido = pedido;
-            ViewBag.TiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
-            ViewBag.Validaciones = validaciones;
-            ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(Asignable)?.Id;
-            ViewBag.EmpleadoActualId = empleadoActualId;
-            ViewBag.EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
-                ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null);
-            return View(empleados);
+            return View(new AsignarPedidoViewModel
+            {
+                Pedido = pedido,
+                Empleados = empleados,
+                Validaciones = validaciones,
+                TiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id),
+                EmpleadoRecomendadoId = empleados.FirstOrDefault(Asignable)?.Id,
+                EmpleadoActualId = empleadoActualId,
+                EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
+                    ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null)
+            });
         }
 
         // CU-26: Asignar pedido a empleado

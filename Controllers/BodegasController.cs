@@ -38,8 +38,6 @@ namespace PickingApp.Controllers
 
             var bodegas = await query.OrderBy(b => b.Codigo).ToListAsync();
 
-            ViewBag.UbicacionesPorBodega = await ContarUbicacionesPorBodegaAsync();
-
             // Búsqueda de un producto específico: en qué bodega está y qué ubicación tiene
             List<Ubicacion>? resultadosProducto = null;
             if (!string.IsNullOrWhiteSpace(busquedaProducto))
@@ -54,11 +52,14 @@ namespace PickingApp.Controllers
                     .ToListAsync();
             }
 
-            ViewBag.FiltroEstado = estado;
-            ViewBag.BusquedaProducto = busquedaProducto;
-            ViewBag.ResultadosProducto = resultadosProducto;
-
-            return View(bodegas);
+            return View(new BodegasIndexViewModel
+            {
+                Bodegas = bodegas,
+                UbicacionesPorBodega = await ContarUbicacionesPorBodegaAsync(),
+                FiltroEstado = estado,
+                BusquedaProducto = busquedaProducto,
+                ResultadosProducto = resultadosProducto
+            });
         }
 
         // Las listas de bodegas solo muestran cuántas ubicaciones tiene cada una: se cuentan en SQL en vez de cargarlas
@@ -99,12 +100,14 @@ namespace PickingApp.Controllers
 
             bodega.Ubicaciones = ubicaciones.ToList();
 
-            ViewBag.TodasBodegas = await _context.Bodegas.AsNoTracking().ToListAsync();
-            ViewBag.UbicacionesPorBodega = await ContarUbicacionesPorBodegaAsync();
-            ViewBag.FiltroUbicacion = filtroUbicacion;
-            ViewBag.FiltroProducto = filtroProducto;
-
-            return View(bodega);
+            return View(new BodegaDetalleViewModel
+            {
+                Bodega = bodega,
+                TodasBodegas = await _context.Bodegas.AsNoTracking().ToListAsync(),
+                UbicacionesPorBodega = await ContarUbicacionesPorBodegaAsync(),
+                FiltroUbicacion = filtroUbicacion,
+                FiltroProducto = filtroProducto
+            });
         }
 
         // CU-18: Crear bodega (Solo Administrador)
@@ -222,29 +225,25 @@ namespace PickingApp.Controllers
             var bodega = await _context.Bodegas.FindAsync(bodegaId);
             if (bodega == null) return NotFound();
 
-            ViewBag.Bodega = bodega;
-            await PrepararSeleccionProductoAsync(new SeleccionProductoViewModel());
-            var model = new Ubicacion { BodegaId = bodegaId };
-            return View(model);
+            return await FormularioUbicacionAsync(new Ubicacion { BodegaId = bodegaId }, bodega, new SeleccionProductoViewModel());
         }
 
-        // Los datos del producto llegan en "seleccion" (campos seleccion.Modo, seleccion.ProductoId, ...)
+        // Los campos de la ubicación llegan como "Ubicacion.Pasillo", "Ubicacion.Estante"... (UbicacionFormViewModel)
+        // y los del producto en "seleccion" (campos seleccion.Modo, seleccion.ProductoId, ...)
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearUbicacion([Bind(nameof(Ubicacion.BodegaId), nameof(Ubicacion.Pasillo), nameof(Ubicacion.Estante),
-            nameof(Ubicacion.Nivel), nameof(Ubicacion.Activa))] Ubicacion model, SeleccionProductoViewModel seleccion)
+            nameof(Ubicacion.Nivel), nameof(Ubicacion.Activa), Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion)
         {
             var bodega = await _context.Bodegas.FindAsync(model.BodegaId);
             if (bodega == null) return NotFound();
-            ViewBag.Bodega = bodega;
-            ModelState.Remove("Producto");
+            ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.Producto)}");
 
             var producto = await ResolverProductoAsync(seleccion);
             if (!ModelState.IsValid || producto == null)
             {
-                await PrepararSeleccionProductoAsync(seleccion);
-                return View(model);
+                return await FormularioUbicacionAsync(model, bodega, seleccion);
             }
 
             // El código de ubicación siempre se genera automáticamente: PASXX-ESTXX-NIVXX
@@ -255,9 +254,8 @@ namespace PickingApp.Controllers
 
             if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == model.BodegaId && u.CodigoUbicacion == model.CodigoUbicacion))
             {
-                ModelState.AddModelError("CodigoUbicacion", "Ya existe una ubicación con ese código en esta bodega.");
-                await PrepararSeleccionProductoAsync(seleccion);
-                return View(model);
+                ModelState.AddModelError($"{PrefijoUbicacion}.{nameof(Ubicacion.CodigoUbicacion)}", "Ya existe una ubicación con ese código en esta bodega.");
+                return await FormularioUbicacionAsync(model, bodega, seleccion);
             }
 
             // Producto nuevo: se inserta junto con la ubicación en el mismo SaveChanges
@@ -289,15 +287,13 @@ namespace PickingApp.Controllers
 
             if (ubicacion == null) return NotFound();
 
-            ViewBag.Bodega = ubicacion.Bodega;
-            await PrepararSeleccionProductoAsync(new SeleccionProductoViewModel { ProductoId = ubicacion.ProductoId });
-            return View(ubicacion);
+            return await FormularioUbicacionAsync(ubicacion, ubicacion.Bodega!, new SeleccionProductoViewModel { ProductoId = ubicacion.ProductoId });
         }
 
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditarUbicacion(int id, Ubicacion model, SeleccionProductoViewModel seleccion, string? motivo)
+        public async Task<IActionResult> EditarUbicacion(int id, [Bind(Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion, string? motivo)
         {
             var ubicacionExistente = await _context.Ubicaciones
                 .Include(u => u.Bodega)
@@ -305,10 +301,9 @@ namespace PickingApp.Controllers
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (ubicacionExistente == null) return NotFound();
-            ViewBag.Bodega = ubicacionExistente.Bodega;
 
-            ModelState.Remove("Producto");
-            ModelState.Remove("CodigoUbicacion");
+            ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.Producto)}");
+            ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.CodigoUbicacion)}");
 
             motivo = (motivo ?? string.Empty).Trim();
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
@@ -318,16 +313,15 @@ namespace PickingApp.Controllers
                 ModelState.AddModelError(string.Empty, "Debe indicar el motivo de la edición.");
             }
 
-            // Vuelve a mostrar el formulario con lo que escribió el usuario (no se guarda nada)
-            async Task<IActionResult> Reintentar()
+            // Vuelve a mostrar el formulario con lo que escribió el usuario (no se guarda nada).
+            // El motivo lo repone la vista desde ModelState, como cualquier campo enviado.
+            Task<IActionResult> Reintentar()
             {
                 ubicacionExistente.Pasillo = model.Pasillo;
                 ubicacionExistente.Estante = model.Estante;
                 ubicacionExistente.Nivel = model.Nivel;
                 ubicacionExistente.Activa = model.Activa;
-                ViewBag.Motivo = motivo;
-                await PrepararSeleccionProductoAsync(seleccion);
-                return View(ubicacionExistente);
+                return FormularioUbicacionAsync(ubicacionExistente, ubicacionExistente.Bodega!, seleccion);
             }
 
             var producto = await ResolverProductoAsync(seleccion);
@@ -537,6 +531,17 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Detalle), new { id = ubicacion.BodegaId });
         }
 
+        // Prefijo de los campos de la ubicación en Crear/Editar ubicación ("Ubicacion.Pasillo"...): es el nombre
+        // de la propiedad en UbicacionFormViewModel, así el [Bind] del POST encuentra lo que escribe la vista
+        private const string PrefijoUbicacion = nameof(UbicacionFormViewModel.Ubicacion);
+
+        // Formulario de Crear/Editar ubicación (la vista sale del nombre de la acción que lo llama)
+        private async Task<IActionResult> FormularioUbicacionAsync(Ubicacion ubicacion, Bodega bodega, SeleccionProductoViewModel seleccion)
+        {
+            await PrepararSeleccionProductoAsync(seleccion);
+            return View(new UbicacionFormViewModel { Ubicacion = ubicacion, Bodega = bodega, Seleccion = seleccion });
+        }
+
         // Productos y categorías para el bloque "Producto" del formulario de ubicación
         private async Task PrepararSeleccionProductoAsync(SeleccionProductoViewModel seleccion)
         {
@@ -557,8 +562,6 @@ namespace PickingApp.Controllers
 
             // Sin productos registrados no hay nada que elegir: el formulario empieza en "Nuevo"
             if (seleccion.Productos.Count == 0) seleccion.Modo = SeleccionProductoViewModel.ModoNuevo;
-
-            ViewBag.SeleccionProducto = seleccion;
         }
 
         // Producto que tendrá la ubicación: uno existente elegido de la lista, o uno nuevo cuyo código no puede

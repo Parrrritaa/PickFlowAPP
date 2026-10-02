@@ -1,24 +1,25 @@
-﻿@model PickingApp.Models.Pedido
+﻿@model PickingApp.Models.ViewModels.PedidoDetalleViewModel
 @{
-    ViewData["Title"] = $"Pedido {Model.CodigoPedido}";
+    var pedido = Model.Pedido;
+    ViewData["Title"] = $"Pedido {pedido.CodigoPedido}";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
-    var totalUbicaciones = Model.Detalles.Select(d => d.UbicacionId).Distinct().Count();
-    var tiempoEstandar = ViewBag.TiempoEstandar as double? ?? 0;
-    var maxHorasJornada = ViewBag.MaxHorasJornada as double? ?? 9.0;
-    var categoriaPredeterminada = ViewBag.CategoriaPredeterminada as string ?? "Predeterminada";
+    var totalUbicaciones = pedido.Detalles.Select(d => d.UbicacionId).Distinct().Count();
+    var tiempoEstandar = Model.TiempoEstandar;
+    var maxHorasJornada = Model.MaxHorasJornada;
+    var categoriaPredeterminada = Model.CategoriaPredeterminada;
     var superaJornada = tiempoEstandar > maxHorasJornada * 60;
-    var partesSugeridas = Model.PartesSugeridas(tiempoEstandar, maxHorasJornada * 60);
-    var esDividido = Model.EstaDividido;
-    var partes = Model.Partes.OrderBy(pa => pa.NumeroParte).ToList();
-    var tiemposPartes = ViewBag.TiemposPartes as Dictionary<int, double> ?? new Dictionary<int, double>();
+    var partesSugeridas = pedido.PartesSugeridas(tiempoEstandar, maxHorasJornada * 60);
+    var esDividido = pedido.EstaDividido;
+    var partes = pedido.Partes.OrderBy(pa => pa.NumeroParte).ToList();
+    var tiemposPartes = Model.TiemposPartes;
     var partesTerminadas = partes.Count(pa => pa.EstaFinalizado);
-    var puedeDividir = Model.MotivoNoDivisible() == null;
-    var puedeDeshacerDivision = Model.PuedeDeshacerDivision;
+    var puedeDividir = pedido.MotivoNoDivisible() == null;
+    var puedeDeshacerDivision = pedido.PuedeDeshacerDivision;
     var esGestor = userRole == Roles.Administrador || userRole == Roles.Supervisor;
-    if (totalUbicaciones == 0) totalUbicaciones = Model.Detalles.Count;
+    if (totalUbicaciones == 0) totalUbicaciones = pedido.Detalles.Count;
     const int productosVisibles = 5;
-    var productosOcultos = Math.Max(0, Model.Detalles.Count - productosVisibles);
-    var pasillosPedido = Model.Detalles
+    var productosOcultos = Math.Max(0, pedido.Detalles.Count - productosVisibles);
+    var pasillosPedido = pedido.Detalles
         .Where(d => d.Ubicacion != null)
         .Select(d => d.Ubicacion!.Pasillo)
         .Distinct()
@@ -26,15 +27,15 @@
         .ToList();
 }
 
-<h1 class="pf-page-title">Pedido @Model.CodigoPedido</h1>
+<h1 class="pf-page-title">Pedido @pedido.CodigoPedido</h1>
 
-@if (Model.PedidoPadre != null)
+@if (pedido.PedidoPadre != null)
 {
     <div class="pf-banner-parte mb-3">
         <i class="bi bi-diagram-3" aria-hidden="true"></i>
         <span>
-            Parte @Model.NumeroParte de @Model.PedidoPadre.Partes.Count del pedido
-            <a asp-action="Detalle" asp-route-id="@Model.PedidoPadreId">@Model.PedidoPadre.CodigoPedido</a>
+            Parte @pedido.NumeroParte de @pedido.PedidoPadre.Partes.Count del pedido
+            <a asp-action="Detalle" asp-route-id="@pedido.PedidoPadreId">@pedido.PedidoPadre.CodigoPedido</a>
         </span>
     </div>
 }
@@ -45,13 +46,13 @@
         <div class="col-md-3">
             <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
                 <div class="text-secondary fw-semibold small mb-1">Estado</div>
-                <div class="fw-bold fs-3" style="color: #3B71CA;">@Model.Estado</div>
+                <div class="fw-bold fs-3" style="color: #3B71CA;">@pedido.Estado</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
                 <div class="text-secondary fw-semibold small mb-1">Prioridad</div>
-                <div class="fw-bold fs-3 text-dark">@Model.Prioridad</div>
+                <div class="fw-bold fs-3 text-dark">@pedido.Prioridad</div>
                 @if (userRole == Roles.Administrador)
                 {
                     <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-bs-toggle="modal" data-bs-target="#modalPrioridad">
@@ -69,7 +70,7 @@
         <div class="col-md-3">
             <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
                 <div class="text-secondary fw-semibold small mb-1">Empleado</div>
-                <div class="fw-bold fs-3 text-dark">@(esDividido ? "Por partes" : Model.Empleado?.NombreCompleto ?? "Sin asignar")</div>
+                <div class="fw-bold fs-3 text-dark">@(esDividido ? "Por partes" : pedido.Empleado?.NombreCompleto ?? "Sin asignar")</div>
             </div>
         </div>
     </div>
@@ -79,48 +80,48 @@
         <h5 class="fw-bold mb-2 text-dark">Información</h5>
         <div class="fs-6">
             <strong>Bodega:</strong>
-            @if (Model.Bodega != null)
+            @if (pedido.Bodega != null)
             {
-                @Model.Bodega.Nombre <span class="text-secondary">(@Model.Bodega.Codigo)</span>
+                @pedido.Bodega.Nombre <span class="text-secondary">(@pedido.Bodega.Codigo)</span>
             }
             else
             {
                 <span class="fst-italic" style="color: #4B5563;">Sin bodega</span>
             }
         </div>
-        @if (Model.Detalles.Any())
+        @if (pedido.Detalles.Any())
         {
             <div class="fs-6 mt-1">
                 <strong>Tiempo estándar:</strong> @PickingApp.Services.Formato.Duracion(tiempoEstandar)
                 <span class="text-secondary small">(según la categoría de cada producto)</span>
             </div>
-            @if (Model.Empleado != null && Model.TiempoEstimadoMinutos.HasValue)
+            @if (pedido.Empleado != null && pedido.TiempoEstimadoMinutos.HasValue)
             {
                 <div class="fs-6 mt-1">
-                    <strong>Tiempo estimado:</strong> @PickingApp.Services.Formato.Duracion(Model.TiempoEstimadoMinutos.Value)
-                    <span class="text-secondary small">(según el rendimiento de @Model.Empleado.NombreCompleto al asignarlo)</span>
+                    <strong>Tiempo estimado:</strong> @PickingApp.Services.Formato.Duracion(pedido.TiempoEstimadoMinutos.Value)
+                    <span class="text-secondary small">(según el rendimiento de @pedido.Empleado.NombreCompleto al asignarlo)</span>
                 </div>
             }
-            @if (!string.IsNullOrEmpty(Model.MotivoReasignacion))
+            @if (!string.IsNullOrEmpty(pedido.MotivoReasignacion))
             {
                 <div class="fs-6 mt-1">
-                    <strong>Motivo de reasignación:</strong> @Model.MotivoReasignacion
+                    <strong>Motivo de reasignación:</strong> @pedido.MotivoReasignacion
                 </div>
             }
-            @if (Model.Estado == PickingApp.Models.PedidoEstados.Completado && Model.TiempoProcesamientoMinutos.HasValue)
+            @if (pedido.Estado == PickingApp.Models.PedidoEstados.Completado && pedido.TiempoProcesamientoMinutos.HasValue)
             {
                 <div class="fs-6 mt-1">
-                    <strong>Tiempo real:</strong> @PickingApp.Services.Formato.Duracion(Model.TiempoProcesamientoMinutos.Value)
+                    <strong>Tiempo real:</strong> @PickingApp.Services.Formato.Duracion(pedido.TiempoProcesamientoMinutos.Value)
                 </div>
             }
-            @if (superaJornada && Model.Estado == PickingApp.Models.PedidoEstados.Pendiente)
+            @if (superaJornada && pedido.Estado == PickingApp.Models.PedidoEstados.Pendiente)
             {
                 <div class="pf-aviso-jornada mt-2" role="note">
                     <i class="bi bi-hourglass-split" aria-hidden="true"></i>
                     A ritmo estándar, este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h).
                     @if (esGestor && puedeDividir)
                     {
-                        <a asp-action="Dividir" asp-route-id="@Model.Id" class="fw-semibold">Dividirlo en @partesSugeridas partes</a>
+                        <a asp-action="Dividir" asp-route-id="@pedido.Id" class="fw-semibold">Dividirlo en @partesSugeridas partes</a>
                     }
                 </div>
             }
@@ -174,7 +175,7 @@
     <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h5 class="fw-bold mb-0 text-dark">@(esDividido || partes.Any() ? "Productos del pedido original" : "Productos")</h5>
-            @if (Model.Detalles.Count > 1)
+            @if (pedido.Detalles.Count > 1)
             {
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <input type="text" id="filtroProductoTexto" class="mockup-search-input" placeholder="Buscar producto, código o ubicación..." />
@@ -202,10 +203,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (Model.Detalles.Any())
+                    @if (pedido.Detalles.Any())
                     {
                         var indice = 0;
-                        @foreach (var d in Model.Detalles)
+                        @foreach (var d in pedido.Detalles)
                         {
                             <tr class="fila-producto @(indice++ >= productosVisibles ? "fila-extra d-none" : "")"
                                 data-buscar="@($"{d.NombreProducto} {d.CodigoProducto} {d.Ubicacion?.CodigoUbicacion}".ToLowerInvariant())"
@@ -261,7 +262,7 @@
     </div>
 
     <!-- Novedades registradas (CU-29 / CU-30) -->
-    @if (Model.Novedades != null && Model.Novedades.Any())
+    @if (pedido.Novedades != null && pedido.Novedades.Any())
     {
         <div class="mb-4">
             <h5 class="fw-bold mb-3 text-dark">Novedades registradas</h5>
@@ -281,7 +282,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var nov in Model.Novedades.OrderByDescending(n => n.FechaRegistro))
+                        @foreach (var nov in pedido.Novedades.OrderByDescending(n => n.FechaRegistro))
                         {
                             <tr>
                                 <td>@nov.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</td>
@@ -323,14 +324,14 @@
     <div class="d-flex flex-wrap gap-3 mt-4 pt-2 align-items-center">
         @if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
         {
-            @if (Model.Estado == PickingApp.Models.PedidoEstados.Pendiente)
+            @if (pedido.Estado == PickingApp.Models.PedidoEstados.Pendiente)
             {
-                <a asp-action="Asignar" asp-route-id="@Model.Id" class="btn-pf-blue">
+                <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-blue">
                     Asignar Empleado
                 </a>
                 @if (puedeDividir)
                 {
-                    <a asp-action="Dividir" asp-route-id="@Model.Id" class="btn-pf-gray">
+                    <a asp-action="Dividir" asp-route-id="@pedido.Id" class="btn-pf-gray">
                         <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i> Dividir pedido
                     </a>
                 }
@@ -339,23 +340,23 @@
             {
                 <form asp-action="DeshacerDivision" method="post" class="d-inline">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="pedidoId" value="@Model.Id" />
+                    <input type="hidden" name="pedidoId" value="@pedido.Id" />
                     <button type="submit" class="btn-pf-gray">
                         <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Deshacer división
                     </button>
                 </form>
             }
-            else if (Model.EstaEnCurso)
+            else if (pedido.EstaEnCurso)
             {
                 <button type="button" class="btn-pf-blue" style="background-color: #52A447;" data-bs-toggle="modal" data-bs-target="#modalCompletar">
                     Marcar Completado
                 </button>
-                <a asp-action="Asignar" asp-route-id="@Model.Id" class="btn-pf-blue" style="background-color: #F59E0B;">
+                <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-blue" style="background-color: #F59E0B;">
                     Reasignar
                 </a>
             }
 
-            @if (!Model.EstaFinalizado)
+            @if (!pedido.EstaFinalizado)
             {
                 <button type="button" class="btn-pf-blue" data-bs-toggle="modal" data-bs-target="#modalCancelar">
                     Cancelar pedido
@@ -381,7 +382,7 @@
             <div class="modal-content rounded-4 border-0 p-2">
                 <form asp-action="CambiarPrioridad" method="post">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="pedidoId" value="@Model.Id" />
+                    <input type="hidden" name="pedidoId" value="@pedido.Id" />
                     <div class="modal-header border-0">
                         <h5 class="modal-title fw-bold text-dark">Cambiar prioridad</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -389,9 +390,9 @@
                     <div class="modal-body">
                         <label class="form-label fw-bold">Nueva prioridad:</label>
                         <select name="nuevaPrioridad" class="form-select">
-                            <option value="Alta" selected="@(Model.Prioridad == "Alta")">Alta</option>
-                            <option value="Media" selected="@(Model.Prioridad == "Media")">Media</option>
-                            <option value="Baja" selected="@(Model.Prioridad == "Baja")">Baja</option>
+                            <option value="Alta" selected="@(pedido.Prioridad == "Alta")">Alta</option>
+                            <option value="Media" selected="@(pedido.Prioridad == "Media")">Media</option>
+                            <option value="Baja" selected="@(pedido.Prioridad == "Baja")">Baja</option>
                         </select>
                     </div>
                     <div class="modal-footer border-0">
@@ -434,7 +435,7 @@
         <div class="modal-content rounded-4 border-0 p-2">
             <form asp-action="Cancelar" method="post">
                 @Html.AntiForgeryToken()
-                <input type="hidden" name="pedidoId" value="@Model.Id" />
+                <input type="hidden" name="pedidoId" value="@pedido.Id" />
                 <div class="modal-header border-0">
                     <h5 class="modal-title fw-bold text-danger">Cancelar Pedido</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -467,13 +468,13 @@
         <div class="modal-content rounded-4 border-0 p-2">
             <form asp-action="MarcarCompletado" method="post">
                 @Html.AntiForgeryToken()
-                <input type="hidden" name="pedidoId" value="@Model.Id" />
+                <input type="hidden" name="pedidoId" value="@pedido.Id" />
                 <div class="modal-header border-0">
                     <h5 class="modal-title fw-bold text-success">Finalizar Pedido de Picking</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>¿Desea marcar como completado el pedido <strong>@Model.CodigoPedido</strong>?</p>
+                    <p>¿Desea marcar como completado el pedido <strong>@pedido.CodigoPedido</strong>?</p>
                     <div class="form-check p-3 bg-light rounded-3 mb-2">
                         <input class="form-check-input" type="checkbox" name="confirmacionFisica" id="chkFisica" value="true" required />
                         <label class="form-check-label fw-semibold text-dark" for="chkFisica">
@@ -496,7 +497,7 @@
         <div class="modal-content rounded-4 border-0 p-2">
             <form asp-action="RegistrarNovedad" method="post">
                 @Html.AntiForgeryToken()
-                <input type="hidden" name="pedidoId" value="@Model.Id" />
+                <input type="hidden" name="pedidoId" value="@pedido.Id" />
                 <div class="modal-header border-0">
                     <h5 class="modal-title fw-bold text-warning">Registrar Novedad</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

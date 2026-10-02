@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -34,13 +35,16 @@ namespace PickingApp.Controllers
 
             var tiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
             var jornadaMinutos = await ObtenerMaxHorasJornadaAsync() * 60;
-            ViewBag.TiempoEstandar = tiempoEstandar;
-            ViewBag.JornadaMinutos = jornadaMinutos;
-            ViewBag.MinutosPorLinea = await _pickingEngine.CalcularMinutosPorLineaAsync(id);
-            ViewBag.MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion);
-            ViewBag.MaxPartes = pedido.MaxPartesPermitidas;
-            ViewBag.PartesSugeridas = pedido.PartesSugeridas(tiempoEstandar, jornadaMinutos);
-            return View(pedido);
+            return View(new DividirPedidoViewModel
+            {
+                Pedido = pedido,
+                TiempoEstandar = tiempoEstandar,
+                JornadaMinutos = jornadaMinutos,
+                MinutosPorLinea = await _pickingEngine.CalcularMinutosPorLineaAsync(id),
+                MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion),
+                MaxPartes = pedido.MaxPartesPermitidas,
+                PartesSugeridas = pedido.PartesSugeridas(tiempoEstandar, jornadaMinutos)
+            });
         }
 
         // cantidades["{detalleId}_{parte}"] = unidades de esa línea que van en esa parte

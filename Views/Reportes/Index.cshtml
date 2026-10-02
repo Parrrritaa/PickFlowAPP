@@ -1,7 +1,8 @@
+@model PickingApp.Models.ViewModels.ReportesIndexViewModel
 @{
     ViewData["Title"] = "Reportes";
-    var empleados = ViewBag.Empleados as IEnumerable<PickingApp.Models.Empleado> ?? Enumerable.Empty<PickingApp.Models.Empleado>();
-    var bodegas = ViewBag.Bodegas as IEnumerable<PickingApp.Models.Bodega> ?? Enumerable.Empty<PickingApp.Models.Bodega>();
+    var empleados = Model.Empleados;
+    var bodegas = Model.Bodegas;
     var hoy = DateTime.Today.ToString("yyyy-MM-dd");
 
     // Control segmentado de dos opciones: la segunda revela un campo adicional
