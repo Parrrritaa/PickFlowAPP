@@ -2,6 +2,10 @@
    Colores de la aplicación: se definen una vez aquí y se usan con var(--pf-...).
    Cambiar un valor aquí cambia ese color en todas las pantallas. */
 :root {
+    /* La app solo tiene tema claro: los controles nativos del navegador (campos, listas, casillas,
+       autocompletado, barras de desplazamiento) se dibujan claros aunque el equipo use tema oscuro. */
+    color-scheme: light;
+
     --pf-navy: #00204A;
     --pf-navy-dark: #001736;
     --pf-navy-hover: rgba(255, 255, 255, 0.1);
@@ -116,6 +120,15 @@ body.pf-logging-out .pf-main-wrapper {
 
 * {
     box-sizing: border-box;
+}
+
+/* Autocompletado del navegador: Chrome impone su color de texto según el tema del equipo y con temas
+   oscuros queda casi blanco sobre su fondo azul claro. -webkit-text-fill-color sí se puede sobrescribir. */
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+    -webkit-text-fill-color: var(--pf-text-dark);
+    caret-color: var(--pf-text-dark);
 }
 
 body {

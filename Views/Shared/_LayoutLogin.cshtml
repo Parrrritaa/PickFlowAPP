@@ -35,6 +35,7 @@
             font-size: 15px;
             width: 100%;
             color: #1F2937;
+            background-color: #FFFFFF;
             margin-bottom: 16px;
             outline: none;
             transition: border-color 0.2s;
@@ -45,6 +46,18 @@
         }
         .pf-login-input::placeholder {
             color: #9CA3AF;
+        }
+        /* El fondo azul que Chrome pone al autocompletar no se puede cambiar con background-color:
+           se tapa con una sombra interior blanca para que el campo se vea igual que los demás */
+        .pf-login-input:-webkit-autofill {
+            box-shadow: 0 0 0 1000px #FFFFFF inset;
+        }
+        .pf-login-input:-webkit-autofill:focus {
+            box-shadow: 0 0 0 1000px #FFFFFF inset, 0 0 0 3px rgba(59, 113, 202, 0.15);
+        }
+        .pf-login-input.pf-login-input--error:-webkit-autofill,
+        .pf-login-input.pf-login-input--error:-webkit-autofill:focus {
+            box-shadow: 0 0 0 1000px #FFFFFF inset, 0 0 0 3px rgba(220, 38, 38, 0.15);
         }
         .btn-pf-login {
             background-color: #EB7D26;
