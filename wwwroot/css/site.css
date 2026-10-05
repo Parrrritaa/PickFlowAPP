@@ -219,6 +219,54 @@ body {
     font-weight: 600;
 }
 
+/* Píldora de selección (site.js): un solo fondo azul que se desliza de la opción anterior a la nueva al cambiar
+   de apartado. Sin JavaScript no existe y la opción activa conserva su propio fondo. */
+.pf-nav.pf-con-pildora {
+    position: relative;
+}
+
+.pf-nav-pildora {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 0;
+    border-radius: 10px;
+    background-color: var(--pf-blue);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+}
+
+/* Resorte con un rebote apenas perceptible: llega con decisión sin "aterrizar" de golpe */
+.pf-nav-pildora.pf-animando {
+    transition: translate 0.42s cubic-bezier(0.3, 1.25, 0.5, 1),
+                height 0.42s cubic-bezier(0.3, 1.25, 0.5, 1);
+}
+
+.pf-con-pildora .pf-nav-link {
+    z-index: 1;
+}
+
+.pf-con-pildora .pf-nav-link.active {
+    background-color: transparent;
+}
+
+/* La opción elegida queda quieta bajo el cursor: solo se desplazan las demás */
+.pf-con-pildora .pf-nav-link.active:hover {
+    transform: none;
+}
+
+/* Al llegar la píldora, el ícono de la opción da un pequeño salto */
+@keyframes pf-icono-llega {
+    0%   { scale: 1; }
+    45%  { scale: 1.2; }
+    100% { scale: 1; }
+}
+
+.pf-nav-link.pf-llega .pf-nav-icon {
+    animation: pf-icono-llega 0.42s var(--pf-ease-out) 0.16s;
+}
+
 /* Contador de notificaciones/solicitudes sin atender en el menú lateral */
 .pf-nav-badge {
     display: inline-flex;

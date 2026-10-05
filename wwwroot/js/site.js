@@ -248,6 +248,112 @@ document.addEventListener('show.bs.modal', function (e) {
     sincronizarBoton();
 })();
 
+// Píldora de selección del menú lateral: al cambiar de apartado, el fondo azul se desliza de la opción anterior
+// a la nueva. Empieza a moverse con el clic (sin retrasar la navegación) y la página siguiente la recibe donde
+// quedó, guardada en sessionStorage, para terminar el recorrido. También se conserva el desplazamiento del menú.
+(function () {
+    var nav = document.querySelector('.pf-nav');
+    var zona = document.querySelector('.pf-sidebar-scroll');
+    var activaOriginal = nav && nav.querySelector('.pf-nav-link.active');
+    if (!nav || !activaOriginal) return;
+
+    var CLAVE = 'pf-menu-pildora';
+    var VIGENCIA_MS = 5000; // más tiempo entre páginas ya no es "cambiar de apartado"
+
+    var pildora = document.createElement('li'); // dentro de la lista <ul>: un <li> decorativo
+    pildora.className = 'pf-nav-pildora';
+    pildora.setAttribute('aria-hidden', 'true');
+    nav.prepend(pildora);
+    nav.classList.add('pf-con-pildora');
+
+    function colocar(y, alto, animar) {
+        pildora.classList.toggle('pf-animando', animar && !pfReducirMovimiento());
+        pildora.style.translate = '0 ' + y + 'px';
+        pildora.style.height = alto + 'px';
+    }
+
+    function irA(link, animar) {
+        colocar(link.offsetTop, link.offsetHeight, animar);
+        if (!animar || pfReducirMovimiento()) return;
+        link.classList.remove('pf-llega');
+        void link.offsetWidth; // reinicia la animación del ícono
+        link.classList.add('pf-llega');
+    }
+
+    function marcarActiva(link) {
+        nav.querySelectorAll('.pf-nav-link.active').forEach(function (l) {
+            l.classList.remove('active');
+            l.removeAttribute('aria-current');
+        });
+        link.classList.add('active');
+        link.setAttribute('aria-current', 'page');
+    }
+
+    // Llegada a la página: desde la posición guardada (si se vino del menú hace un momento) o directo a la activa
+    var guardado = null;
+    try { guardado = JSON.parse(sessionStorage.getItem(CLAVE) || 'null'); } catch (e) { }
+    try { sessionStorage.removeItem(CLAVE); } catch (e) { }
+    var reciente = guardado && Date.now() - guardado.t < VIGENCIA_MS;
+
+    activaOriginal.setAttribute('aria-current', 'page');
+    if (reciente && zona) zona.scrollTop = guardado.scroll;
+
+    if (reciente && Math.abs(guardado.y - activaOriginal.offsetTop) > 1) {
+        colocar(guardado.y, guardado.alto, false);
+        // Tres cuadros: el layout quita el bloqueo de transiciones de la carga inicial en los dos primeros
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () { irA(activaOriginal, true); });
+            });
+        });
+    } else {
+        irA(activaOriginal, false);
+    }
+
+    // La opción activa queda a la vista si el desplazamiento guardado la dejó fuera
+    if (zona) {
+        var arriba = activaOriginal.offsetTop - zona.scrollTop;
+        if (arriba < 0 || arriba + activaOriginal.offsetHeight > zona.clientHeight) {
+            activaOriginal.scrollIntoView({ block: 'nearest', behavior: pfReducirMovimiento() ? 'auto' : 'smooth' });
+        }
+    }
+
+    // Clic normal en otra opción: la píldora sale ya hacia ella mientras carga la página
+    nav.addEventListener('click', function (e) {
+        var link = e.target.closest('.pf-nav-link');
+        if (!link || link.classList.contains('active')) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // nueva pestaña o ventana
+        marcarActiva(link);
+        irA(link, true);
+    });
+
+    // Al salir se guarda dónde va la píldora (puede estar a mitad de camino) y el desplazamiento del menú
+    window.addEventListener('pagehide', function () {
+        var caja = pildora.getBoundingClientRect();
+        var y = caja.top - nav.getBoundingClientRect().top;
+        try {
+            sessionStorage.setItem(CLAVE, JSON.stringify({ y: y, alto: caja.height, scroll: zona ? zona.scrollTop : 0, t: Date.now() }));
+        } catch (e) { }
+    });
+
+    // Volver con el botón Atrás restaura la página desde la caché tal como quedó al hacer clic:
+    // la píldora regresa a la opción de esta página
+    window.addEventListener('pageshow', function (e) {
+        if (!e.persisted) return;
+        try { sessionStorage.removeItem(CLAVE); } catch (err) { }
+        marcarActiva(activaOriginal);
+        irA(activaOriginal, true);
+    });
+
+    // El alto de las opciones cambia al mostrar u ocultar el menú (barra de íconos) o al cambiar el tamaño
+    window.addEventListener('resize', function () { irA(nav.querySelector('.pf-nav-link.active') || activaOriginal, false); });
+    document.querySelectorAll('[data-menu-toggle]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            setTimeout(function () { irA(nav.querySelector('.pf-nav-link.active') || activaOriginal, false); }, 320);
+        });
+    });
+})();
+
 function pfReducirMovimiento() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
