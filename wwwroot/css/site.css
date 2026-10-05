@@ -63,6 +63,32 @@
     animation: pf-fade-up-in 0.5s var(--pf-ease-out) both;
 }
 
+/* Datos de acceso incorrectos: el cuadro tiembla de lado a lado y se detiene (como en macOS).
+   Usa "translate", aparte del "transform" de la entrada; con movimiento reducido no se anima (ver más abajo). */
+@keyframes pf-temblor {
+    0%, 100% { translate: 0; }
+    15% { translate: -12px; }
+    30% { translate: 10px; }
+    45% { translate: -8px; }
+    60% { translate: 6px; }
+    75% { translate: -3px; }
+    90% { translate: 2px; }
+}
+
+.pf-login-card.pf-temblor {
+    animation: pf-temblor 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.pf-login-aviso:not([hidden]) {
+    animation: pf-row-in 0.24s var(--pf-ease-out);
+}
+
+.pf-login-input.pf-login-input--error,
+.pf-login-input.pf-login-input--error:focus {
+    border-color: #DC2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
 /* fill-mode "backwards": al terminar no queda un transform residual, que convertiría al contenedor
    en referencia de los elementos position:fixed (modales) y los dejaría detrás del fondo oscuro. */
 body.pf-just-logged-in .pf-sidebar {

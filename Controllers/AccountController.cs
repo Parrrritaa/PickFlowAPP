@@ -101,7 +101,7 @@ namespace PickingApp.Controllers
             // ModelState.IsValid es false si falla alguna validación del ViewModel ([Required], [EmailAddress])
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return ErrorLogin(model);
             }
 
             // SELECT del usuario por correo (los correos se guardan en minúsculas)
@@ -114,7 +114,7 @@ namespace PickingApp.Controllers
                 ModelState.AddModelError(string.Empty, "Credenciales de acceso inválidas.");
                 await _auditService.LogAsync(model.Correo, "Desconocido", "Fallo de Autenticación", "Autenticación", 
                     $"Intento fallido con correo no registrado: {model.Correo}");
-                return View(model);
+                return ErrorLogin(model);
             }
 
             var maxIntentos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxIntentosFallidos);
@@ -138,7 +138,7 @@ namespace PickingApp.Controllers
                         "Tu cuenta se encuentra bloqueada por superar el límite de intentos consecutivos fallidos. Contacta a un Administrador o espera 24 horas.");
                     await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Bloqueado", "Autenticación",
                         "Intento de acceso a cuenta bloqueada");
-                    return View(model);
+                    return ErrorLogin(model);
                 }
             }
 
@@ -147,7 +147,7 @@ namespace PickingApp.Controllers
                 ModelState.AddModelError(string.Empty, "Tu cuenta se encuentra inactiva. Contacta al Administrador.");
                 await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Inactivo", "Autenticación", 
                     "Intento de acceso a cuenta inactiva");
-                return View(model);
+                return ErrorLogin(model);
             }
 
             // Validar hash de contraseña: BCrypt aplica el mismo proceso a la contraseña escrita, con la sal
@@ -188,7 +188,7 @@ namespace PickingApp.Controllers
 
                     ModelState.AddModelError(string.Empty,
                         $"Has alcanzado el límite de {maxIntentos} intentos fallidos. Tu cuenta ha sido bloqueada temporalmente por seguridad.");
-                    return View(model);
+                    return ErrorLogin(model);
                 }
 
                 await _context.SaveChangesAsync();
@@ -203,7 +203,7 @@ namespace PickingApp.Controllers
                 await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Contraseña Incorrecta", "Autenticación", 
                     $"Intento fallido #{usuario.IntentosFallidos}");
 
-                return View(model);
+                return ErrorLogin(model);
             }
 
             // Inicio de sesión exitoso: se reinician los intentos y se guarda la fecha de acceso
@@ -244,12 +244,27 @@ namespace PickingApp.Controllers
             TempData["JustLoggedIn"] = true;
 
             // Url.IsLocalUrl evita redirigir a otro sitio si alguien manipula el returnUrl
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-            {
-                return Redirect(returnUrl);
-            }
+            var destino = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+                ? returnUrl
+                : Url.Action("Index", "Home")!;
 
-            return RedirectToAction("Index", "Home");
+            // Con fetch, la página misma navega al destino (la cookie de sesión ya viene en esta respuesta)
+            return EsEnvioConFetch ? Json(new { ok = true, url = destino }) : Redirect(destino);
+        }
+
+        // El formulario de inicio de sesión se envía con fetch (Views/Account/Login.cshtml) para mostrar el error
+        // sin recargar la página. Sin JavaScript llega como un envío normal y se responde con la vista completa.
+        private bool EsEnvioConFetch => Request.Headers["X-Requested-With"] == "fetch";
+
+        // Errores del ModelState por campo ("" = mensaje general, "Correo", "Password")
+        private IActionResult ErrorLogin(LoginViewModel model)
+        {
+            if (!EsEnvioConFetch) return View(model);
+
+            var errores = ModelState
+                .Where(e => e.Value!.Errors.Count > 0)
+                .ToDictionary(e => e.Key, e => e.Value!.Errors.Select(x => x.ErrorMessage).ToArray());
+            return Json(new { ok = false, errores });
         }
 
         // Cierra la sesión: borra la cookie de autenticación del navegador
