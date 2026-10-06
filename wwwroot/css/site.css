@@ -2381,6 +2381,18 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 /* ===== Dashboard (Views/Home/Index.cshtml) ===== */
 .pf-dash-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
 .pf-dash-head .pf-page-title { margin-bottom: 0; }
+
+/* Easter egg (wwwroot/js/dashboard-sonido.js): solo la palabra es tocable, como la nariz del póster, y se
+   aprieta al sonar. Sin user-select, tocarla varias veces seguidas no selecciona el texto. */
+#pfDashTitulo { width: fit-content; user-select: none; -webkit-tap-highlight-color: transparent; }
+#pfDashTitulo.pf-boop { animation: pf-boop 0.3s var(--pf-ease-out); }
+@keyframes pf-boop {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(0.94, 0.88); }
+    65%  { transform: scale(1.03, 1.05); }
+    100% { transform: scale(1); }
+}
+
 .pf-dash-sub { margin: 4px 0 0; font-size: 15px; color: var(--pf-text-secondary); }
 
 /* Franja de estados: una sola tarjeta dividida; el color vive solo en el punto, el número va en tinta oscura */

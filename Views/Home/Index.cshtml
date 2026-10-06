@@ -20,7 +20,8 @@
 
 <div class="pf-dash-head">
     <div>
-        <h1 class="pf-page-title">Dashboard</h1>
+        @* Easter egg: al tocar el título suena una trompeta (wwwroot/js/dashboard-sonido.js) *@
+        <h1 class="pf-page-title" id="pfDashTitulo" data-sonido="@Url.Content("~/audio/trompeta-dashboard.mp3")">Dashboard</h1>
         <p class="pf-dash-sub">
             @hoy ·
             @(porAtender == 0 ? "no hay pedidos por atender" : porAtender == 1 ? "1 pedido por atender" : $"{porAtender} pedidos por atender")
@@ -217,4 +218,5 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
     <script src="~/js/grafica-pedidos.js" asp-append-version="true"></script>
     <script src="~/js/dashboard-grafica.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard-sonido.js" asp-append-version="true"></script>
 }
