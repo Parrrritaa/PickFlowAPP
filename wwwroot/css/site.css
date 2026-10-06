@@ -331,6 +331,10 @@ body {
 }
 
 .btn-pf-logout {
+    /* flex centra el texto y no deja espacio entre el ícono (oculto con el menú completo) y el texto */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background-color: var(--pf-orange);
     color: #FFFFFF;
     font-weight: 700;
@@ -775,6 +779,7 @@ body {
 }
 
 .pf-logout-icon {
+    display: inline-block; /* en línea, max-width no se aplica y el ícono invisible empujaba el texto */
     max-width: 0;
     opacity: 0;
     overflow: hidden;
@@ -862,9 +867,6 @@ body {
     }
 
     html.pf-sidebar-collapsed .btn-pf-logout {
-        display: flex;
-        align-items: center;
-        justify-content: center;
         padding: 12px 0;
     }
 }
