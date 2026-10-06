@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -18,13 +19,15 @@ namespace PickingApp.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
         private readonly IEmailService _emailService;
+        private readonly IAntiforgery _antiforgery;
 
         // Inyección de dependencias: ASP.NET entrega estos objetos según lo registrado en Program.cs
-        public AccountController(ApplicationDbContext context, IAuditService auditService, IEmailService emailService)
+        public AccountController(ApplicationDbContext context, IAuditService auditService, IEmailService emailService, IAntiforgery antiforgery)
         {
             _context = context;
             _auditService = auditService;
             _emailService = emailService;
+            _antiforgery = antiforgery;
         }
 
         // Fallos permitidos contra un mismo código antes de anularlo.
@@ -91,12 +94,27 @@ namespace PickingApp.Controllers
         }
 
         // POST: recibe el correo y la contraseña del formulario (LoginViewModel).
-        // [ValidateAntiForgeryToken] rechaza envíos que no vengan del formulario de la propia aplicación.
+        // El token antifalsificación, que rechaza envíos que no vengan del formulario de la propia aplicación, se
+        // valida aquí a mano y no con [ValidateAntiForgeryToken]: ese atributo responde con un 400 en blanco cuando
+        // el formulario quedó viejo, y en el inicio de sesión eso tiene salida (ver abajo).
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
+
+            if (!await _antiforgery.IsRequestValidAsync(HttpContext))
+            {
+                // El token se generó sin sesión, así que deja de valer en cuanto la sesión existe: pasa si el primer
+                // envío sí entró pero el navegador lo cortó y reenvió el formulario. Ya hay sesión: se sigue al destino.
+                if (User.Identity?.IsAuthenticated == true)
+                {
+                    return IrADestino(returnUrl);
+                }
+
+                // Sin sesión no se revisan las credenciales; ErrorLogin entrega un token nuevo para reintentar
+                ModelState.AddModelError(string.Empty, "El formulario caducó. Escribe tu contraseña de nuevo e inténtalo otra vez.");
+                return ErrorLogin(model);
+            }
 
             // ModelState.IsValid es false si falla alguna validación del ViewModel ([Required], [EmailAddress])
             if (!ModelState.IsValid)
@@ -243,6 +261,11 @@ namespace PickingApp.Controllers
             // Marca la llegada como "recién logueado" para la animación de entrada del panel (solo se ve una vez).
             TempData["JustLoggedIn"] = true;
 
+            return IrADestino(returnUrl);
+        }
+
+        private IActionResult IrADestino(string? returnUrl)
+        {
             // Url.IsLocalUrl evita redirigir a otro sitio si alguien manipula el returnUrl
             var destino = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
                 ? returnUrl
@@ -256,7 +279,9 @@ namespace PickingApp.Controllers
         // sin recargar la página. Sin JavaScript llega como un envío normal y se responde con la vista completa.
         private bool EsEnvioConFetch => Request.Headers["X-Requested-With"] == "fetch";
 
-        // Errores del ModelState por campo ("" = mensaje general, "Correo", "Password")
+        // Errores del ModelState por campo ("" = mensaje general, "Correo", "Password").
+        // Con fetch la página no se recarga, así que también viaja un token antifalsificación vigente: si el que
+        // tenía el formulario caducó, el siguiente intento ya no falla. Sin fetch, la vista genera uno nuevo.
         private IActionResult ErrorLogin(LoginViewModel model)
         {
             if (!EsEnvioConFetch) return View(model);
@@ -264,7 +289,8 @@ namespace PickingApp.Controllers
             var errores = ModelState
                 .Where(e => e.Value!.Errors.Count > 0)
                 .ToDictionary(e => e.Key, e => e.Value!.Errors.Select(x => x.ErrorMessage).ToArray());
-            return Json(new { ok = false, errores });
+            var token = _antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+            return Json(new { ok = false, errores, token });
         }
 
         // Cierra la sesión: borra la cookie de autenticación del navegador

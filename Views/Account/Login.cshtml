@@ -111,6 +111,8 @@
                         window.location.assign(datos.url); // el botón sigue en "Iniciando sesión…" mientras carga
                         return;
                     }
+                    // Token antifalsificación vigente para el siguiente intento (por si el del formulario caducó)
+                    if (datos.token) form.elements['__RequestVerificationToken'].value = datos.token;
                     mostrarErrores(datos.errores);
                     temblar();
                 } catch (err) {
