@@ -1,4 +1,4 @@
-namespace PickingApp.Models
+﻿namespace PickingApp.Models
 {
     // Valores permitidos de las columnas que en MySQL son ENUM (ver EnumMySql en ApplicationDbContext).
     // Agregar un valor aquí necesita una migración nueva: el ENUM de la base de datos no se amplía solo.
@@ -17,9 +17,10 @@ namespace PickingApp.Models
         public const string Faltante = "Faltante";
         public const string Averia = "Avería";
         public const string UbicacionIncorrecta = "Ubicación Incorrecta";
+        public const string DiferenciaCantidad = "Diferencia Cantidad";
         public const string Otro = "Otro";
 
-        public static readonly string[] Todos = { Faltante, Averia, UbicacionIncorrecta, Otro };
+        public static readonly string[] Todos = { Faltante, Averia, UbicacionIncorrecta, DiferenciaCantidad, Otro };
     }
 
     public static class TiposNotificacion

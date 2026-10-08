@@ -390,9 +390,10 @@
                     <div class="modal-body">
                         <label class="form-label fw-bold">Nueva prioridad:</label>
                         <select name="nuevaPrioridad" class="form-select">
-                            <option value="Alta" selected="@(pedido.Prioridad == "Alta")">Alta</option>
-                            <option value="Media" selected="@(pedido.Prioridad == "Media")">Media</option>
-                            <option value="Baja" selected="@(pedido.Prioridad == "Baja")">Baja</option>
+                            @foreach (var prioridad in Prioridades.Todas)
+                            {
+                                <option value="@prioridad" selected="@(pedido.Prioridad == prioridad)">@prioridad</option>
+                            }
                         </select>
                     </div>
                     <div class="modal-footer border-0">
@@ -417,7 +418,7 @@
                     </div>
                     <div class="modal-body">
                         <label class="form-label fw-bold">Observaciones de atención:</label>
-                        <textarea name="observacionesAtencion" class="form-control" rows="3" placeholder="Describa cómo fue atendida la novedad"></textarea>
+                        <textarea name="observacionesAtencion" class="form-control" rows="3" maxlength="500" placeholder="Describa cómo fue atendida la novedad"></textarea>
                     </div>
                     <div class="modal-footer border-0">
                         <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
@@ -450,7 +451,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Motivo de Cancelación (Obligatorio):</label>
-                        <textarea name="motivoCancelacion" class="form-control" rows="3" required placeholder="Especifique el motivo de cancelación"></textarea>
+                        <textarea name="motivoCancelacion" class="form-control" rows="3" maxlength="250" required placeholder="Especifique el motivo de cancelación"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -506,16 +507,16 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">Tipo de Novedad:</label>
                         <select name="tipoNovedad" class="form-select">
-                            <option value="Faltante">Faltante de Producto</option>
-                            <option value="Avería">Avería / Producto Dañado</option>
-                            <option value="Ubicación Incorrecta">Ubicación Física Incorrecta</option>
-                            <option value="Diferencia Cantidad">Diferencia de Cantidades</option>
-                            <option value="Otro">Otro Motivo</option>
+                            <option value="@TiposNovedad.Faltante">Faltante de Producto</option>
+                            <option value="@TiposNovedad.Averia">Avería / Producto Dañado</option>
+                            <option value="@TiposNovedad.UbicacionIncorrecta">Ubicación Física Incorrecta</option>
+                            <option value="@TiposNovedad.DiferenciaCantidad">Diferencia de Cantidades</option>
+                            <option value="@TiposNovedad.Otro">Otro Motivo</option>
                         </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Descripción de la Novedad:</label>
-                        <textarea name="descripcion" class="form-control" rows="3" required placeholder="Detalle la situación encontrada"></textarea>
+                        <textarea name="descripcion" class="form-control" rows="3" maxlength="500" required placeholder="Detalle la situación encontrada"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0">

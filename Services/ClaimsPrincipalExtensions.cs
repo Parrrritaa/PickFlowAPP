@@ -4,6 +4,9 @@ namespace PickingApp.Services
 {
     public static class ClaimsPrincipalExtensions
     {
+        // Id del usuario en sesión; solo para acciones con [Authorize], donde la cookie siempre lo trae.
+        public static int IdUsuario(this ClaimsPrincipal user) => int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
         // Texto para identificar al usuario en notificaciones sin exponer su correo, p. ej. "administrador Jonathan Romero".
         public static string DescripcionParaNotificacion(this ClaimsPrincipal user)
         {

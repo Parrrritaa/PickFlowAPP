@@ -21,7 +21,6 @@ namespace PickingApp.Controllers
         private readonly IEmailService _emailService;
         private readonly IAntiforgery _antiforgery;
 
-        // Inyección de dependencias: ASP.NET entrega estos objetos según lo registrado en Program.cs
         public AccountController(ApplicationDbContext context, IAuditService auditService, IEmailService emailService, IAntiforgery antiforgery)
         {
             _context = context;
@@ -37,7 +36,7 @@ namespace PickingApp.Controllers
         private static string AsignarCodigoVerificacion(Usuario usuario)
         {
             var codigo = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
-            usuario.CodigoVerificacion = codigo;
+            usuario.CodigoVerificacionHash = BCrypt.Net.BCrypt.HashPassword(codigo);
             usuario.CodigoVerificacionExpira = DateTime.Now.AddMinutes(10);
             usuario.IntentosCodigo = 0;
             return codigo;
@@ -45,17 +44,17 @@ namespace PickingApp.Controllers
 
         private static bool CodigoCoincide(Usuario usuario, string codigo)
         {
-            return !string.IsNullOrEmpty(usuario.CodigoVerificacion) &&
-                usuario.CodigoVerificacion == codigo.Trim() &&
+            return !string.IsNullOrEmpty(usuario.CodigoVerificacionHash) &&
                 usuario.CodigoVerificacionExpira.HasValue &&
-                usuario.CodigoVerificacionExpira.Value >= DateTime.Now;
+                usuario.CodigoVerificacionExpira.Value >= DateTime.Now &&
+                PasswordCoincide(codigo.Trim(), usuario.CodigoVerificacionHash);
         }
 
         // Cuenta un fallo contra el código vigente y lo anula al llegar al límite, para que los
         // 6 dígitos no se puedan adivinar por fuerza bruta. Devuelve true si el código quedó anulado.
         private async Task<bool> RegistrarFalloCodigoAsync(Usuario usuario)
         {
-            if (string.IsNullOrEmpty(usuario.CodigoVerificacion))
+            if (string.IsNullOrEmpty(usuario.CodigoVerificacionHash))
             {
                 return false;
             }
@@ -64,7 +63,7 @@ namespace PickingApp.Controllers
             var anulado = usuario.IntentosCodigo >= MaxIntentosCodigo;
             if (anulado)
             {
-                usuario.CodigoVerificacion = null;
+                usuario.CodigoVerificacionHash = null;
                 usuario.CodigoVerificacionExpira = null;
                 usuario.PasswordPendienteHash = null;
                 usuario.IntentosCodigo = 0;
@@ -126,101 +125,54 @@ namespace PickingApp.Controllers
             var usuario = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Correo == model.Correo.Trim().ToLower());
 
+            // BCrypt aplica el mismo proceso a la contraseña escrita, con la sal guardada dentro del hash, y compara
+            // el resultado (la contraseña nunca se desencripta). Si el correo no existe se compara contra un hash
+            // ficticio, para que el tiempo de respuesta tampoco revele qué correos están registrados.
+            var passwordValida = PasswordCoincide(model.Password, usuario?.PasswordHash ?? HashFicticio.Value);
+
             if (usuario == null)
             {
-                // Mismo mensaje que con contraseña incorrecta: no revela qué correos existen
-                ModelState.AddModelError(string.Empty, "Credenciales de acceso inválidas.");
-                await _auditService.LogAsync(model.Correo, "Desconocido", "Fallo de Autenticación", "Autenticación", 
+                await _auditService.LogAsync(model.Correo, "Desconocido", "Fallo de Autenticación", "Autenticación",
                     $"Intento fallido con correo no registrado: {model.Correo}");
-                return ErrorLogin(model);
+                return CredencialesInvalidas(model);
             }
 
-            var maxIntentos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxIntentosFallidos);
+            // RN-06-CU01: el bloqueo se levanta automáticamente a las 24 horas.
+            if (usuario.Estado == EstadosUsuario.Bloqueado &&
+                usuario.FechaBloqueo.HasValue && DateTime.Now - usuario.FechaBloqueo.Value >= TimeSpan.FromHours(24))
+            {
+                usuario.Estado = EstadosUsuario.Activo;
+                usuario.IntentosFallidos = 0;
+                usuario.FechaBloqueo = null;
+                await _context.SaveChangesAsync();
 
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Desbloqueo Automático", "Seguridad",
+                    "Cuenta desbloqueada automáticamente tras 24 horas de bloqueo.");
+            }
+
+            // Mientras la contraseña no sea correcta, la respuesta es la misma exista o no la cuenta y esté como esté:
+            // no revela correos registrados, intentos restantes ni bloqueos
+            if (!passwordValida)
+            {
+                await RegistrarIntentoFallidoAsync(usuario);
+                return CredencialesInvalidas(model);
+            }
+
+            // Con la contraseña correcta ya se puede decir por qué la cuenta no entra
             if (usuario.Estado == EstadosUsuario.Bloqueado)
             {
-                // RN-06-CU01: el bloqueo se levanta automáticamente a las 24 horas.
-                if (usuario.FechaBloqueo.HasValue && DateTime.Now - usuario.FechaBloqueo.Value >= TimeSpan.FromHours(24))
-                {
-                    usuario.Estado = EstadosUsuario.Activo;
-                    usuario.IntentosFallidos = 0;
-                    usuario.FechaBloqueo = null;
-                    await _context.SaveChangesAsync();
-
-                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Desbloqueo Automático", "Seguridad",
-                        "Cuenta desbloqueada automáticamente tras 24 horas de bloqueo.");
-                }
-                else
-                {
-                    ModelState.AddModelError(string.Empty,
-                        "Tu cuenta se encuentra bloqueada por superar el límite de intentos consecutivos fallidos. Contacta a un Administrador o espera 24 horas.");
-                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Bloqueado", "Autenticación",
-                        "Intento de acceso a cuenta bloqueada");
-                    return ErrorLogin(model);
-                }
+                ModelState.AddModelError(string.Empty,
+                    "Tu cuenta está bloqueada por superar el límite de intentos fallidos. Espera 24 horas, pide a un Administrador que la desbloquee o recupera tu contraseña.");
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Bloqueado", "Autenticación",
+                    "Intento de acceso a cuenta bloqueada");
+                return ErrorLogin(model);
             }
 
             if (usuario.Estado == EstadosUsuario.Inactivo)
             {
                 ModelState.AddModelError(string.Empty, "Tu cuenta se encuentra inactiva. Contacta al Administrador.");
-                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Inactivo", "Autenticación", 
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Inactivo", "Autenticación",
                     "Intento de acceso a cuenta inactiva");
-                return ErrorLogin(model);
-            }
-
-            // Validar hash de contraseña: BCrypt aplica el mismo proceso a la contraseña escrita, con la sal
-            // guardada dentro del hash, y compara el resultado. La contraseña nunca se desencripta.
-            bool passwordValida = false;
-            try
-            {
-                passwordValida = BCrypt.Net.BCrypt.Verify(model.Password, usuario.PasswordHash);
-            }
-            catch
-            {
-                passwordValida = false;
-            }
-
-            if (!passwordValida)
-            {
-                usuario.IntentosFallidos++;
-
-                // RNF-06: Bloqueo al alcanzar los intentos consecutivos configurados, excepto Administrador
-                if (usuario.IntentosFallidos >= maxIntentos && usuario.NombreRol != Roles.Administrador)
-                {
-                    usuario.Estado = EstadosUsuario.Bloqueado;
-                    usuario.FechaBloqueo = DateTime.Now;
-
-                    _context.Notificaciones.Add(new Notificacion
-                    {
-                        RolDestinoId = Roles.IdAdministrador,
-                        Titulo = "Cuenta Bloqueada",
-                        Mensaje = $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.NombreRol)} ha sido bloqueada por {usuario.IntentosFallidos} intentos fallidos.",
-                        Tipo = TiposNotificacion.Danger,
-                        FechaCreacion = DateTime.Now
-                    });
-
-                    await _context.SaveChangesAsync();
-
-                    await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Bloqueo de Cuenta", "Seguridad", 
-                        $"Cuenta bloqueada tras {usuario.IntentosFallidos} intentos fallidos consecutivos");
-
-                    ModelState.AddModelError(string.Empty,
-                        $"Has alcanzado el límite de {maxIntentos} intentos fallidos. Tu cuenta ha sido bloqueada temporalmente por seguridad.");
-                    return ErrorLogin(model);
-                }
-
-                await _context.SaveChangesAsync();
-
-                var intentosRestantes = Math.Max(0, maxIntentos - usuario.IntentosFallidos);
-                var mensajeError = usuario.NombreRol == Roles.Administrador
-                    ? "Credenciales de acceso inválidas."
-                    : $"Credenciales inválidas. Intentos restantes antes del bloqueo: {intentosRestantes}";
-
-                ModelState.AddModelError(string.Empty, mensajeError);
-
-                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Contraseña Incorrecta", "Autenticación", 
-                    $"Intento fallido #{usuario.IntentosFallidos}");
-
                 return ErrorLogin(model);
             }
 
@@ -229,31 +181,7 @@ namespace PickingApp.Controllers
             usuario.UltimoAcceso = DateTime.Now;
             await _context.SaveChangesAsync();
 
-            // Los claims son los datos del usuario que viajan dentro de la cookie de sesión.
-            // Con ellos se lee después User.Identity.Name, el rol para [Authorize] y el Id del usuario.
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
-                new Claim(ClaimTypes.Name, usuario.NombreCompleto),
-                new Claim(ClaimTypes.Email, usuario.Correo),
-                new Claim(ClaimTypes.Role, usuario.NombreRol)
-            };
-
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            // RNF-06: la expiración deslizante conserva esta duración en cada renovación, así que
-            // define el cierre por inactividad de toda la sesión
-            var minutosInactividad = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MinutosInactividadSesion);
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = model.RememberMe,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(minutosInactividad)
-            };
-
-            // Crea la cookie cifrada de sesión y la envía al navegador
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(claimsIdentity),
-                authProperties);
+            await IniciarSesionAsync(usuario);
 
             await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Inicio de Sesión", "Autenticación",
                 "Inicio de sesión correcto en el sistema");
@@ -275,7 +203,20 @@ namespace PickingApp.Controllers
             return EsEnvioConFetch ? Json(new { ok = true, url = destino }) : Redirect(destino);
         }
 
-        // El formulario de inicio de sesión se envía con fetch (Views/Account/Login.cshtml) para mostrar el error
+        // Crea la cookie cifrada de sesión con los datos de SesionUsuario. También se llama tras cambiar la
+        // contraseña: el sello nuevo invalida las demás sesiones y esta se reemite para no cerrarse.
+        private async Task IniciarSesionAsync(Usuario usuario)
+        {
+            // RNF-06: la expiración deslizante conserva esta duración en cada renovación, así que
+            // define el cierre por inactividad de toda la sesión
+            var minutosInactividad = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MinutosInactividadSesion);
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                SesionUsuario.CrearPrincipal(usuario),
+                new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(minutosInactividad) });
+        }
+
+        // El formulario de inicio de sesión se envía con fetch (wwwroot/js/paginas/login.js) para mostrar el error
         // sin recargar la página. Sin JavaScript llega como un envío normal y se responde con la vista completa.
         private bool EsEnvioConFetch => Request.Headers["X-Requested-With"] == "fetch";
 
@@ -291,6 +232,62 @@ namespace PickingApp.Controllers
                 .ToDictionary(e => e.Key, e => e.Value!.Errors.Select(x => x.ErrorMessage).ToArray());
             var token = _antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
             return Json(new { ok = false, errores, token });
+        }
+
+        private IActionResult CredencialesInvalidas(LoginViewModel model)
+        {
+            ModelState.AddModelError(string.Empty, "Credenciales de acceso inválidas.");
+            return ErrorLogin(model);
+        }
+
+        // Hash de una contraseña al azar: se calcula una sola vez, la primera vez que alguien escribe un correo inexistente
+        private static readonly Lazy<string> HashFicticio = new(() => BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()));
+
+        private static bool PasswordCoincide(string password, string hash)
+        {
+            try
+            {
+                return BCrypt.Net.BCrypt.Verify(password, hash);
+            }
+            catch
+            {
+                // Hash con formato inválido en la base de datos
+                return false;
+            }
+        }
+
+        // RNF-06: solo una cuenta activa suma intentos; al llegar al máximo configurado queda bloqueada,
+        // excepto el Administrador
+        private async Task RegistrarIntentoFallidoAsync(Usuario usuario)
+        {
+            if (usuario.Estado != EstadosUsuario.Activo)
+            {
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Contraseña Incorrecta", "Autenticación",
+                    $"Intento fallido sobre cuenta {usuario.Estado.ToLowerInvariant()}");
+                return;
+            }
+
+            usuario.IntentosFallidos++;
+            var maxIntentos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxIntentosFallidos);
+            var bloquear = usuario.IntentosFallidos >= maxIntentos && usuario.NombreRol != Roles.Administrador;
+            if (bloquear)
+            {
+                usuario.Estado = EstadosUsuario.Bloqueado;
+                usuario.FechaBloqueo = DateTime.Now;
+
+                await Avisos.AlRolAsync(_context, Roles.IdAdministrador,
+                    "Cuenta Bloqueada",
+                    $"La cuenta del {ClaimsPrincipalExtensions.DescribirUsuario(usuario.NombreCompleto, usuario.NombreRol)} ha sido bloqueada por {usuario.IntentosFallidos} intentos fallidos.",
+                    TiposNotificacion.Danger);
+            }
+            await _context.SaveChangesAsync();
+
+            await _auditService.LogAsync(usuario.Correo, usuario.NombreRol,
+                bloquear ? "Bloqueo de Cuenta" : "Contraseña Incorrecta",
+                bloquear ? "Seguridad" : "Autenticación",
+                bloquear
+                    ? $"Cuenta bloqueada tras {usuario.IntentosFallidos} intentos fallidos consecutivos"
+                    : $"Intento fallido #{usuario.IntentosFallidos}");
         }
 
         // Cierra la sesión: borra la cookie de autenticación del navegador
@@ -316,7 +313,7 @@ namespace PickingApp.Controllers
             return View();
         }
 
-        // CU-03: paso 1 — se envía un código de verificación de 6 dígitos al correo registrado.
+        // CU-03: paso 1: se envía un código de verificación de 6 dígitos al correo registrado.
         [HttpPost]
         [ValidateAntiForgeryToken]
         [EnableRateLimiting("CodigoVerificacion")]
@@ -366,7 +363,7 @@ namespace PickingApp.Controllers
             return View(new VerificarCodigoRecuperacionViewModel { Correo = correo });
         }
 
-        // CU-03: paso 2 — se valida el código y, si es correcto, el propio usuario establece su nueva contraseña.
+        // CU-03: paso 2: se valida el código y, si es correcto, el propio usuario establece su nueva contraseña.
         [HttpPost]
         [ValidateAntiForgeryToken]
         [EnableRateLimiting("CodigoVerificacion")]
@@ -391,8 +388,8 @@ namespace PickingApp.Controllers
             }
 
             // Se guarda el hash BCrypt de la nueva contraseña y se invalida el código usado
-            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
-            usuario.CodigoVerificacion = null;
+            usuario.EstablecerPasswordHash(BCrypt.Net.BCrypt.HashPassword(model.NewPassword));
+            usuario.CodigoVerificacionHash = null;
             usuario.CodigoVerificacionExpira = null;
             usuario.IntentosCodigo = 0;
             usuario.IntentosFallidos = 0;
@@ -450,8 +447,9 @@ namespace PickingApp.Controllers
             // Administrador: cambio directo e inmediato.
             if (usuario.NombreRol == Roles.Administrador)
             {
-                usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
+                usuario.EstablecerPasswordHash(BCrypt.Net.BCrypt.HashPassword(model.NewPassword));
                 await _context.SaveChangesAsync();
+                await IniciarSesionAsync(usuario);
 
                 await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Cambio de Contraseña", "Seguridad",
                     "El usuario actualizó su contraseña exitosamente");
@@ -483,7 +481,7 @@ namespace PickingApp.Controllers
             return RedirectToAction("VerificarCodigoCambio");
         }
 
-        // CU-42: paso 2 — se confirma el código enviado al correo y se aplica la nueva contraseña pendiente.
+        // CU-42: paso 2: se confirma el código enviado al correo y se aplica la nueva contraseña pendiente.
         [Authorize]
         [HttpGet]
         public IActionResult VerificarCodigoCambio()
@@ -525,12 +523,13 @@ namespace PickingApp.Controllers
             }
 
             // Código correcto: el hash pendiente pasa a ser la contraseña vigente
-            usuario.PasswordHash = usuario.PasswordPendienteHash;
+            usuario.EstablecerPasswordHash(usuario.PasswordPendienteHash);
             usuario.PasswordPendienteHash = null;
-            usuario.CodigoVerificacion = null;
+            usuario.CodigoVerificacionHash = null;
             usuario.CodigoVerificacionExpira = null;
             usuario.IntentosCodigo = 0;
             await _context.SaveChangesAsync();
+            await IniciarSesionAsync(usuario);
 
             await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Cambio de Contraseña", "Seguridad",
                 "El usuario confirmó el cambio de contraseña mediante código enviado por correo.");

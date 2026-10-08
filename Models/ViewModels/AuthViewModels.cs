@@ -13,8 +13,6 @@ namespace PickingApp.Models.ViewModels
         [Required(ErrorMessage = "La contraseña es obligatoria.")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
-
-        public bool RememberMe { get; set; } = false;
     }
 
     // [Compare] valida que ConfirmPassword sea igual a NewPassword
@@ -35,7 +33,7 @@ namespace PickingApp.Models.ViewModels
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
-    // CU-03: paso 1 de recuperación — se pide el correo para enviar el código de verificación.
+    // CU-03: paso 1 de recuperación: se pide el correo para enviar el código de verificación.
     public class SolicitarCodigoViewModel
     {
         [Required(ErrorMessage = "El correo es obligatorio.")]
@@ -43,7 +41,7 @@ namespace PickingApp.Models.ViewModels
         public string Correo { get; set; } = string.Empty;
     }
 
-    // CU-03: paso 2 de recuperación — código de verificación + nueva contraseña.
+    // CU-03: paso 2 de recuperación: código de verificación + nueva contraseña.
     public class VerificarCodigoRecuperacionViewModel
     {
         [Required]
@@ -65,7 +63,7 @@ namespace PickingApp.Models.ViewModels
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
-    // CU-42: paso 2 del cambio de contraseña estando logueado — confirmación por código de verificación.
+    // CU-42: paso 2 del cambio de contraseña estando logueado: confirmación por código de verificación.
     public class VerificarCodigoCambioViewModel
     {
         [Required(ErrorMessage = "El código de verificación es obligatorio.")]

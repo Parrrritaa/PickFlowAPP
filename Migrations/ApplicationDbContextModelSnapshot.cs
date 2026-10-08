@@ -302,9 +302,6 @@ namespace PickingApp.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
-                    b.Property<int?>("RolDestinoId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Tipo")
                         .IsRequired()
                         .HasColumnType("enum('Info','Warning','Success','Danger')");
@@ -314,12 +311,10 @@ namespace PickingApp.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)");
 
-                    b.Property<int?>("UsuarioDestinoId")
+                    b.Property<int>("UsuarioDestinoId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("RolDestinoId");
 
                     b.HasIndex("UsuarioDestinoId");
 
@@ -366,7 +361,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("TipoNovedad")
                         .IsRequired()
-                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Otro')");
+                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Diferencia Cantidad','Otro')");
 
                     b.HasKey("Id");
 
@@ -674,12 +669,12 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("CodigoVerificacion")
-                        .HasMaxLength(6)
-                        .HasColumnType("varchar(6)");
-
                     b.Property<DateTime?>("CodigoVerificacionExpira")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CodigoVerificacionHash")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
 
                     b.Property<string>("Correo")
                         .IsRequired()
@@ -720,6 +715,11 @@ namespace PickingApp.Migrations
 
                     b.Property<int>("RolId")
                         .HasColumnType("int");
+
+                    b.Property<string>("SelloSeguridad")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("varchar(36)");
 
                     b.Property<DateTime?>("UltimoAcceso")
                         .HasColumnType("datetime(6)");
@@ -765,17 +765,11 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Notificacion", b =>
                 {
-                    b.HasOne("PickingApp.Models.Rol", "RolDestino")
-                        .WithMany()
-                        .HasForeignKey("RolDestinoId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("PickingApp.Models.Usuario", "UsuarioDestino")
                         .WithMany()
                         .HasForeignKey("UsuarioDestinoId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("RolDestino");
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("UsuarioDestino");
                 });

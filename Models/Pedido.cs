@@ -107,6 +107,22 @@ namespace PickingApp.Models
         public bool PuedeDeshacerDivision =>
             EstaDividido && Partes.All(pa => pa.Estado == PedidoEstados.Pendiente && !pa.Novedades.Any());
 
+        // Tiempo real de picking: desde el inicio efectivo (asignación + margen) hasta la finalización; mínimo 1 minuto
+        public static double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion) =>
+            Math.Round(Math.Max(1, (fechaFinalizacion - inicioProceso).TotalMinutes), 1);
+
+        // Parte k de la división (PED-XXX-Pk): pendiente, con la cabecera del original y sin líneas todavía
+        public Pedido NuevaParte(int k) => new()
+        {
+            CodigoPedido = $"{CodigoPedido}-P{k}",
+            BodegaId = BodegaId,
+            Prioridad = Prioridad,
+            Estado = PedidoEstados.Pendiente,
+            FechaCarga = FechaCarga,
+            NumeroParte = k,
+            PedidoPadre = this
+        };
+
         public void Asignar(int empleadoId, DateTime inicioProceso, double tiempoEstimado, double tiempoEstandar) =>
             TomarEmpleado(PedidoEstados.Asignado, empleadoId, inicioProceso, tiempoEstimado, tiempoEstandar);
 

@@ -14,10 +14,12 @@ namespace PickingApp.Services
     public class ExcelService : IExcelService
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<ExcelService> _logger;
 
-        public ExcelService(ApplicationDbContext context)
+        public ExcelService(ApplicationDbContext context, ILogger<ExcelService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<ExcelValidationResult> ValidarArchivoExcelAsync(Stream stream, IReadOnlyList<ResolucionExcel> resoluciones, bool puedeEditarUbicaciones)
@@ -71,10 +73,10 @@ namespace PickingApp.Services
 
                 var incidencias = new GestorIncidencias(resoluciones, bodegas, ubicacionesDb, categorias, puedeEditarUbicaciones, result);
 
-                // Skip(1) salta la fila de encabezados
                 var rows = range.RowsUsed().Skip(1);
                 var totalFilas = 0;
-                var pedidosDict = new Dictionary<string, Pedido>();
+                // Sin distinguir mayúsculas, igual que MySQL: "PED-1" y "ped-1" son el mismo pedido
+                var pedidosDict = new Dictionary<string, Pedido>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var row in rows)
                 {
@@ -94,6 +96,13 @@ namespace PickingApp.Services
 
                     if (string.IsNullOrWhiteSpace(codPedido) || string.IsNullOrWhiteSpace(codProducto))
                     {
+                        continue;
+                    }
+
+                    // Largos de las columnas en MySQL (Pedido.CodigoPedido, Producto.Codigo y Producto.Nombre)
+                    if (codPedido.Length > 50 || codProducto.Length > 50 || nomProducto.Length > 150)
+                    {
+                        result.Errors.Add($"Fila {filaNum}: el código del pedido y el del producto admiten hasta 50 caracteres, y el nombre del producto hasta 150.");
                         continue;
                     }
 
@@ -149,11 +158,9 @@ namespace PickingApp.Services
                             continue;
                         }
 
-                        prioridad = string.IsNullOrWhiteSpace(prioridad) ? "Media" : prioridad;
-                        if (prioridad != "Alta" && prioridad != "Media" && prioridad != "Baja")
-                        {
-                            prioridad = "Media";
-                        }
+                        // "alta" vale como Alta; vacía o desconocida, Media
+                        prioridad = Prioridades.Todas.FirstOrDefault(p => p.Equals(prioridad, StringComparison.OrdinalIgnoreCase))
+                            ?? Prioridades.Media;
 
                         pedido = new Pedido
                         {
@@ -161,7 +168,7 @@ namespace PickingApp.Services
                             // La bodega del pedido es la de la ubicación donde se recoge (el usuario pudo elegir otra)
                             BodegaId = destino?.BodegaId ?? bodega.Id,
                             Prioridad = prioridad,
-                            Estado = "Pendiente",
+                            Estado = PedidoEstados.Pendiente,
                             FechaCarga = DateTime.Now,
                             Detalles = new List<DetallePedido>()
                         };
@@ -199,7 +206,9 @@ namespace PickingApp.Services
             catch (Exception ex)
             {
                 result.IsValid = false;
-                result.Errors.Add($"No fue posible leer el archivo seleccionado. Verifique que el formato sea correcto ({ex.Message}).");
+                // El detalle técnico queda en el registro del servidor; al usuario le sirve saber qué revisar
+                _logger.LogWarning(ex, "No se pudo leer el archivo Excel de pedidos.");
+                result.Errors.Add("No fue posible leer el archivo seleccionado. Verifique que sea un Excel (.xlsx) válido, que no esté dañado y que no tenga contraseña.");
             }
 
             return result;

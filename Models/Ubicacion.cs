@@ -20,17 +20,17 @@ namespace PickingApp.Models
 
         [Required(ErrorMessage = "El pasillo es obligatorio")]
         [StringLength(20)]
-        [RegularExpression(@"^\d+$", ErrorMessage = "El pasillo solo debe contener números")]
+        [RegularExpression(@"^\d{1,9}$", ErrorMessage = "El pasillo solo debe contener números (hasta 9 dígitos)")]
         public string Pasillo { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "El estante es obligatorio")]
         [StringLength(20)]
-        [RegularExpression(@"^\d+$", ErrorMessage = "El estante solo debe contener números")]
+        [RegularExpression(@"^\d{1,9}$", ErrorMessage = "El estante solo debe contener números (hasta 9 dígitos)")]
         public string Estante { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "El nivel es obligatorio")]
         [StringLength(20)]
-        [RegularExpression(@"^\d+$", ErrorMessage = "El nivel solo debe contener números")]
+        [RegularExpression(@"^\d{1,9}$", ErrorMessage = "El nivel solo debe contener números (hasta 9 dígitos)")]
         public string Nivel { get; set; } = string.Empty;
 
         public bool Activa { get; set; } = true;

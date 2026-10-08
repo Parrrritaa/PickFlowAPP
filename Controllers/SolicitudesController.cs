@@ -1,5 +1,4 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
@@ -17,15 +16,16 @@ namespace PickingApp.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly ILogger<SolicitudesController> _logger;
 
-        public SolicitudesController(ApplicationDbContext context, IAuditService auditService)
+        public SolicitudesController(ApplicationDbContext context, IAuditService auditService, ILogger<SolicitudesController> logger)
         {
             _context = context;
             _auditService = auditService;
+            _logger = logger;
         }
 
-        // CU-08: el Supervisor solo revisa, aprueba o rechaza registros de empleados; el resto es del Administrador
-        private const int TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
+        private const int TipoGestionableSupervisor = FlujoSolicitudes.TipoGestionableSupervisor;
         private const string MensajeSinPermisoSupervisor = "Los Supervisores solo tienen permiso para gestionar solicitudes de registro de empleados.";
 
         // Cabe en la notificación al solicitante (500 caracteres con el resto del mensaje) y en MotivoRechazo
@@ -34,7 +34,7 @@ namespace PickingApp.Controllers
         private bool PuedeGestionar(Solicitud solicitud) =>
             !User.IsInRole(Roles.Supervisor) || solicitud.TipoSolicitudId == TipoGestionableSupervisor;
 
-        private int UsuarioActualId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        private int UsuarioActualId => User.IdUsuario();
 
         // Bandeja de aprobación para Administrador y Supervisor
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
@@ -126,7 +126,7 @@ namespace PickingApp.Controllers
             return View("Index", modelo);
         }
 
-        // Diapositiva 16 / CU-08: Revisar Solicitud
+        // CU-08: Revisar Solicitud
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> Revisar(int id)
@@ -352,28 +352,24 @@ namespace PickingApp.Controllers
             try
             {
                 // Aplica el cambio pedido (crear, editar o inactivar empleado; editar o eliminar ubicación)
-                await AplicarAsync(solicitud);
+                await FlujoSolicitudes.AplicarAsync(_context, solicitud);
 
                 solicitud.Estado = EstadosSolicitud.Aprobada;
                 solicitud.FechaRespuesta = DateTime.Now;
                 solicitud.UsuarioRespondeId = UsuarioActualId;
 
                 // Notificar al usuario solicitante (CU-43); el enlace abre esta solicitud
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    UsuarioDestinoId = solicitud.UsuarioSolicitanteId,
-                    Titulo = "Solicitud Aprobada",
-                    Mensaje = $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.",
-                    Tipo = TiposNotificacion.Success,
-                    FechaCreacion = DateTime.Now,
-                    Enlace = $"/Solicitudes/Detalle/{solicitud.Id}"
-                });
+                Avisos.AlUsuario(_context, solicitud.UsuarioSolicitanteId,
+                    "Solicitud Aprobada",
+                    $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.",
+                    TiposNotificacion.Success,
+                    $"/Solicitudes/Detalle/{solicitud.Id}");
 
                 // Un solo SaveChanges guarda el cambio aplicado, la solicitud aprobada y la notificación:
                 // si algo falla, no se guarda nada a medias
                 await _context.SaveChangesAsync();
 
-                await _auditService.RegistrarAsync("Aprobar Solicitud", "Solicitudes",
+                await _auditService.RegistrarAsync(AccionesLog.AprobarSolicitud, "Solicitudes",
                     $"Solicitud #{solicitud.Id} ({solicitud.NombreTipo}) aprobada.");
 
                 TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} aprobada correctamente.";
@@ -387,7 +383,8 @@ namespace PickingApp.Controllers
             // Los errores de base de datos siguen hasta ErrorBaseDatosMiddleware, que muestra el aviso comprensible
             catch (Exception ex) when (!ErroresBaseDatos.EsErrorDeBaseDatos(ex))
             {
-                TempData["ErrorMessage"] = $"Error al procesar la aprobación: {ex.Message}";
+                _logger.LogError(ex, "Error inesperado al aprobar la solicitud {Id}.", id);
+                TempData["ErrorMessage"] = "No se pudo aprobar la solicitud por un error inesperado; no se guardó ningún cambio. Inténtelo de nuevo.";
             }
 
             // Si no se pudo aprobar, se vuelve a la misma solicitud para rechazarla o revisarla
@@ -428,199 +425,19 @@ namespace PickingApp.Controllers
             solicitud.UsuarioRespondeId = UsuarioActualId;
 
             // Notificar al usuario solicitante (CU-43); el enlace abre la solicitud con el motivo
-            _context.Notificaciones.Add(new Notificacion
-            {
-                UsuarioDestinoId = solicitud.UsuarioSolicitanteId,
-                Titulo = "Solicitud Rechazada",
-                Mensaje = $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" fue rechazada. Motivo: {motivoRechazo}",
-                Tipo = TiposNotificacion.Danger,
-                FechaCreacion = DateTime.Now,
-                Enlace = $"/Solicitudes/Detalle/{solicitud.Id}"
-            });
+            Avisos.AlUsuario(_context, solicitud.UsuarioSolicitanteId,
+                "Solicitud Rechazada",
+                $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" fue rechazada. Motivo: {motivoRechazo}",
+                TiposNotificacion.Danger,
+                $"/Solicitudes/Detalle/{solicitud.Id}");
 
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Rechazar Solicitud", "Solicitudes",
+            await _auditService.RegistrarAsync(AccionesLog.RechazarSolicitud, "Solicitudes",
                 $"Solicitud #{solicitud.Id} rechazada. Motivo: {motivoRechazo}");
 
             TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} rechazada.";
             return RedirectToAction(nameof(Index));
-        }
-
-        // El empleado pudo tomar un pedido entre la creación de la solicitud y su aprobación.
-        private async Task ValidarSinPedidoEnCursoAsync(Empleado empleado, string accion)
-        {
-            var pedidoEnCurso = await _context.Pedidos
-                .Where(p => p.EmpleadoId == empleado.Id && PedidoEstados.EnCurso.Contains(p.Estado))
-                .Select(p => p.CodigoPedido)
-                .FirstOrDefaultAsync();
-
-            if (pedidoEnCurso != null)
-            {
-                throw new ReglaNegocioException($"No se puede aprobar: el empleado '{empleado.NombreCompleto}' tiene el pedido {pedidoEnCurso} en curso y no es posible {accion}. Reasigne, complete o cancele el pedido primero; la solicitud sigue pendiente.");
-            }
-        }
-
-        // Aplica los cambios de la solicitud. Las reglas se validan otra vez: entre la creación de la solicitud
-        // y su aprobación otro registro pudo tomar la identificación, el correo o el código, o cambiar la jornada máxima.
-        // Según el tipo, se leen los datos guardados en DatosJson y se aplica el cambio correspondiente
-        private Task AplicarAsync(Solicitud solicitud) => solicitud.TipoSolicitudId switch
-        {
-            TiposSolicitud.RegistroEmpleado => RegistrarEmpleadoAsync(solicitud.LeerDatos<DatosEmpleadoSolicitud>()),
-            TiposSolicitud.EdicionEmpleado => EditarEmpleadoAsync(solicitud.LeerDatos<SolicitudEdicionEmpleado>()),
-            TiposSolicitud.InactivacionEmpleado => InactivarEmpleadoAsync(solicitud.LeerDatos<SolicitudInactivacionEmpleado>()),
-            TiposSolicitud.EdicionUbicacion => EditarUbicacionAsync(solicitud.LeerDatos<SolicitudEdicionUbicacion>()),
-            TiposSolicitud.EliminacionUbicacion => EliminarUbicacionAsync(solicitud.LeerDatos<SolicitudEliminacionUbicacion>()),
-            _ => throw new ReglaNegocioException($"No se puede aprobar: tipo de solicitud desconocido ({solicitud.TipoSolicitudId}).")
-        };
-
-        private async Task RegistrarEmpleadoAsync(DatosEmpleadoSolicitud datos)
-        {
-            var identificacion = datos.Identificacion.Trim();
-            var correo = ReglasEmpleado.NormalizarCorreo(datos.Correo);
-            await ValidarReglasEmpleadoAsync(identificacion, correo, datos.HorarioEntrada, datos.HorarioSalida, empleadoId: null);
-
-            _context.Empleados.Add(new Empleado
-            {
-                Identificacion = identificacion,
-                NombreCompleto = datos.NombreCompleto,
-                Correo = correo,
-                HorarioEntrada = datos.HorarioEntrada,
-                HorarioSalida = datos.HorarioSalida,
-                FechaIngreso = datos.FechaIngreso
-            });
-        }
-
-        // Solo se aplican los campos que la solicitud cambia: si otro campo se editó mientras esperaba,
-        // aprobarla no lo devuelve al valor de antes
-        private async Task EditarEmpleadoAsync(SolicitudEdicionEmpleado solicitud)
-        {
-            var datos = solicitud.NuevosDatos;
-            var empleado = await _context.Empleados.FindAsync(datos.Id)
-                ?? throw new ReglaNegocioException("No se puede aprobar: el empleado ya no existe. Rechace la solicitud.");
-
-            var campos = solicitud.Cambios.Select(c => c.Campo).ToHashSet();
-            var correo = campos.Contains(CamposEmpleado.Correo) ? ReglasEmpleado.NormalizarCorreo(datos.Correo) : empleado.Correo;
-            var entrada = campos.Contains(CamposEmpleado.HoraEntrada) ? datos.HorarioEntrada : empleado.HorarioEntrada;
-            var salida = campos.Contains(CamposEmpleado.HoraSalida) ? datos.HorarioSalida : empleado.HorarioSalida;
-            await ValidarReglasEmpleadoAsync(empleado.Identificacion, correo, entrada, salida, empleado.Id);
-
-            if (campos.Contains(CamposEmpleado.Nombre)) empleado.NombreCompleto = datos.NombreCompleto;
-            if (campos.Contains(CamposEmpleado.FechaIngreso)) empleado.FechaIngreso = datos.FechaIngreso;
-            empleado.Correo = correo;
-            empleado.HorarioEntrada = entrada;
-            empleado.HorarioSalida = salida;
-        }
-
-        private async Task InactivarEmpleadoAsync(SolicitudInactivacionEmpleado datos)
-        {
-            var empleado = await _context.Empleados.FindAsync(datos.EmpleadoId)
-                ?? throw new ReglaNegocioException("No se puede aprobar: el empleado ya no existe. Rechace la solicitud.");
-
-            await ValidarSinPedidoEnCursoAsync(empleado, "inactivarlo");
-            empleado.Activo = false;
-        }
-
-        private async Task EditarUbicacionAsync(SolicitudEdicionUbicacion datos)
-        {
-            var ubicacion = await _context.Ubicaciones
-                .Include(u => u.Producto)
-                .FirstOrDefaultAsync(u => u.Id == datos.UbicacionId)
-                ?? throw new ReglaNegocioException("No se puede aprobar: la ubicación ya no existe. Rechace la solicitud.");
-
-            // Solo se aplican los campos que la solicitud cambia (igual que en la edición de empleados)
-            var nuevos = datos.NuevosDatos;
-            var campos = datos.Cambios.Select(c => c.Campo).ToHashSet();
-
-            if (campos.Contains(CamposUbicacion.Codigo))
-            {
-                var duplicada = await _context.Ubicaciones.AnyAsync(u =>
-                    u.BodegaId == ubicacion.BodegaId && u.CodigoUbicacion == nuevos.CodigoUbicacion && u.Id != ubicacion.Id);
-                if (duplicada)
-                {
-                    throw new ReglaNegocioException($"No se puede aprobar: ya existe otra ubicación con el código '{nuevos.CodigoUbicacion}' en esta bodega. La solicitud sigue pendiente.");
-                }
-                ubicacion.Pasillo = nuevos.Pasillo;
-                ubicacion.Estante = nuevos.Estante;
-                ubicacion.Nivel = nuevos.Nivel;
-                ubicacion.CodigoUbicacion = nuevos.CodigoUbicacion;
-            }
-            if (campos.Contains(CamposUbicacion.Estado))
-            {
-                ubicacion.Activa = nuevos.Activa;
-            }
-            // La ubicación toma un producto existente sin modificarlo, o registra el producto nuevo propuesto
-            if (campos.Contains(CamposUbicacion.Producto))
-            {
-                ubicacion.Producto = await ProductoDeSolicitudAsync(nuevos);
-            }
-        }
-
-        private async Task<Producto> ProductoDeSolicitudAsync(DatosUbicacionSolicitud nuevos)
-        {
-            if (nuevos.ProductoId is int productoId)
-            {
-                return await _context.Productos.FindAsync(productoId)
-                    ?? throw new ReglaNegocioException("No se puede aprobar: el producto elegido ya no existe. Rechace la solicitud.");
-            }
-
-            var existente = await _context.Productos
-                .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == nuevos.CodigoProducto.ToUpper());
-            if (existente != null)
-            {
-                // Otro registro tomó el código mientras la solicitud esperaba
-                if (nuevos.ProductoNuevo)
-                {
-                    throw new ReglaNegocioException($"No se puede aprobar: el producto {existente.Codigo} ya existe ({existente.Nombre}). Rechace la solicitud para que se elija como producto existente.");
-                }
-                // Solicitud anterior a esta opción: se usa el producto con ese código tal como está
-                return existente;
-            }
-
-            // Si la categoría fue eliminada mientras tanto, el producto queda sin clasificar
-            var categoriaId = nuevos.CategoriaProductoId;
-            if (categoriaId.HasValue && !await _context.CategoriasProducto.AnyAsync(c => c.Id == categoriaId.Value))
-            {
-                categoriaId = null;
-            }
-
-            var producto = new Producto
-            {
-                Codigo = nuevos.CodigoProducto,
-                Nombre = nuevos.NombreProducto ?? nuevos.CodigoProducto,
-                CategoriaProductoId = categoriaId,
-                UnidadesPorCaja = Math.Max(1, nuevos.UnidadesPorCaja ?? 1)
-            };
-            _context.Productos.Add(producto);
-            return producto;
-        }
-
-        private async Task EliminarUbicacionAsync(SolicitudEliminacionUbicacion datos)
-        {
-            var ubicacion = await _context.Ubicaciones.FindAsync(datos.UbicacionId)
-                ?? throw new ReglaNegocioException("No se puede aprobar: la ubicación ya no existe. Rechace la solicitud.");
-
-            // Pudo recibir pedidos después de creada la solicitud
-            if (await _context.DetallesPedido.AnyAsync(d => d.UbicacionId == ubicacion.Id))
-            {
-                throw new ReglaNegocioException($"No se puede aprobar: la ubicación '{ubicacion.CodigoUbicacion}' tiene pedidos asociados. Rechace la solicitud.");
-            }
-            _context.Ubicaciones.Remove(ubicacion);
-        }
-
-        private async Task ValidarReglasEmpleadoAsync(string identificacion, string? correo, TimeSpan entrada, TimeSpan salida, int? empleadoId)
-        {
-            var error = await ReglasEmpleado.ValidarAsync(_context, identificacion, correo, entrada, salida, empleadoId);
-            if (error != null)
-            {
-                throw new ReglaNegocioException($"No se puede aprobar: {error.Mensaje} La solicitud sigue pendiente.");
-            }
-        }
-
-        // Excepción propia para reglas de negocio: Aprobar la atrapa y muestra su mensaje al usuario
-        private sealed class ReglaNegocioException : Exception
-        {
-            public ReglaNegocioException(string message) : base(message) { }
         }
     }
 }

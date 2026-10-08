@@ -191,14 +191,14 @@
     function ajustarAgrupar() {
         const s = el('pfAgrupar');
         el('pfAgruparTexto').textContent = s.options[s.selectedIndex].text;
-        el('pfAgruparMenu').querySelectorAll('.pf-opcion').forEach(o => {
+        el('pfAgruparMenu').querySelectorAll('.pf-menu-opcion').forEach(o => {
             o.classList.toggle('active', o.dataset.valor === s.value);
             o.setAttribute('aria-pressed', o.dataset.valor === s.value);
         });
     }
 
     el('pfAgruparMenu').addEventListener('click', e => {
-        const o = e.target.closest('.pf-opcion');
+        const o = e.target.closest('.pf-menu-opcion');
         if (!o) return;
         const s = el('pfAgrupar');
         if (s.value !== o.dataset.valor) {

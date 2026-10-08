@@ -29,6 +29,17 @@ namespace PickingApp.Models
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
 
+        // Viaja en la cookie de sesión; al cambiar la contraseña se renueva y las sesiones abiertas dejan de valer.
+        [Required]
+        [StringLength(36)]
+        public string SelloSeguridad { get; set; } = Guid.NewGuid().ToString();
+
+        public void EstablecerPasswordHash(string hash)
+        {
+            PasswordHash = hash;
+            SelloSeguridad = Guid.NewGuid().ToString();
+        }
+
         [Required]
         public int RolId { get; set; } = Roles.IdAuxiliar;
 
@@ -51,9 +62,9 @@ namespace PickingApp.Models
 
         public DateTime? UltimoAcceso { get; set; }
 
-        // Código de verificación (6 dígitos) enviado por correo para recuperar u confirmar el cambio de contraseña.
-        [StringLength(6)]
-        public string? CodigoVerificacion { get; set; }
+        // Hash BCrypt del código de 6 dígitos enviado por correo para recuperar o confirmar el cambio de contraseña.
+        [StringLength(60)]
+        public string? CodigoVerificacionHash { get; set; }
 
         public DateTime? CodigoVerificacionExpira { get; set; }
 

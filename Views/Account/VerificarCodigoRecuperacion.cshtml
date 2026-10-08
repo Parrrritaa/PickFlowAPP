@@ -1,4 +1,4 @@
-@model PickingApp.Models.ViewModels.VerificarCodigoRecuperacionViewModel
+﻿@model PickingApp.Models.ViewModels.VerificarCodigoRecuperacionViewModel
 @{
     ViewData["Title"] = "Verificar código";
     Layout = "_LayoutLogin";
@@ -28,17 +28,20 @@
         <input type="hidden" asp-for="Correo" />
 
         <div class="mb-3 text-start">
-            <input asp-for="Codigo" class="pf-login-input" placeholder="Código de verificación" inputmode="numeric" pattern="\d*" maxlength="6" required />
+            <label asp-for="Codigo" class="visually-hidden">Código de verificación</label>
+            <input asp-for="Codigo" class="pf-login-input" placeholder="Código de verificación" inputmode="numeric" pattern="\d*" maxlength="6" autocomplete="one-time-code" required />
             <span asp-validation-for="Codigo" class="text-danger small"></span>
         </div>
 
         <div class="mb-3 text-start">
-            <input asp-for="NewPassword" type="password" class="pf-login-input" placeholder="Nueva contraseña" required />
+            <label asp-for="NewPassword" class="visually-hidden">Nueva contraseña</label>
+            <input asp-for="NewPassword" type="password" class="pf-login-input" placeholder="Nueva contraseña" autocomplete="new-password" required />
             <span asp-validation-for="NewPassword" class="text-danger small"></span>
         </div>
 
         <div class="mb-3 text-start">
-            <input asp-for="ConfirmPassword" type="password" class="pf-login-input" placeholder="Confirmar nueva contraseña" required />
+            <label asp-for="ConfirmPassword" class="visually-hidden">Confirmar nueva contraseña</label>
+            <input asp-for="ConfirmPassword" type="password" class="pf-login-input" placeholder="Confirmar nueva contraseña" autocomplete="new-password" required />
             <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
         </div>
 

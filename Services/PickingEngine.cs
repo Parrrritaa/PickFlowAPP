@@ -249,12 +249,7 @@ namespace PickingApp.Services
 
             // Regla 3: Validar Jornada Laboral
             var horaActual = contexto.HoraActual;
-            var enHorario = empleado.HorarioEntrada < empleado.HorarioSalida
-                ? horaActual >= empleado.HorarioEntrada && horaActual <= empleado.HorarioSalida
-                // Turno nocturno que cruza medianoche
-                : horaActual >= empleado.HorarioEntrada || horaActual <= empleado.HorarioSalida;
-
-            if (!enHorario)
+            if (!empleado.TrabajaA(horaActual))
             {
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' se encuentra fuera de su jornada laboral ({empleado.HorarioEntrada:hh\\:mm} - {empleado.HorarioSalida:hh\\:mm}).";
                 result.MotivoCorto = "Fuera de jornada";
@@ -284,18 +279,6 @@ namespace PickingApp.Services
 
             result.PuedeAsignar = true;
             return result;
-        }
-
-        // Tiempo real de picking: desde el inicio efectivo (asignación + margen) hasta la finalización
-        public double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion)
-        {
-            if (fechaFinalizacion <= inicioProceso)
-            {
-                return 1.0; // Mínimo 1 minuto
-            }
-
-            var diferencia = (fechaFinalizacion - inicioProceso).TotalMinutes;
-            return Math.Round(diferencia, 1);
         }
     }
 }

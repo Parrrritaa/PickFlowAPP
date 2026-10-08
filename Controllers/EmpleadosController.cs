@@ -142,12 +142,9 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            // Rol e Id del usuario que tiene la sesión, leídos de la cookie
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Administrador y Supervisor: Creación directa (CU-06)
-            if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
+            if (User.IsInRole(Roles.Administrador) || User.IsInRole(Roles.Supervisor))
             {
                 _context.Empleados.Add(model);
                 await _context.SaveChangesAsync();
@@ -170,22 +167,10 @@ namespace PickingApp.Controllers
 
                 // El empleado aún no se crea: sus datos se guardan como JSON en la solicitud
                 // y se insertan en Empleados solo cuando la solicitud se aprueba
-                var solicitud = Solicitud.Nueva(TiposSolicitud.RegistroEmpleado, userId, DatosEmpleadoSolicitud.Desde(model));
+                await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.RegistroEmpleado, DatosEmpleadoSolicitud.Desde(model),
+                    "Solicitud de Nuevo Empleado", $"el registro del empleado {model.NombreCompleto}", TiposNotificacion.Info);
 
-                _context.Solicitudes.Add(solicitud);
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    RolDestinoId = Roles.IdSupervisor,
-                    Titulo = "Solicitud de Nuevo Empleado",
-                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó el registro del empleado {model.NombreCompleto}.",
-                    Tipo = TiposNotificacion.Info,
-                    FechaCreacion = DateTime.Now,
-                    Enlace = "/Solicitudes/Index"
-                });
-
-                await _context.SaveChangesAsync();
-
-                await _auditService.RegistrarAsync("Solicitud Registro Empleado", "Solicitudes", 
+                await _auditService.RegistrarAsync(AccionesLog.SolicitudRegistroEmpleado, "Solicitudes", 
                     $"Auxiliar solicitó registro de empleado: {model.NombreCompleto}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud para registrar a '{model.NombreCompleto}'. Requiere aprobación de un Supervisor o Administrador.";
@@ -229,11 +214,9 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Administrador: Edición directa (CU-09)
-            if (userRole == Roles.Administrador)
+            if (User.IsInRole(Roles.Administrador))
             {
                 empleadoExistente.NombreCompleto = model.NombreCompleto;
                 empleadoExistente.Correo = model.Correo;
@@ -258,21 +241,12 @@ namespace PickingApp.Controllers
                     return View(model);
                 }
 
-                // Lista de campos que cambiaron (valor anterior → nuevo) para que el Administrador los revise
-                var cambios = new List<CambioSolicitud>();
-                void AgregarCambio(string campo, string anterior, string nuevo)
-                {
-                    if (!string.Equals(anterior, nuevo, StringComparison.Ordinal))
-                    {
-                        cambios.Add(new CambioSolicitud { Campo = campo, Anterior = anterior, Nuevo = nuevo });
-                    }
-                }
-
-                AgregarCambio(CamposEmpleado.Nombre, empleadoExistente.NombreCompleto, model.NombreCompleto);
-                AgregarCambio(CamposEmpleado.Correo, empleadoExistente.Correo ?? "-", model.Correo ?? "-");
-                AgregarCambio(CamposEmpleado.FechaIngreso, empleadoExistente.FechaIngreso.ToString("dd/MM/yyyy"), model.FechaIngreso.ToString("dd/MM/yyyy"));
-                AgregarCambio(CamposEmpleado.HoraEntrada, FormatHora(empleadoExistente.HorarioEntrada), FormatHora(model.HorarioEntrada));
-                AgregarCambio(CamposEmpleado.HoraSalida, FormatHora(empleadoExistente.HorarioSalida), FormatHora(model.HorarioSalida));
+                var cambios = new ListaCambios();
+                cambios.Agregar(CamposEmpleado.Nombre, empleadoExistente.NombreCompleto, model.NombreCompleto);
+                cambios.Agregar(CamposEmpleado.Correo, empleadoExistente.Correo ?? "-", model.Correo ?? "-");
+                cambios.Agregar(CamposEmpleado.FechaIngreso, empleadoExistente.FechaIngreso.ToString("dd/MM/yyyy"), model.FechaIngreso.ToString("dd/MM/yyyy"));
+                cambios.Agregar(CamposEmpleado.HoraEntrada, FormatHora(empleadoExistente.HorarioEntrada), FormatHora(model.HorarioEntrada));
+                cambios.Agregar(CamposEmpleado.HoraSalida, FormatHora(empleadoExistente.HorarioSalida), FormatHora(model.HorarioSalida));
 
                 // Una solicitud sin cambios no tiene nada que aprobar; una segunda sobre el mismo empleado
                 // mostraría valores "anteriores" que ya no serían los reales al aprobarla
@@ -286,27 +260,14 @@ namespace PickingApp.Controllers
                     return View(model);
                 }
 
-                var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionEmpleado, userId, new SolicitudEdicionEmpleado
+                await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.EdicionEmpleado, new SolicitudEdicionEmpleado
                 {
                     Motivo = motivo,
                     Cambios = cambios,
                     NuevosDatos = DatosEmpleadoSolicitud.Desde(model)
-                });
+                }, "Solicitud de Edición de Empleado", $"modificar los datos del empleado {model.NombreCompleto}", TiposNotificacion.Info);
 
-                _context.Solicitudes.Add(solicitud);
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    RolDestinoId = Roles.IdAdministrador,
-                    Titulo = "Solicitud de Edición de Empleado",
-                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar los datos del empleado {model.NombreCompleto}.",
-                    Tipo = TiposNotificacion.Info,
-                    FechaCreacion = DateTime.Now,
-                    Enlace = "/Solicitudes/Index"
-                });
-
-                await _context.SaveChangesAsync();
-
-                await _auditService.RegistrarAsync("Solicitud Edición Empleado", "Solicitudes",
+                await _auditService.RegistrarAsync(AccionesLog.SolicitudEdicionEmpleado, "Solicitudes",
                     $"Solicitud de edición enviada para empleado {model.NombreCompleto}. Motivo: {motivo}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud de modificación para '{model.NombreCompleto}'. Requiere aprobación del Administrador.";
@@ -334,11 +295,9 @@ namespace PickingApp.Controllers
                 }
             }
 
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Administrador: Inactivación Directa (CU-12)
-            if (userRole == Roles.Administrador)
+            if (User.IsInRole(Roles.Administrador))
             {
                 // El mismo botón inactiva o reactiva: invierte el estado actual
                 empleado.Activo = !empleado.Activo;
@@ -366,28 +325,15 @@ namespace PickingApp.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                var solicitud = Solicitud.Nueva(TiposSolicitud.InactivacionEmpleado, userId, new SolicitudInactivacionEmpleado
+                await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.InactivacionEmpleado, new SolicitudInactivacionEmpleado
                 {
                     EmpleadoId = empleado.Id,
                     Identificacion = empleado.Identificacion,
                     NombreCompleto = empleado.NombreCompleto,
                     Motivo = motivo
-                });
+                }, "Solicitud de Inactivación de Empleado", $"inactivar al empleado {empleado.NombreCompleto}", TiposNotificacion.Warning);
 
-                _context.Solicitudes.Add(solicitud);
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    RolDestinoId = Roles.IdAdministrador,
-                    Titulo = "Solicitud de Inactivación de Empleado",
-                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó inactivar al empleado {empleado.NombreCompleto}.",
-                    Tipo = TiposNotificacion.Warning,
-                    FechaCreacion = DateTime.Now,
-                    Enlace = "/Solicitudes/Index"
-                });
-
-                await _context.SaveChangesAsync();
-
-                await _auditService.RegistrarAsync("Solicitud Inactivar Empleado", "Solicitudes", 
+                await _auditService.RegistrarAsync(AccionesLog.SolicitudInactivarEmpleado, "Solicitudes", 
                     $"Solicitud de inactivación para {empleado.NombreCompleto}. Motivo: {motivo}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud de inactivación para '{empleado.NombreCompleto}'. Requiere aprobación del Administrador.";

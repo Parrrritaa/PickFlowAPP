@@ -1,4 +1,5 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using PickingApp.Data;
 using PickingApp.Models;
 using PickingApp.Services;
@@ -24,6 +25,8 @@ namespace PickingApp.Tests
         {
             var opciones = new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                // La base en memoria no tiene transacciones: las acciones que abren una siguen como si no la hubiera
+                .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
                 .Options;
             Db = new ApplicationDbContext(opciones);
             Db.Database.EnsureCreated();

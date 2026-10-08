@@ -1,8 +1,9 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Services;
 
 namespace PickingApp.ViewComponents
 {
@@ -11,7 +12,7 @@ namespace PickingApp.ViewComponents
     // y SolicitudesController.Index, para que el número coincida con lo que se ve al entrar.
     public class MenuBadgesViewComponent : ViewComponent
     {
-        private const int TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
+        private const int TipoGestionableSupervisor = FlujoSolicitudes.TipoGestionableSupervisor;
         private readonly ApplicationDbContext _context;
 
         public MenuBadgesViewComponent(ApplicationDbContext context)
@@ -32,9 +33,7 @@ namespace PickingApp.ViewComponents
 
             var count = tipo switch
             {
-                "notificaciones" => await _context.Notificaciones.CountAsync(n => !n.Leida &&
-                    (n.UsuarioDestinoId == userId || n.RolDestino!.Nombre == userRole ||
-                     (n.UsuarioDestinoId == null && n.RolDestinoId == null))),
+                "notificaciones" => await _context.Notificaciones.CountAsync(n => n.UsuarioDestinoId == userId && !n.Leida),
 
                 "solicitudes" when userRole == Roles.Administrador =>
                     await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente),

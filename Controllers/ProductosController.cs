@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -64,8 +63,8 @@ namespace PickingApp.Controllers
                 return Error($"Los minutos por unidad deben ser un número mayor que 0 y hasta {MaxMinutosPorUnidad:0}.");
             }
 
-            var nombreNormalizado = nombre.ToLower();
-            if (await _context.CategoriasProducto.AnyAsync(c => c.Nombre.ToLower() == nombreNormalizado && c.Id != id))
+            // Sin distinguir mayúsculas, igual que el índice único de MySQL
+            if (await _context.CategoriasProducto.AnyAsync(c => c.Nombre == nombre && c.Id != id))
             {
                 return Error($"Ya existe una categoría llamada '{nombre}'.");
             }

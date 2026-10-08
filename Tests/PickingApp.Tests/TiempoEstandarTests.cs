@@ -1,3 +1,4 @@
+﻿using PickingApp.Models;
 using PickingApp.Services;
 
 namespace PickingApp.Tests
@@ -62,11 +63,11 @@ namespace PickingApp.Tests
         [Fact]
         public void ElTiempoRealNuncaEsMenorQueUnMinuto()
         {
-            using var e = new Escenario();
             var inicio = new DateTime(2026, 10, 2, 10, 0, 0);
 
-            Assert.Equal(1.0, e.Motor().CalcularTiempoProcesamiento(inicio, inicio.AddMinutes(-5)));
-            Assert.Equal(12.5, e.Motor().CalcularTiempoProcesamiento(inicio, inicio.AddMinutes(12.5)));
+            Assert.Equal(1.0, Pedido.CalcularTiempoProcesamiento(inicio, inicio.AddMinutes(-5)));
+            Assert.Equal(1.0, Pedido.CalcularTiempoProcesamiento(inicio, inicio.AddMinutes(0.4)));
+            Assert.Equal(12.5, Pedido.CalcularTiempoProcesamiento(inicio, inicio.AddMinutes(12.5)));
         }
     }
 }

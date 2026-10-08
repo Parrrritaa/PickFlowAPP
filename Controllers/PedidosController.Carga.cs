@@ -64,7 +64,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             var ajustes = validacion.Cambios.Any() ? $" Ajustes: {string.Join("; ", validacion.Cambios)}." : string.Empty;
-            await _auditService.RegistrarAsync("Carga Excel Pedidos", "Pedidos",
+            await _auditService.RegistrarAsync(AccionesLog.CargaExcelPedidos, "Pedidos",
                 $"Se procesó el archivo '{archivoExcel.FileName}' registrando {validacion.TotalPedidos} pedidos ({validacion.TotalFilas} líneas de productos).{ajustes}");
 
             TempData["SuccessMessage"] = $"El archivo fue procesado correctamente y los {validacion.TotalPedidos} pedidos quedaron registrados en el sistema."

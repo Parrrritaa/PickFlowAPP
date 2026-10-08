@@ -31,5 +31,14 @@ namespace PickingApp.Models
 
         [ForeignKey("UbicacionId")]
         public virtual Ubicacion? Ubicacion { get; set; }
+
+        // La misma línea con otra cantidad, para repartirla entre las partes de un pedido dividido
+        public DetallePedido Copia(int cantidad) => new()
+        {
+            CodigoProducto = CodigoProducto,
+            NombreProducto = NombreProducto,
+            Cantidad = cantidad,
+            UbicacionId = UbicacionId
+        };
     }
 }

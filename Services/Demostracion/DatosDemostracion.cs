@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
 
@@ -100,7 +100,7 @@ namespace PickingApp.Services
             var sim = new SimulacionDemostracion(DateTime.Now, _azar,
                 await _context.Empleados.Where(e => e.Activo).ToListAsync(),
                 await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos),
-                supervisor, administrador);
+                supervisor, administrador, usuarios);
 
             // Todo o nada: si algo falla, no queda una demostración a medias
             await using var transaccion = await _context.Database.BeginTransactionAsync();
@@ -121,7 +121,7 @@ namespace PickingApp.Services
             foreach (var padre in divididos.Where(p => p.CerrarSiTerminaronLasPartes()))
             {
                 var completado = padre.Estado == PedidoEstados.Completado;
-                sim.Log(padre.FechaFinalizacion!.Value, supervisor, completado ? "Completar Pedido" : "Cancelar Pedido",
+                sim.Log(padre.FechaFinalizacion!.Value, supervisor, completado ? AccionesLog.CompletarPedido : AccionesLog.CancelarPedido,
                     $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
             }
 
@@ -239,36 +239,22 @@ namespace PickingApp.Services
         {
             var lineas = pedido.Detalles.ToList();
             var totalPartes = lineas.Count == 1 ? 2 : Math.Min(lineas.Count, _azar.Next(2, 4));
-            var partes = Enumerable.Range(1, totalPartes).Select(k => new Pedido
-            {
-                CodigoPedido = $"{pedido.CodigoPedido}-P{k}",
-                BodegaId = pedido.BodegaId,
-                Prioridad = pedido.Prioridad,
-                Estado = PedidoEstados.Pendiente,
-                FechaCarga = pedido.FechaCarga,
-                NumeroParte = k,
-                PedidoPadre = pedido
-            }).ToList();
-
-            DetallePedido Copia(DetallePedido l, int cantidad) => new()
-            {
-                CodigoProducto = l.CodigoProducto, NombreProducto = l.NombreProducto, Cantidad = cantidad, UbicacionId = l.UbicacionId
-            };
+            var partes = Enumerable.Range(1, totalPartes).Select(pedido.NuevaParte).ToList();
 
             if (lineas.Count == 1)
             {
                 var mitad = lineas[0].Cantidad / 2;
-                partes[0].Detalles.Add(Copia(lineas[0], lineas[0].Cantidad - mitad));
-                partes[1].Detalles.Add(Copia(lineas[0], mitad));
+                partes[0].Detalles.Add(lineas[0].Copia(lineas[0].Cantidad - mitad));
+                partes[1].Detalles.Add(lineas[0].Copia(mitad));
             }
             else
             {
-                for (var i = 0; i < lineas.Count; i++) partes[i % totalPartes].Detalles.Add(Copia(lineas[i], lineas[i].Cantidad));
+                for (var i = 0; i < lineas.Count; i++) partes[i % totalPartes].Detalles.Add(lineas[i].Copia(lineas[i].Cantidad));
             }
 
             pedido.Estado = PedidoEstados.Dividido;
             partes.ForEach(pedido.Partes.Add);
-            sim.Log(pedido.FechaCarga.AddMinutes(12), sim.Supervisor, "Dividir Pedido",
+            sim.Log(pedido.FechaCarga.AddMinutes(12), sim.Supervisor, AccionesLog.DividirPedido,
                 $"Pedido {pedido.CodigoPedido} dividido en {totalPartes} partes: " +
                 string.Join(", ", partes.Select(p => $"{p.CodigoPedido} ({p.Detalles.Sum(d => d.Cantidad)} uds)")) + ".");
             return partes;
@@ -285,24 +271,24 @@ namespace PickingApp.Services
                 var respondida = s.Estado != EstadosSolicitud.Pendiente;
 
                 sim.Log(s.FechaSolicitud, Solicitante, LogAccion, LogDetalle, "Solicitudes");
-                sim.Notificar(s.FechaSolicitud, Titulo,
+                sim.NotificarRol(s.FechaSolicitud, RolDestinoId, Titulo,
                     $"El {ClaimsPrincipalExtensions.DescribirUsuario(Solicitante.NombreCompleto, Solicitante.NombreRol)} solicitó {QueSolicito}.",
-                    TipoAviso, "/Solicitudes/Index", rolDestinoId: RolDestinoId, leida: respondida);
+                    TipoAviso, "/Solicitudes/Index", leida: respondida);
                 if (!respondida || Responde == null) return;
 
                 var fecha = s.FechaRespuesta!.Value;
                 var quien = ClaimsPrincipalExtensions.DescribirUsuario(Responde.NombreCompleto, Responde.NombreRol);
                 if (s.Estado == EstadosSolicitud.Aprobada)
                 {
-                    sim.Notificar(fecha, "Solicitud Aprobada", $"Tu solicitud SOL-{s.Id} \"{nombreTipo}\" ha sido aprobada por el {quien}.",
-                        TiposNotificacion.Success, $"/Solicitudes/Detalle/{s.Id}", usuarioDestinoId: Solicitante.Id);
-                    sim.Log(fecha, Responde, "Aprobar Solicitud", $"Solicitud #{s.Id} ({nombreTipo}) aprobada.", "Solicitudes");
+                    sim.NotificarUsuario(fecha, Solicitante.Id, "Solicitud Aprobada", $"Tu solicitud SOL-{s.Id} \"{nombreTipo}\" ha sido aprobada por el {quien}.",
+                        TiposNotificacion.Success, $"/Solicitudes/Detalle/{s.Id}");
+                    sim.Log(fecha, Responde, AccionesLog.AprobarSolicitud, $"Solicitud #{s.Id} ({nombreTipo}) aprobada.", "Solicitudes");
                 }
                 else
                 {
-                    sim.Notificar(fecha, "Solicitud Rechazada", $"Tu solicitud SOL-{s.Id} \"{nombreTipo}\" fue rechazada. Motivo: {s.MotivoRechazo}",
-                        TiposNotificacion.Danger, $"/Solicitudes/Detalle/{s.Id}", usuarioDestinoId: Solicitante.Id);
-                    sim.Log(fecha, Responde, "Rechazar Solicitud", $"Solicitud #{s.Id} rechazada. Motivo: {s.MotivoRechazo}", "Solicitudes");
+                    sim.NotificarUsuario(fecha, Solicitante.Id, "Solicitud Rechazada", $"Tu solicitud SOL-{s.Id} \"{nombreTipo}\" fue rechazada. Motivo: {s.MotivoRechazo}",
+                        TiposNotificacion.Danger, $"/Solicitudes/Detalle/{s.Id}");
+                    sim.Log(fecha, Responde, AccionesLog.RechazarSolicitud, $"Solicitud #{s.Id} rechazada. Motivo: {s.MotivoRechazo}", "Solicitudes");
                 }
             }
         }
@@ -352,7 +338,7 @@ namespace PickingApp.Services
                         NuevosDatos = DatosEmpleadoSolicitud.Desde(e)
                     }, hoy.AddDays(-4).AddHours(10).AddMinutes(_azar.Next(0, 50)), Roles.IdAdministrador,
                         "Solicitud de Edición de Empleado", TiposNotificacion.Info, $"modificar los datos del empleado {e.NombreCompleto}",
-                        "Solicitud Edición Empleado", $"Solicitud de edición enviada para empleado {e.NombreCompleto}. Motivo: {motivo}", administrador);
+                        AccionesLog.SolicitudEdicionEmpleado, $"Solicitud de edición enviada para empleado {e.NombreCompleto}. Motivo: {motivo}", administrador);
                 }
                 if (libres.Count > 1)
                 {
@@ -364,7 +350,7 @@ namespace PickingApp.Services
                         EmpleadoId = e.Id, Identificacion = e.Identificacion, NombreCompleto = e.NombreCompleto, Motivo = motivo
                     }, hoy.AddDays(-3).AddHours(15).AddMinutes(_azar.Next(0, 50)), Roles.IdAdministrador,
                         "Solicitud de Inactivación de Empleado", TiposNotificacion.Warning, $"inactivar al empleado {e.NombreCompleto}",
-                        "Solicitud Inactivar Empleado", $"Solicitud de inactivación para {e.NombreCompleto}. Motivo: {motivo}", administrador,
+                        AccionesLog.SolicitudInactivarEmpleado, $"Solicitud de inactivación para {e.NombreCompleto}. Motivo: {motivo}", administrador,
                         "Las ausencias tienen soporte de incapacidad médica; el empleado sigue activo.");
                 }
                 if (libres.Count > 2)
@@ -382,7 +368,7 @@ namespace PickingApp.Services
                         NuevosDatos = nuevos
                     }, hoy.AddDays(-1).AddHours(16).AddMinutes(_azar.Next(0, 50)), Roles.IdAdministrador,
                         "Solicitud de Edición de Empleado", TiposNotificacion.Info, $"modificar los datos del empleado {e.NombreCompleto}",
-                        "Solicitud Edición Empleado", $"Solicitud de edición enviada para empleado {e.NombreCompleto}. Motivo: {motivo}");
+                        AccionesLog.SolicitudEdicionEmpleado, $"Solicitud de edición enviada para empleado {e.NombreCompleto}. Motivo: {motivo}");
                 }
             }
 
@@ -407,12 +393,12 @@ namespace PickingApp.Services
                 // salvo que ya haya un registro esperando (al cargar la demostración más de una vez)
                 Agregar(TiposSolicitud.RegistroEmpleado, auxiliar, Aspirante(nombres[0]), hoy.AddDays(-2).AddHours(9).AddMinutes(_azar.Next(0, 50)),
                     Roles.IdSupervisor, "Solicitud de Nuevo Empleado", TiposNotificacion.Info, $"el registro del empleado {nombres[0]}",
-                    "Solicitud Registro Empleado", $"Auxiliar solicitó registro de empleado: {nombres[0]}", supervisor,
+                    AccionesLog.SolicitudRegistroEmpleado, $"Auxiliar solicitó registro de empleado: {nombres[0]}", supervisor,
                     "La identificación no coincide con el documento; envíala de nuevo con los datos del contrato.");
                 if (!await _context.Solicitudes.AnyAsync(s => s.TipoSolicitudId == TiposSolicitud.RegistroEmpleado && s.Estado == EstadosSolicitud.Pendiente))
                     Agregar(TiposSolicitud.RegistroEmpleado, auxiliar, Aspirante(nombres[1]), sim.Ahora.AddMinutes(-_azar.Next(30, 90)),
                     Roles.IdSupervisor, "Solicitud de Nuevo Empleado", TiposNotificacion.Info, $"el registro del empleado {nombres[1]}",
-                    "Solicitud Registro Empleado", $"Auxiliar solicitó registro de empleado: {nombres[1]}");
+                    AccionesLog.SolicitudRegistroEmpleado, $"Auxiliar solicitó registro de empleado: {nombres[1]}");
             }
 
             return creadas;

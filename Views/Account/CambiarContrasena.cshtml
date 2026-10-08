@@ -1,4 +1,4 @@
-@model PickingApp.Models.ViewModels.ChangePasswordViewModel
+﻿@model PickingApp.Models.ViewModels.ChangePasswordViewModel
 @{
     ViewData["Title"] = "Cambiar contraseña";
 }
@@ -21,19 +21,19 @@
 
         <div class="mockup-form-group mb-3">
             <label asp-for="CurrentPassword" class="mockup-label">Contraseña actual <span class="text-danger">*</span></label>
-            <input asp-for="CurrentPassword" type="password" class="mockup-input" required />
+            <input asp-for="CurrentPassword" type="password" class="mockup-input" autocomplete="current-password" required />
             <span asp-validation-for="CurrentPassword" class="text-danger small"></span>
         </div>
 
         <div class="mockup-form-group mb-3">
             <label asp-for="NewPassword" class="mockup-label">Nueva contraseña <span class="text-danger">*</span></label>
-            <input asp-for="NewPassword" type="password" class="mockup-input" required />
+            <input asp-for="NewPassword" type="password" class="mockup-input" autocomplete="new-password" required />
             <span asp-validation-for="NewPassword" class="text-danger small"></span>
         </div>
 
         <div class="mockup-form-group mb-4">
             <label asp-for="ConfirmPassword" class="mockup-label">Confirmar nueva contraseña <span class="text-danger">*</span></label>
-            <input asp-for="ConfirmPassword" type="password" class="mockup-input" required />
+            <input asp-for="ConfirmPassword" type="password" class="mockup-input" autocomplete="new-password" required />
             <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
         </div>
 

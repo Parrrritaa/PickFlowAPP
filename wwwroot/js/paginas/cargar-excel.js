@@ -1,0 +1,486 @@
+(function () {
+    var pagina = document.currentScript.dataset;
+    var form = document.getElementById('formExcel');
+    var input = document.getElementById('archivoExcel');
+    var btnValidar = document.getElementById('btnValidar');
+    var textoValidar = btnValidar.innerHTML;
+    var seccion = document.getElementById('sectionValidacion');
+    var lista = document.getElementById('listaVerificaciones');
+    var resumen = document.getElementById('resumenValidacion');
+    var cajaErrores = document.getElementById('erroresValidacion');
+    var listaErrores = document.getElementById('listaErroresValidacion');
+    var btnConfirmar = document.getElementById('btnConfirmarCarga');
+    var textoConfirmar = btnConfirmar.innerHTML;
+    var seccionIncidencias = document.getElementById('seccionIncidencias');
+    var listaIncidencias = document.getElementById('listaIncidencias');
+    var urlValidar = pagina.urlValidar;
+    var erroresVisiblesInicial = 5;
+    // Clave de la incidencia → su tarjeta, para mostrar el error de cada decisión
+    var tarjetas = {};
+    var decisionesRevisadas = false;
+
+    // Un archivo nuevo invalida el resultado anterior
+    input.addEventListener('change', function () {
+        seccion.hidden = true;
+        btnConfirmar.hidden = true;
+        listaIncidencias.innerHTML = '';
+        tarjetas = {};
+    });
+
+    function plural(n, singular, varios) { return n + ' ' + (n === 1 ? singular : varios); }
+
+    function elemento(etiqueta, clase, texto) {
+        var el = document.createElement(etiqueta);
+        if (clase) el.className = clase;
+        if (texto != null) el.textContent = texto;
+        return el;
+    }
+
+    // "4, 7, 9, 12 y 3 más": evita tarjetas enormes cuando un producto aparece en muchas filas
+    function listar(valores) {
+        var max = 4;
+        var visibles = valores.slice(0, max).join(', ');
+        if (valores.length <= max) return valores.length > 1 ? visibles.replace(/, ([^,]*)$/, ' y $1') : visibles;
+        return visibles + ' y ' + (valores.length - max) + ' más';
+    }
+
+    // estado: 'ok' | 'error' | 'revisar' | 'pendiente'. Todo se escribe como texto: los mensajes incluyen contenido del archivo.
+    function verificacion(estado, texto, detalle) {
+        var li = document.createElement('li');
+        li.className = 'd-flex align-items-start text-dark';
+        var icono = document.createElement('i');
+        icono.setAttribute('aria-hidden', 'true');
+        icono.className = 'bi me-2 fs-5 ' + (estado === 'ok' ? 'bi-check-circle-fill text-success'
+            : estado === 'error' ? 'bi-x-circle-fill text-danger'
+            : estado === 'revisar' ? 'bi-exclamation-circle-fill pf-texto-revisar' : 'bi-dash-circle text-secondary');
+        var cuerpo = document.createElement('span');
+        var titulo = document.createElement('span');
+        titulo.textContent = texto;
+        var estadoSr = document.createElement('span');
+        estadoSr.className = 'visually-hidden';
+        estadoSr.textContent = estado === 'ok' ? ' (correcto)' : estado === 'error' ? ' (con errores)'
+            : estado === 'revisar' ? ' (por decidir)' : ' (sin verificar)';
+        cuerpo.append(titulo, estadoSr);
+        if (detalle) {
+            var small = document.createElement('div');
+            small.className = 'small text-secondary';
+            small.textContent = detalle;
+            cuerpo.appendChild(small);
+        }
+        li.append(icono, cuerpo);
+        lista.appendChild(li);
+    }
+
+    function mostrar(r) {
+        lista.innerHTML = '';
+        listaErrores.innerHTML = '';
+        lista.hidden = !!r.sinVerificar;
+
+        var estructura = r.tipoValido && r.estructuraValida;
+        verificacion(r.tipoValido ? 'ok' : 'error', 'Tipo de archivo válido');
+        verificacion(!r.tipoValido ? 'pendiente' : r.estructuraValida ? 'ok' : 'error', 'Estructura de archivo válida');
+
+        // Una fila con error no pasa a las verificaciones siguientes: esas quedan pendientes hasta corregirla.
+        // Los pasos "decidir" no son errores del archivo: esas filas siguen y se resuelven abajo, en las tarjetas.
+        var pasos = [
+            ['filasConCantidadInvalida', 'Cantidades válidas'],
+            ['filasConBodegaNoRegistrada', 'Bodegas registradas'],
+            ['filasConProductoNoRegistrado', 'Productos registrados', 'decidir'],
+            ['filasConNombreDistinto', 'Nombres coinciden con el código', 'decidir'],
+            ['filasConUbicacionNoRegistrada', 'Ubicaciones registradas y activas', 'decidir'],
+            ['filasConProductoIncorrecto', 'Productos corresponden a su ubicación', 'decidir'],
+            ['filasConPedidoDuplicado', 'Pedidos no registrados previamente']
+        ];
+        var erroresPrevios = 0;
+        pasos.forEach(function (p) {
+            var filas = r[p[0]] || 0;
+            var decidir = p[2] === 'decidir';
+            if (!estructura) {
+                verificacion('pendiente', p[1]);
+            } else if (filas > 0) {
+                if (decidir) verificacion('revisar', p[1], plural(filas, 'fila por decidir', 'filas por decidir'));
+                else verificacion('error', p[1], plural(filas, 'fila con error', 'filas con error'));
+            } else if (erroresPrevios > 0) {
+                verificacion('pendiente', p[1], 'Se verificará en las filas con errores cuando se corrijan');
+            } else {
+                verificacion('ok', p[1]);
+            }
+            if (!decidir) erroresPrevios += filas;
+        });
+
+        var errores = r.errores || [];
+        var incidencias = r.incidencias || [];
+        var filasPorDecidir = incidencias.reduce(function (total, inc) { return total + inc.filas.length; }, 0);
+
+        if (r.sinVerificar) {
+            resumen.textContent = 'No fue posible validar el archivo. Revise su conexión e inténtelo de nuevo.';
+        } else if (r.valido) {
+            resumen.textContent = plural(r.totalPedidos, 'pedido', 'pedidos') + ' (' +
+                plural(r.totalFilas, 'línea de producto', 'líneas de producto') + ') listos para cargar.';
+        } else if (incidencias.length && !errores.length) {
+            resumen.textContent = plural(r.totalPedidos, 'pedido', 'pedidos') + ' listos para cargar cuando decida qué hacer con ' +
+                plural(filasPorDecidir, 'fila', 'filas') + '.';
+        } else if (incidencias.length) {
+            resumen.textContent = 'El archivo no se puede cargar todavía. Cuando corrija los errores podrá decidir qué hacer con ' +
+                plural(filasPorDecidir, 'fila', 'filas') + ' de productos o ubicaciones.';
+        } else {
+            resumen.textContent = 'El archivo no se puede cargar todavía.';
+        }
+
+        errores.forEach(function (e, i) {
+            var li = document.createElement('li');
+            li.textContent = e;
+            if (i >= erroresVisiblesInicial) li.classList.add('d-none', 'pf-error-extra');
+            listaErrores.appendChild(li);
+        });
+        var ocultos = errores.length - erroresVisiblesInicial;
+        if (ocultos > 0) {
+            var liToggle = document.createElement('li');
+            liToggle.className = 'mt-1';
+            liToggle.style.listStyleType = 'none';
+            var btnToggle = document.createElement('button');
+            btnToggle.type = 'button';
+            btnToggle.className = 'btn btn-link fw-semibold text-decoration-none p-0';
+            var textoMas = 'Ver ' + plural(ocultos, 'observación más', 'observaciones más');
+            btnToggle.textContent = textoMas;
+            btnToggle.addEventListener('click', function () {
+                var expandir = btnToggle.dataset.expandido !== 'true';
+                var items = Array.prototype.slice.call(listaErrores.querySelectorAll('.pf-error-extra'));
+                btnToggle.disabled = true;
+                btnToggle.dataset.expandido = expandir ? 'true' : 'false';
+                btnToggle.textContent = expandir ? 'Ver menos' : textoMas;
+
+                if (expandir) {
+                    // Al desplegar, cada fila aparece con un pequeño desfase (cascada) en vez de todas a la vez
+                    items.forEach(function (el, idx) {
+                        el.classList.remove('d-none');
+                        el.classList.remove('pf-reveal');
+                        if (pfReducirMovimiento()) return;
+                        el.style.animationDelay = (idx * 30) + 'ms';
+                        void el.offsetWidth;
+                        el.classList.add('pf-reveal');
+                    });
+                    btnToggle.disabled = false;
+                    return;
+                }
+
+                // Al ocultar, las filas se recogen hacia arriba con un fundido: más rápido que la
+                // entrada y sin desfase notorio, para que "Ver menos" se sienta ágil, no perezoso.
+                if (pfReducirMovimiento() || !items[0] || !items[0].animate) {
+                    items.forEach(function (el) { el.classList.add('d-none'); });
+                    btnToggle.disabled = false;
+                    return;
+                }
+                var salidas = items.map(function (el, idx) {
+                    return el.animate(
+                        [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px)' }],
+                        { duration: 150, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', delay: idx * 12, fill: 'forwards' }
+                    ).finished;
+                });
+                Promise.all(salidas).then(function () {
+                    items.forEach(function (el) {
+                        el.classList.add('d-none');
+                        el.style.opacity = '';
+                        el.style.transform = '';
+                    });
+                    btnToggle.disabled = false;
+                });
+            });
+            liToggle.appendChild(btnToggle);
+            listaErrores.appendChild(liToggle);
+        }
+        cajaErrores.hidden = errores.length === 0;
+
+        // Las decisiones solo se piden cuando el archivo no tiene errores: al corregirlo se vuelve a validar desde cero
+        listaIncidencias.innerHTML = '';
+        tarjetas = {};
+        decisionesRevisadas = false;
+        var decidir = incidencias.length > 0 && errores.length === 0;
+        if (decidir) {
+            incidencias.forEach(function (inc, i) {
+                var t = tarjeta(inc, i, r);
+                tarjetas[inc.clave] = t;
+                listaIncidencias.appendChild(t);
+            });
+        }
+        seccionIncidencias.hidden = !decidir;
+        btnConfirmar.hidden = !(r.valido || decidir);
+
+        seccion.hidden = false;
+        seccion.classList.remove('pf-reveal');
+        void seccion.offsetWidth;
+        seccion.classList.add('pf-reveal');
+    }
+
+    // Tarjeta de una incidencia. Los campos se envían como resoluciones[i].* (ResolucionExcel en el servidor);
+    // los de las opciones no elegidas van deshabilitados y no viajan.
+    function tarjeta(inc, i, datos) {
+        var prefijo = 'resoluciones[' + i + '].';
+        var id = 'incidencia' + i;
+        var productoNuevo = inc.tipo === 'producto-no-registrado';
+        var nombreDistinto = inc.tipo === 'nombre-distinto';
+
+        var card = elemento('section', 'pf-incidencia');
+        card.setAttribute('aria-labelledby', id + '-titulo');
+
+        var clave = elemento('input');
+        clave.type = 'hidden';
+        clave.name = prefijo + 'Clave';
+        clave.value = inc.clave;
+        card.appendChild(clave);
+
+        var cabecera = elemento('div', 'pf-incidencia-cabecera');
+        var icono = elemento('span', 'pf-incidencia-icono');
+        icono.setAttribute('aria-hidden', 'true');
+        icono.appendChild(elemento('i', 'bi ' + (productoNuevo ? 'bi-box-seam' : nombreDistinto ? 'bi-tag'
+            : inc.tipo === 'ubicacion-inactiva' ? 'bi-slash-circle' : 'bi-geo-alt')));
+        var textos = elemento('div');
+        var titulo = elemento('h6', 'pf-incidencia-titulo', inc.titulo);
+        titulo.id = id + '-titulo';
+        textos.append(titulo, elemento('p', 'pf-incidencia-meta',
+            (inc.filas.length === 1 ? 'Fila ' : 'Filas ') + listar(inc.filas) + ' · ' +
+            (inc.pedidos.length === 1 ? 'Pedido ' : 'Pedidos ') + listar(inc.pedidos)));
+        cabecera.append(icono, textos);
+        card.append(cabecera, elemento('p', 'pf-incidencia-texto', inc.detalle));
+
+        if (productoNuevo) card.appendChild(camposProducto(inc, prefijo, id, datos));
+
+        var opciones = elemento('fieldset', 'pf-opciones');
+        opciones.appendChild(elemento('legend', 'mockup-label',
+            nombreDistinto ? '¿Con qué nombre se carga?' : productoNuevo ? '¿Dónde se guarda?' : '¿De dónde se recoge?'));
+        var lista = elemento('div', 'pf-opciones-lista');
+        if (nombreDistinto) {
+            lista.appendChild(opcion(prefijo, id, 'nombre-registrado', 'Cargar como ' + inc.codigoProducto + ' · ' + inc.nombreProducto,
+                'Se usa el nombre registrado en el sistema'));
+        }
+        inc.ubicaciones.forEach(function (u) {
+            lista.appendChild(opcion(prefijo, id, String(u.id), 'Recoger de ' + u.codigo,
+                u.bodega + (u.bodegaId === inc.bodegaId ? '' : ' · otra bodega')));
+        });
+        if (inc.textoCorregir) {
+            lista.appendChild(opcion(prefijo, id, 'corregir', inc.textoCorregir, 'Se modifica esa ubicación al confirmar la carga'));
+        }
+        if (!nombreDistinto) {
+            var nueva = opcion(prefijo, id, 'nueva', productoNuevo ? 'En una ubicación nueva' : 'Crear una ubicación nueva',
+                'Elija la bodega y la posición');
+            nueva.appendChild(camposUbicacion(inc, prefijo, id, datos));
+            lista.appendChild(nueva);
+        }
+        opciones.appendChild(lista);
+        card.appendChild(opciones);
+
+        var error = elemento('p', 'pf-incidencia-error text-danger');
+        error.setAttribute('role', 'alert');
+        error.hidden = true;
+        card.appendChild(error);
+
+        // Una sola opción posible: se deja elegida. Un nombre distinto se confirma siempre a mano.
+        var radios = lista.querySelectorAll('input[type="radio"]');
+        if (radios.length === 1 && !nombreDistinto) radios[0].checked = true;
+
+        function actualizar() {
+            lista.querySelectorAll('.pf-opcion-fila').forEach(function (fila) {
+                var detalle = fila.querySelector('.pf-opcion-detalle');
+                if (!detalle) return;
+                var elegida = fila.querySelector('input[type="radio"]').checked;
+                detalle.hidden = !elegida;
+                detalle.querySelectorAll('input, select').forEach(function (campo) { campo.disabled = !elegida; });
+            });
+        }
+        lista.addEventListener('change', actualizar);
+        card.addEventListener('input', function () { error.hidden = true; });
+        card.addEventListener('change', function () { error.hidden = true; });
+        actualizar();
+
+        card._error = error;
+        return card;
+    }
+
+    function opcion(prefijo, id, valor, texto, nota) {
+        var fila = elemento('div', 'pf-opcion-fila');
+        var label = elemento('label', 'pf-opcion');
+        var radio = elemento('input', 'form-check-input');
+        radio.type = 'radio';
+        radio.name = prefijo + 'Opcion';
+        radio.value = valor;
+        radio.required = true;
+        var cuerpo = elemento('span');
+        cuerpo.append(elemento('span', 'pf-opcion-titulo', texto), elemento('span', 'pf-opcion-nota', nota));
+        label.append(radio, cuerpo);
+        fila.appendChild(label);
+        return fila;
+    }
+
+    function campo(etiqueta, id, control, columnas) {
+        var col = elemento('div', columnas + ' mockup-form-group');
+        var label = elemento('label', 'mockup-label', etiqueta);
+        label.htmlFor = id;
+        control.id = id;
+        col.append(label, control);
+        return col;
+    }
+
+    function entrada(nombre, valor, extra) {
+        var el = elemento('input', 'mockup-input');
+        el.name = nombre;
+        el.value = valor == null ? '' : valor;
+        el.required = true;
+        Object.keys(extra || {}).forEach(function (k) { el.setAttribute(k, extra[k]); });
+        return el;
+    }
+
+    function camposProducto(inc, prefijo, id, datos) {
+        var fila = elemento('div', 'row g-3 mb-3');
+        fila.appendChild(campo('Nombre del producto', id + '-nombre',
+            entrada(prefijo + 'NombreProducto', inc.nombreProducto, { maxlength: '150' }), 'col-12'));
+
+        var categoria = elemento('select', 'mockup-input');
+        categoria.name = prefijo + 'CategoriaProductoId';
+        categoria.appendChild(new Option('Sin clasificar (usa «' + datos.categoriaPredeterminada + '»)', ''));
+        (datos.categorias || []).forEach(function (c) {
+            categoria.appendChild(new Option(c.nombre + ' · ' + c.minutos + ' min/u', String(c.id)));
+        });
+        fila.appendChild(campo('Categoría', id + '-categoria', categoria, 'col-md-7'));
+        fila.appendChild(campo('Cantidad máx. por caja', id + '-unidades',
+            entrada(prefijo + 'UnidadesPorCaja', '1', { type: 'number', min: '1', max: pagina.maxUnidades, step: '1' }), 'col-md-5'));
+        return fila;
+    }
+
+    // Bodega y posición de la ubicación nueva. Si la del Excel no existe, se propone esa misma.
+    function camposUbicacion(inc, prefijo, id, datos) {
+        var detalle = elemento('div', 'pf-opcion-detalle');
+        var fila = elemento('div', 'row g-2');
+
+        var bodega = elemento('select', 'mockup-input');
+        bodega.name = prefijo + 'BodegaId';
+        bodega.required = true;
+        (datos.bodegas || []).forEach(function (b) {
+            bodega.appendChild(new Option(b.codigo + ' · ' + b.nombre, String(b.id), false, b.id === inc.bodegaId));
+        });
+        fila.appendChild(campo('Bodega', id + '-bodega', bodega, 'col-12 col-md-6'));
+
+        var propuesta = !inc.ubicacionExiste;
+        var numero = { inputmode: 'numeric', pattern: '\\d{1,9}', maxlength: '9', title: 'Solo números', placeholder: '1' };
+        var pasillo = entrada(prefijo + 'Pasillo', propuesta ? inc.pasillo : '', numero);
+        var estante = entrada(prefijo + 'Estante', propuesta ? inc.estante : '', numero);
+        var nivel = entrada(prefijo + 'Nivel', propuesta ? inc.nivel : '', numero);
+        fila.appendChild(campo('Pasillo', id + '-pasillo', pasillo, 'col-4 col-md-2'));
+        fila.appendChild(campo('Estante', id + '-estante', estante, 'col-4 col-md-2'));
+        fila.appendChild(campo('Nivel', id + '-nivel', nivel, 'col-4 col-md-2'));
+
+        var codigo = elemento('div', 'form-text small mt-2');
+        codigo.setAttribute('aria-live', 'polite');
+        function dos(v) { return String(parseInt(v, 10)).padStart(2, '0'); }
+        function actualizarCodigo() {
+            var ok = [pasillo, estante, nivel].every(function (c) { return /^\d{1,9}$/.test(c.value.trim()); });
+            codigo.textContent = ok
+                ? 'Código: PAS' + dos(pasillo.value) + '-EST' + dos(estante.value) + '-NIV' + dos(nivel.value)
+                : 'El código se genera a partir del pasillo, estante y nivel.';
+        }
+        [pasillo, estante, nivel].forEach(function (c) { c.addEventListener('input', actualizarCodigo); });
+        actualizarCodigo();
+
+        detalle.append(fila, codigo);
+        return detalle;
+    }
+
+    function ponerCargando(texto) {
+        btnConfirmar.classList.add('is-loading');
+        btnConfirmar.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>' + texto;
+    }
+
+    function quitarCargando() {
+        btnConfirmar.classList.remove('is-loading');
+        btnConfirmar.innerHTML = textoConfirmar;
+    }
+
+    // Antes de guardar, el servidor revisa las decisiones con el mismo archivo (sin registrar nada).
+    // Si alguna no sirve (p. ej. la ubicación nueva ya existe) se muestra en su tarjeta.
+    function revisarDecisiones() {
+        ponerCargando('Revisando…');
+        Object.keys(tarjetas).forEach(function (c) { tarjetas[c]._error.hidden = true; });
+
+        fetch(urlValidar, { method: 'POST', body: new FormData(form) })
+            .then(function (resp) {
+                if (!resp.ok) throw new Error();
+                return resp.json();
+            })
+            .then(function (r) {
+                if (r.valido) {
+                    decisionesRevisadas = true;
+                    ponerCargando('Cargando pedidos…');
+                    form.submit();
+                    return;
+                }
+
+                var primera = null;
+                var generales = (r.errores || []).slice();
+                Object.keys(r.erroresResolucion || {}).forEach(function (c) {
+                    var t = tarjetas[c];
+                    if (!t) return;
+                    t._error.textContent = r.erroresResolucion[c];
+                    t._error.hidden = false;
+                    primera = primera || t;
+                });
+                // Incidencias que no estaban al validar: algo cambió en el sistema mientras tanto
+                if ((!primera && !generales.length) || (r.incidencias || []).some(function (inc) { return !tarjetas[inc.clave]; })) {
+                    generales.push('Los productos o ubicaciones cambiaron desde la validación. Vuelva a validar el archivo.');
+                }
+                listaErrores.innerHTML = '';
+                generales.forEach(function (e) { listaErrores.appendChild(elemento('li', null, e)); });
+                cajaErrores.hidden = generales.length === 0;
+
+                quitarCargando();
+                var destino = primera || (generales.length ? cajaErrores : null);
+                if (destino) destino.scrollIntoView({ block: 'center', behavior: pfReducirMovimiento() ? 'auto' : 'smooth' });
+            })
+            .catch(function () {
+                listaErrores.innerHTML = '';
+                listaErrores.appendChild(elemento('li', null, 'No fue posible revisar las decisiones. Revise su conexión e inténtelo de nuevo.'));
+                cajaErrores.hidden = false;
+                quitarCargando();
+            });
+    }
+
+    btnValidar.addEventListener('click', function () {
+        if (!input.files || input.files.length === 0) {
+            input.reportValidity();
+            return;
+        }
+
+        var datos = new FormData();
+        datos.append('archivoExcel', input.files[0]);
+        datos.append('__RequestVerificationToken', form.querySelector('input[name="__RequestVerificationToken"]').value);
+
+        btnValidar.classList.add('is-loading');
+        btnValidar.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>Validando…';
+
+        fetch(pagina.urlValidar, { method: 'POST', body: datos })
+            .then(function (resp) {
+                if (!resp.ok) throw new Error();
+                return resp.json();
+            })
+            .then(mostrar)
+            .catch(function () {
+                mostrar({ valido: false, sinVerificar: true });
+            })
+            .finally(function () {
+                btnValidar.classList.remove('is-loading');
+                btnValidar.innerHTML = textoValidar;
+            });
+    });
+
+    form.addEventListener('submit', function (e) {
+        if (btnConfirmar.classList.contains('is-loading')) {
+            e.preventDefault();
+            return;
+        }
+        if (listaIncidencias.children.length && !decisionesRevisadas) {
+            e.preventDefault();
+            revisarDecisiones();
+            return;
+        }
+        // Evita un doble envío mientras el servidor registra los pedidos
+        ponerCargando('Cargando pedidos…');
+    });
+})();

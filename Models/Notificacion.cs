@@ -2,19 +2,16 @@
 
 namespace PickingApp.Models
 {
-    // Aviso interno que aparece en la campana. Va a un usuario (UsuarioDestinoId) o a todo un rol (RolDestino).
+    // Aviso interno que aparece en la campana. Cada notificación es de un solo usuario, que la marca leída por su
+    // cuenta; un aviso a todo un rol se guarda como una copia por usuario (Services/Avisos.cs).
     public class Notificacion
     {
         [Key]
         public int Id { get; set; }
 
-        public int? UsuarioDestinoId { get; set; }
+        public int UsuarioDestinoId { get; set; }
 
         public Usuario? UsuarioDestino { get; set; }
-
-        public int? RolDestinoId { get; set; } // Id de Roles, o null para todos
-
-        public Rol? RolDestino { get; set; }
 
         [Required]
         [StringLength(150)]

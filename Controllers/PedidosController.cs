@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -74,9 +74,10 @@ namespace PickingApp.Controllers
 
             if (!string.IsNullOrWhiteSpace(busqueda))
             {
-                var b = busqueda.Trim().ToLower();
-                query = query.Where(p => p.CodigoPedido.ToLower().Contains(b) ||
-                                         p.Detalles.Any(d => d.NombreProducto.ToLower().Contains(b) || d.CodigoProducto.ToLower().Contains(b)));
+                // La intercalación de MySQL ya compara sin distinguir mayúsculas
+                var b = busqueda.Trim();
+                query = query.Where(p => p.CodigoPedido.Contains(b) ||
+                                         p.Detalles.Any(d => d.NombreProducto.Contains(b) || d.CodigoProducto.Contains(b)));
             }
 
             // empleadoId = -1 filtra los pedidos sin empleado asignado; en los divididos se mira el empleado de sus partes
@@ -111,7 +112,7 @@ namespace PickingApp.Controllers
             // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes.
             // El Id al final deja el orden fijo, para que un pedido no salte de una página a otra.
             var pedidos = await query
-                .OrderByDescending(p => p.Prioridad == "Alta")
+                .OrderByDescending(p => p.Prioridad == Prioridades.Alta)
                 .ThenByDescending(p => p.FechaCarga)
                 .ThenBy(p => p.CodigoPedido)
                 .ThenBy(p => p.Id)
@@ -169,7 +170,7 @@ namespace PickingApp.Controllers
                 TiempoEstandar = pedido.TiempoEstandarMinutos ?? await _pickingEngine.CalcularTiempoEstandarAsync(pedido.Id),
                 CategoriaPredeterminada = await _context.CategoriasProducto
                     .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "Predeterminada",
-                MaxHorasJornada = await ObtenerMaxHorasJornadaAsync(),
+                MaxHorasJornada = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada),
                 TiemposPartes = await _pickingEngine.CalcularTiemposEstandarAsync(pedido.Partes.Select(pa => pa.Id).ToList())
             });
         }
@@ -195,12 +196,12 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            // Cálculo del tiempo real de picking (PickingEngine.CalcularTiempoProcesamiento).
+            // Cálculo del tiempo real de picking (Pedido.CalcularTiempoProcesamiento).
             // El tiempo real cuenta desde el inicio fijado al asignar (asignación + margen de ese momento)
             var fechaFin = DateTime.Now;
             var inicioProceso = pedido.FechaInicioProceso
-                ?? (pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10)).AddMinutes(await ObtenerMargenInicioAsync());
-            var tiempoReal = _pickingEngine.CalcularTiempoProcesamiento(inicioProceso, fechaFin);
+                ?? (pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10)).AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos));
+            var tiempoReal = Pedido.CalcularTiempoProcesamiento(inicioProceso, fechaFin);
 
             pedido.Estado = PedidoEstados.Completado;
             pedido.ConfirmacionFisica = true;
@@ -212,7 +213,7 @@ namespace PickingApp.Controllers
             // Guarda en una sola transacción el pedido completado (y el pedido original si se cerró)
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Completar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(AccionesLog.CompletarPedido, "Pedidos",
                 $"Pedido {pedido.CodigoPedido} marcado como completado con entrega física. Tiempo real calculado: {tiempoReal} min");
             await RegistrarCierrePedidoDivididoAsync(padreCerrado);
 
@@ -224,11 +225,13 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Cancelar(int pedidoId, string motivoCancelacion)
+        public async Task<IActionResult> Cancelar(int pedidoId,
+            [Required(ErrorMessage = "El motivo de cancelación es obligatorio.")]
+            [StringLength(250, ErrorMessage = "El motivo de cancelación admite hasta {1} caracteres.")] string motivoCancelacion)
         {
-            if (string.IsNullOrWhiteSpace(motivoCancelacion))
+            if (!ModelState.IsValid)
             {
-                TempData["ErrorMessage"] = "El motivo de cancelación es obligatorio.";
+                TempData["ErrorMessage"] = ModelState.PrimerError();
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
@@ -272,7 +275,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Cancelar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(AccionesLog.CancelarPedido, "Pedidos",
                 $"Pedido {pedido.CodigoPedido} cancelado{(partesCanceladas > 0 ? $" junto con {partesCanceladas} parte(s) sin terminar" : "")}. Motivo: {motivoCancelacion}");
             await RegistrarCierrePedidoDivididoAsync(padreCerrado);
 
@@ -288,6 +291,12 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CambiarPrioridad(int pedidoId, string nuevaPrioridad)
         {
+            if (!Prioridades.Todas.Contains(nuevaPrioridad))
+            {
+                TempData["ErrorMessage"] = "Seleccione una prioridad válida.";
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
             var pedido = await _context.Pedidos.FindAsync(pedidoId);
             if (pedido == null) return NotFound();
 
@@ -328,11 +337,9 @@ namespace PickingApp.Controllers
             if (padre == null) return;
 
             var completado = padre.Estado == PedidoEstados.Completado;
-            await _auditService.RegistrarAsync(completado ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(completado ? AccionesLog.CompletarPedido : AccionesLog.CancelarPedido, "Pedidos",
                 $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
         }
 
-        private Task<double> ObtenerMaxHorasJornadaAsync() =>
-            ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada);
     }
 }

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -216,7 +216,7 @@ namespace PickingApp.Controllers
             switch (agrupar)
             {
                 case "prioridad":
-                    datos = Conteo(filas.Select(f => f.Prioridad), new[] { ("Alta", "Alta"), ("Media", "Media"), ("Baja", "Baja") });
+                    datos = Conteo(filas.Select(f => f.Prioridad), Prioridades.Todas.Select(p => (p, p)).ToArray());
                     break;
                 case "bodega":
                     datos = filas.GroupBy(f => f.Bodega).OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
@@ -248,11 +248,6 @@ namespace PickingApp.Controllers
             }
 
             return (filas.Count, datos);
-        }
-
-        public IActionResult Privacy()
-        {
-            return View();
         }
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

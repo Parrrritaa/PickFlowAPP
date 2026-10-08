@@ -18,5 +18,8 @@ namespace PickingApp.Models
 
         // Estados finales: el pedido ya no admite cambios de asignación.
         public static readonly string[] Finalizados = { Completado, Cancelado };
+
+        // Pedidos que todavía se van a recoger (el original Dividido no: se recogen sus partes).
+        public static readonly string[] SinTerminar = { Pendiente, Asignado, Reasignado };
     }
 }

@@ -106,12 +106,6 @@ namespace PickingApp.Data
                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<Usuario>().Navigation(u => u.Rol).AutoInclude();
 
-            modelBuilder.Entity<Notificacion>()
-                .HasOne(n => n.RolDestino)
-                .WithMany()
-                .HasForeignKey(n => n.RolDestinoId)
-                .OnDelete(DeleteBehavior.Restrict);
-
             modelBuilder.Entity<Solicitud>()
                 .HasOne(s => s.TipoSolicitud)
                 .WithMany()
@@ -183,7 +177,7 @@ namespace PickingApp.Data
                 .HasForeignKey(s => s.UsuarioRespondeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Cascade: con SetNull una notificación personal quedaría sin destino ni rol y se volvería visible para todos.
+            // Cascade: una notificación no tiene sentido sin su destinatario.
             modelBuilder.Entity<Notificacion>()
                 .HasOne(n => n.UsuarioDestino)
                 .WithMany()

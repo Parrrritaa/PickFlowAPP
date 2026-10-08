@@ -1,6 +1,9 @@
-@model PickingApp.Models.Usuario
+﻿@model PickingApp.Models.Usuario
+@using PickingApp.Services
 @{
     ViewData["Title"] = "Editar usuario";
+    // El propio rol y estado no se cambian aquí (UsuariosController.Editar lo rechaza)
+    var esUnoMismo = Model.Id == User.IdUsuario();
 }
 
 <h1 class="pf-page-title">Editar usuario</h1>
@@ -17,21 +20,21 @@
             </div>
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Nombre completo <span class="text-danger">*</span></label>
-                <input type="text" name="nombreCompleto" class="mockup-input" value="@Model.NombreCompleto" required />
+                <input type="text" name="nombreCompleto" class="mockup-input" value="@Model.NombreCompleto" maxlength="100" required />
             </div>
         </div>
 
         <div class="row mb-3">
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Número de identificación <span class="text-danger">*</span></label>
-                <input type="text" name="identificacion" class="mockup-input" value="@Model.Identificacion" inputmode="numeric" pattern="\d*" title="Solo números" required />
+                <input type="text" name="identificacion" class="mockup-input" value="@Model.Identificacion" maxlength="30" inputmode="numeric" pattern="\d*" title="Solo números" required />
             </div>
         </div>
 
         <div class="row mb-3">
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Rol <span class="text-danger">*</span></label>
-                <select name="rolId" class="mockup-input" required>
+                <select name="rolId" class="mockup-input" required disabled="@esUnoMismo">
                     @foreach (var rol in Roles.Catalogo)
                     {
                         <option value="@rol.Id" selected="@(Model.RolId == rol.Id)">@rol.Nombre</option>
@@ -43,7 +46,7 @@
         <div class="row mb-4">
             <div class="col-md-6 mockup-form-group">
                 <label class="mockup-label">Estado <span class="text-danger">*</span></label>
-                <select name="estado" class="mockup-input" required>
+                <select name="estado" class="mockup-input" required disabled="@esUnoMismo">
                     @foreach (var estado in EstadosUsuario.Todos)
                     {
                         <option value="@estado" selected="@(Model.Estado == estado)">@estado</option>
@@ -52,9 +55,20 @@
             </div>
         </div>
 
-        <div class="mockup-alert-warning mb-4" style="font-weight: normal;">
-            Cambiar el rol modificara los módulos y permisos disponibles para este usuario.
-        </div>
+        @if (esUnoMismo)
+        {
+            <input type="hidden" name="rolId" value="@Model.RolId" />
+            <input type="hidden" name="estado" value="@Model.Estado" />
+            <div class="mockup-alert-warning mb-4" style="font-weight: normal;">
+                Tu propio rol y tu estado solo los puede cambiar otro Administrador.
+            </div>
+        }
+        else
+        {
+            <div class="mockup-alert-warning mb-4" style="font-weight: normal;">
+                Cambiar el rol modificará los módulos y permisos disponibles para este usuario.
+            </div>
+        }
 
         <div class="d-flex justify-content-end gap-3 pt-2">
             <a asp-action="Index" class="btn-pf-gray">

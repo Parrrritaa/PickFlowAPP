@@ -49,6 +49,11 @@ namespace PickingApp.Models
         [NotMapped]
         public string JornadaLaboral => $"{HorarioEntrada:hh\\:mm} - {HorarioSalida:hh\\:mm}";
 
+        // Dentro de su horario a esa hora; un turno cuya salida no es posterior a la entrada cruza la medianoche
+        public bool TrabajaA(TimeSpan hora) => HorarioEntrada < HorarioSalida
+            ? hora >= HorarioEntrada && hora <= HorarioSalida
+            : hora >= HorarioEntrada || hora <= HorarioSalida;
+
         // [NotMapped]: se calcula en C# y no existe como columna en MySQL
         [NotMapped]
         public int MesesExperiencia

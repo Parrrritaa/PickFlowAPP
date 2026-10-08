@@ -62,6 +62,7 @@ appsettings.Development.json
 .claude/
 .agents/
 graphify-out/
+anti-slop/
 CLAUDE.md
 skills-lock.json
 .gitattributes

@@ -1,9 +1,9 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
@@ -20,14 +20,11 @@ namespace PickingApp.Controllers
         // CU-43: Mostrar notificaciones internas
         public async Task<IActionResult> Index()
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
+            var userId = User.IdUsuario();
 
-            // Solo las pendientes: al marcarse como leída, la notificación se descarta de la lista.
-            // Se muestran las dirigidas al usuario, a su rol o a todos
+            // Solo las pendientes: al marcarse como leída, la notificación se descarta de la lista
             var notificaciones = await _context.Notificaciones
-                .Where(n => !n.Leida)
-                .Where(n => n.UsuarioDestinoId == userId || n.RolDestino!.Nombre == userRole || (n.UsuarioDestinoId == null && n.RolDestinoId == null))
+                .Where(n => n.UsuarioDestinoId == userId && !n.Leida)
                 .OrderByDescending(n => n.FechaCreacion)
                 .Take(50)
                 .ToListAsync();
@@ -39,25 +36,19 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarcarLeida(int id)
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? Roles.Auxiliar;
+            // Solo las propias: el Id de otra persona no encuentra nada (evita IDOR)
+            var userId = User.IdUsuario();
+            var notificacion = await _context.Notificaciones.FirstOrDefaultAsync(n => n.Id == id && n.UsuarioDestinoId == userId);
+            var esDelUsuario = notificacion != null;
 
-            var notificacion = await _context.Notificaciones.Include(n => n.RolDestino).FirstOrDefaultAsync(n => n.Id == id);
-
-            // Evita que un usuario marque como leída una notificación dirigida específicamente a otro usuario (IDOR).
-            // Las notificaciones por rol o globales sí son compartidas y cualquiera del rol puede marcarlas.
-            var esDelUsuario = notificacion != null &&
-                (notificacion.UsuarioDestinoId == null || notificacion.UsuarioDestinoId == userId) &&
-                (notificacion.RolDestinoId == null || notificacion.RolDestino!.Nombre == userRole || notificacion.UsuarioDestinoId == userId);
-
-            if (notificacion != null && esDelUsuario)
+            if (notificacion != null)
             {
                 notificacion.Leida = true;
                 await _context.SaveChangesAsync();
             }
 
             // Petición desde la página (sin recarga): responde con el resultado para animar el descarte
-            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            if (Request.Headers["X-Requested-With"] == "fetch")
             {
                 return esDelUsuario ? NoContent() : NotFound();
             }

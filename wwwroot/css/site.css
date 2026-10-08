@@ -1,4 +1,4 @@
-/* Tema de PickFlow (basado en el mockup)
+﻿/* Tema de PickFlow
    Colores de la aplicación: se definen una vez aquí y se usan con var(--pf-...).
    Cambiar un valor aquí cambia ese color en todas las pantallas. */
 :root {
@@ -165,6 +165,12 @@ body {
     padding-left: 8px;
     text-decoration: none;
     display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 200px;
+    transition: opacity var(--pf-duration-base) var(--pf-ease),
+                max-width var(--pf-duration-sidebar) var(--pf-ease-out),
+                padding-left var(--pf-duration-sidebar) var(--pf-ease-out);
 }
 
 /* Fila superior del menú: logo + botón para ocultar */
@@ -175,6 +181,7 @@ body {
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 24px;
+    transition: padding-right var(--pf-duration-sidebar) var(--pf-ease-out);
 }
 
 .pf-sidebar-brand .brand-pick {
@@ -214,6 +221,7 @@ body {
 }
 
 .pf-nav-link {
+    position: relative;
     display: flex;
     align-items: center;
     padding: 10px 16px;
@@ -235,6 +243,7 @@ body {
     font-size: 18px;
     line-height: 1;
     text-align: center;
+    transition: margin-right var(--pf-duration-sidebar) var(--pf-ease-out);
 }
 
 .pf-nav-link:hover {
@@ -407,7 +416,7 @@ body {
     margin-bottom: 24px;
 }
 
-/* Contenedor gris tipo tarjeta (mockup) */
+/* Contenedor gris tipo tarjeta */
 .mockup-card {
     background-color: var(--pf-gray-bg);
     border-radius: 28px;
@@ -591,7 +600,7 @@ body {
     margin-bottom: 24px;
 }
 
-/* Tablas (mockup) */
+/* Tablas */
 .mockup-table {
     width: 100%;
     border-collapse: separate;
@@ -788,20 +797,6 @@ body {
     transition: opacity var(--pf-duration-base) var(--pf-ease),
                 max-width var(--pf-duration-sidebar) var(--pf-ease-out);
 }
-
-.pf-nav-link { position: relative; }
-
-.pf-sidebar-brand {
-    white-space: nowrap;
-    overflow: hidden;
-    max-width: 200px;
-    transition: opacity var(--pf-duration-base) var(--pf-ease),
-                max-width var(--pf-duration-sidebar) var(--pf-ease-out),
-                padding-left var(--pf-duration-sidebar) var(--pf-ease-out);
-}
-
-.pf-nav-icon { transition: margin-right var(--pf-duration-sidebar) var(--pf-ease-out); }
-.pf-sidebar-top { transition: padding-right var(--pf-duration-sidebar) var(--pf-ease-out); }
 
 /* Pantallas anchas: al ocultar el menú queda una barra angosta con solo los íconos (el ancho se anima).
    Los íconos no se mueven al contraer: el menú se recoge y recorta los textos. */
@@ -2452,16 +2447,16 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 .pf-agrupar-btn i { font-size: 13px; -webkit-text-stroke: 0.6px; transition: rotate 0.3s var(--pf-ease-out); }
 .pf-agrupar-btn[aria-expanded="true"] i { rotate: 180deg; }
 /* Menú de opciones: filas redondeadas, la elegida resaltada con una marca */
-.pf-opciones { min-width: 190px; padding: 6px; transform-origin: top left; }
-.pf-opcion {
+.pf-menu-opciones { min-width: 190px; padding: 6px; transform-origin: top left; }
+.pf-menu-opcion {
     position: relative; display: block; width: 100%; padding: 8px 34px 8px 12px; border: 0; border-radius: 10px;
     background: transparent; text-align: left; font-size: 15px; font-weight: 500; color: var(--pf-text-dark); cursor: pointer;
     transition: background-color var(--pf-duration-fast) var(--pf-ease);
 }
-.pf-opcion:hover { background: var(--pf-gray-light); }
-.pf-opcion:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: -2px; }
-.pf-opcion.active { color: var(--pf-blue-hover); font-weight: 600; }
-.pf-opcion.active::after {
+.pf-menu-opcion:hover { background: var(--pf-gray-light); }
+.pf-menu-opcion:focus-visible { outline: 2px solid var(--pf-blue); outline-offset: -2px; }
+.pf-menu-opcion.active { color: var(--pf-blue-hover); font-weight: 600; }
+.pf-menu-opcion.active::after {
     content: "\F26E"; font-family: "bootstrap-icons"; position: absolute; right: 12px; top: 50%; translate: 0 -50%; font-size: 15px;
 }
 .pf-chart-resumen { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: 2px 0 0; font-size: 14px; color: var(--pf-text-secondary); }

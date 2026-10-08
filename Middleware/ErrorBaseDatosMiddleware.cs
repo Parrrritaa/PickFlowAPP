@@ -70,6 +70,10 @@ namespace PickingApp.Middleware
                 MySqlErrorCode.AccessDenied or
                 MySqlErrorCode.UnknownDatabase);
 
+        // Un índice único rechazó el registro (otro lo guardó primero)
+        public static bool EsClaveDuplicada(Exception ex) =>
+            Cadena(ex).OfType<MySqlException>().Any(e => e.ErrorCode == MySqlErrorCode.DuplicateKeyEntry);
+
         private static IEnumerable<Exception> Cadena(Exception ex)
         {
             for (Exception? actual = ex; actual != null; actual = actual.InnerException)

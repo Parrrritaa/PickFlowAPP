@@ -1,4 +1,4 @@
-@model PickingApp.Models.ViewModels.SolicitarCodigoViewModel
+﻿@model PickingApp.Models.ViewModels.SolicitarCodigoViewModel
 @{
     ViewData["Title"] = "Recuperar contraseña";
     Layout = "_LayoutLogin";
@@ -14,7 +14,8 @@
         @Html.AntiForgeryToken()
 
         <div class="mb-3 text-start">
-            <input asp-for="Correo" class="pf-login-input" placeholder="Correo electrónico" required />
+            <label asp-for="Correo" class="visually-hidden">Correo electrónico</label>
+            <input asp-for="Correo" class="pf-login-input" placeholder="Correo electrónico" autocomplete="email" required />
             <span asp-validation-for="Correo" class="text-danger small"></span>
         </div>
 

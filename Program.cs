@@ -31,14 +31,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Servicios de la aplicación (inyección de dependencias).
 // Cada interfaz se asocia a su implementación: quien pide IPickingEngine en su constructor recibe un PickingEngine.
-// AddScoped crea una instancia por petición HTTP.
 builder.Services.AddHttpContextAccessor();
 // Reloj del sistema: PickingEngine lo recibe para las reglas de jornada (las pruebas usan uno fijo)
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IExcelService, ExcelService>();
 builder.Services.AddScoped<IPickingEngine, PickingEngine>();
-builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddSingleton<IReportService, ReportService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<DatosDemostracion>();
 
@@ -55,6 +54,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Events.OnValidatePrincipal = SesionUsuario.ValidarAsync;
     });
 
 // Límite por IP para las acciones que envían o validan códigos de verificación por correo:
@@ -91,7 +91,7 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        await DbInitializer.SeedAsync(context);
+        await DbInitializer.SeedAsync(context, datosDeEjemplo: app.Environment.IsDevelopment());
     }
     catch (Exception ex)
     {

@@ -59,6 +59,5 @@ namespace PickingApp.Services
         Task<Dictionary<int, double>> CalcularTiemposEstandarAsync(IReadOnlyCollection<int> pedidoIds);
         Task<Dictionary<int, double>> CalcularMinutosPorLineaAsync(int pedidoId);
         Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds);
-        double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion);
     }
 }

@@ -9,7 +9,9 @@ namespace PickingApp.Data
     // si la tabla está vacía, así que reiniciar la aplicación no duplica nada.
     public static class DbInitializer
     {
-        public static async Task SeedAsync(ApplicationDbContext context)
+        // datosDeEjemplo: bodegas, ubicaciones y empleados de prueba; solo en Development, para que una
+        // instalación real empiece vacía en lugar de con registros inventados que parecen reales
+        public static async Task SeedAsync(ApplicationDbContext context, bool datosDeEjemplo)
         {
             // Crea la base de datos si no existe y aplica las migraciones pendientes de la carpeta Migrations
             await context.Database.MigrateAsync();
@@ -68,6 +70,8 @@ namespace PickingApp.Data
                 await context.Usuarios.AddRangeAsync(usuarios);
                 await context.SaveChangesAsync();
             }
+
+            if (!datosDeEjemplo) return;
 
             // 3. Bodegas Iniciales (CU-18)
             if (!await context.Bodegas.AnyAsync())

@@ -1,4 +1,4 @@
-namespace PickingApp.Models
+﻿namespace PickingApp.Models
 {
     // Id fijos de la tabla TiposSolicitud (el catálogo se siembra con estas mismas filas)
     public static class TiposSolicitud
@@ -56,6 +56,19 @@ namespace PickingApp.Models
         public string Campo { get; set; } = string.Empty;
         public string Anterior { get; set; } = string.Empty;
         public string Nuevo { get; set; } = string.Empty;
+    }
+
+    // Campos que cambiaron (valor anterior → nuevo) para que quien revisa la solicitud los compare
+    public class ListaCambios : List<CambioSolicitud>
+    {
+        // Un campo que queda igual no se agrega
+        public void Agregar(string campo, string anterior, string nuevo)
+        {
+            if (!string.Equals(anterior, nuevo, StringComparison.Ordinal))
+            {
+                Add(new CambioSolicitud { Campo = campo, Anterior = anterior, Nuevo = nuevo });
+            }
+        }
     }
 
     // RegistroEmpleado guarda estos datos en la raíz; EdicionEmpleado los guarda en NuevosDatos

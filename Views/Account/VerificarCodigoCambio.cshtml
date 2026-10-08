@@ -1,4 +1,4 @@
-@model PickingApp.Models.ViewModels.VerificarCodigoCambioViewModel
+﻿@model PickingApp.Models.ViewModels.VerificarCodigoCambioViewModel
 @{
     ViewData["Title"] = "Verificar código";
 }
@@ -23,7 +23,7 @@
 
         <div class="mockup-form-group mb-4">
             <label asp-for="Codigo" class="mockup-label">Código de verificación <span class="text-danger">*</span></label>
-            <input asp-for="Codigo" class="mockup-input" inputmode="numeric" pattern="\d*" maxlength="6" required />
+            <input asp-for="Codigo" class="mockup-input" inputmode="numeric" pattern="\d*" maxlength="6" autocomplete="one-time-code" required />
             <span asp-validation-for="Codigo" class="text-danger small"></span>
         </div>
 

@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,11 +14,17 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RegistrarNovedad(int pedidoId, string tipoNovedad, string descripcion)
+        public async Task<IActionResult> RegistrarNovedad(int pedidoId, string tipoNovedad,
+            [Required(ErrorMessage = "La descripción de la novedad es obligatoria.")]
+            [StringLength(500, ErrorMessage = "La descripción de la novedad admite hasta {1} caracteres.")] string descripcion)
         {
-            if (string.IsNullOrWhiteSpace(descripcion))
+            if (!TiposNovedad.Todos.Contains(tipoNovedad))
             {
-                TempData["ErrorMessage"] = "La descripción de la novedad es obligatoria.";
+                ModelState.AddModelError(nameof(tipoNovedad), "Seleccione un tipo de novedad válido.");
+            }
+            if (!ModelState.IsValid)
+            {
+                TempData["ErrorMessage"] = ModelState.PrimerError();
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
@@ -40,19 +46,15 @@ namespace PickingApp.Controllers
             // Se agregan la novedad y la notificación al Administrador; ambas se guardan en el mismo SaveChangesAsync
             _context.NovedadesPedido.Add(novedad);
 
-            _context.Notificaciones.Add(new Notificacion
-            {
-                RolDestinoId = Roles.IdAdministrador,
-                Titulo = "Novedad en Pedido",
-                Mensaje = $"Se registró una novedad de tipo '{tipoNovedad}' en el pedido {pedido.CodigoPedido}.",
-                Tipo = TiposNotificacion.Warning,
-                FechaCreacion = DateTime.Now,
-                Enlace = $"/Pedidos/Detalle/{pedidoId}"
-            });
+            await Avisos.AlRolAsync(_context, Roles.IdAdministrador,
+                "Novedad en Pedido",
+                $"Se registró una novedad de tipo '{tipoNovedad}' en el pedido {pedido.CodigoPedido}.",
+                TiposNotificacion.Warning,
+                $"/Pedidos/Detalle/{pedidoId}");
 
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Registrar Novedad", "Pedidos", 
+            await _auditService.RegistrarAsync(AccionesLog.RegistrarNovedad, "Pedidos", 
                 $"Novedad registrada en pedido {pedido.CodigoPedido}: [{tipoNovedad}] {descripcion}");
 
             TempData["SuccessMessage"] = "Novedad registrada correctamente en el pedido.";
@@ -63,13 +65,20 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AtenderNovedad(int novedadId, string observacionesAtencion)
+        public async Task<IActionResult> AtenderNovedad(int novedadId,
+            [StringLength(500, ErrorMessage = "Las observaciones admiten hasta {1} caracteres.")] string? observacionesAtencion)
         {
             var novedad = await _context.NovedadesPedido
                 .Include(n => n.Pedido)
                 .FirstOrDefaultAsync(n => n.Id == novedadId);
 
             if (novedad == null) return NotFound();
+
+            if (!ModelState.IsValid)
+            {
+                TempData["ErrorMessage"] = ModelState.PrimerError();
+                return RedirectToAction(nameof(Detalle), new { id = novedad.PedidoId });
+            }
 
             var userName = User.Identity?.Name ?? "Usuario";
 
@@ -80,7 +89,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Atender Novedad", "Pedidos", 
+            await _auditService.RegistrarAsync(AccionesLog.AtenderNovedad, "Pedidos", 
                 $"Novedad #{novedad.Id} del pedido {novedad.Pedido?.CodigoPedido} marcada como atendida.");
 
             TempData["SuccessMessage"] = "La novedad ha sido marcada como atendida.";

@@ -42,12 +42,13 @@ namespace PickingApp.Controllers
             List<Ubicacion>? resultadosProducto = null;
             if (!string.IsNullOrWhiteSpace(busquedaProducto))
             {
-                var texto = busquedaProducto.Trim().ToLower();
+                // La intercalación de MySQL ya compara sin distinguir mayúsculas
+                var texto = busquedaProducto.Trim();
                 resultadosProducto = await _context.Ubicaciones
                     .Include(u => u.Bodega)
                     .Include(u => u.Producto)
                     .Where(u => u.Producto != null &&
-                                (u.Producto.Codigo.ToLower().Contains(texto) || u.Producto.Nombre.ToLower().Contains(texto)))
+                                (u.Producto.Codigo.Contains(texto) || u.Producto.Nombre.Contains(texto)))
                     .OrderBy(u => u.Bodega!.Codigo).ThenBy(u => u.CodigoUbicacion)
                     .ToListAsync();
             }
@@ -69,7 +70,7 @@ namespace PickingApp.Controllers
                 .Select(g => new { BodegaId = g.Key, Total = g.Count() })
                 .ToDictionaryAsync(x => x.BodegaId, x => x.Total);
 
-        // Detalle de Bodega y sus Ubicaciones (diapositiva 26)
+        // Detalle de Bodega y sus Ubicaciones
         public async Task<IActionResult> Detalle(int id, string? filtroUbicacion, string? filtroProducto)
         {
             // AsNoTracking: vista de solo lectura; más abajo se reemplaza bodega.Ubicaciones con la lista filtrada.
@@ -87,15 +88,16 @@ namespace PickingApp.Controllers
 
             if (!string.IsNullOrWhiteSpace(filtroUbicacion))
             {
-                var texto = filtroUbicacion.Trim().ToLower();
-                ubicaciones = ubicaciones.Where(u => u.CodigoUbicacion.ToLower().Contains(texto));
+                var texto = filtroUbicacion.Trim();
+                ubicaciones = ubicaciones.Where(u => u.CodigoUbicacion.Contains(texto, StringComparison.OrdinalIgnoreCase));
             }
 
             if (!string.IsNullOrWhiteSpace(filtroProducto))
             {
-                var texto = filtroProducto.Trim().ToLower();
+                var texto = filtroProducto.Trim();
                 ubicaciones = ubicaciones.Where(u => u.Producto != null &&
-                    (u.Producto.Codigo.ToLower().Contains(texto) || u.Producto.Nombre.ToLower().Contains(texto)));
+                    (u.Producto.Codigo.Contains(texto, StringComparison.OrdinalIgnoreCase) ||
+                     u.Producto.Nombre.Contains(texto, StringComparison.OrdinalIgnoreCase)));
             }
 
             bodega.Ubicaciones = ubicaciones.ToList();
@@ -128,20 +130,33 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            // El código de bodega siempre se genera automáticamente con autoincremento: BOD-01, BOD-02, ...
-            var codigosExistentes = await _context.Bodegas.Select(b => b.Codigo).ToListAsync();
-            var maxNumero = codigosExistentes
-                .Select(c => System.Text.RegularExpressions.Regex.Match(c, @"BOD-(\d+)$"))
-                .Where(m => m.Success)
-                .Select(m => int.Parse(m.Groups[1].Value))
-                .DefaultIfEmpty(0)
-                .Max();
-            model.Codigo = $"BOD-{(maxNumero + 1):D2}";
-
-            // INSERT de la nueva bodega en MySQL
             model.FechaCreacion = DateTime.Now;
             _context.Bodegas.Add(model);
-            await _context.SaveChangesAsync();
+
+            // El código de bodega siempre se genera automáticamente con autoincremento: BOD-01, BOD-02, ...
+            // Dos altas al mismo tiempo pueden calcular el mismo número: el índice único rechaza la segunda
+            // y esta vuelve a calcularlo con lo ya guardado
+            for (var intento = 1; ; intento++)
+            {
+                var codigosExistentes = await _context.Bodegas.AsNoTracking().Select(b => b.Codigo).ToListAsync();
+                var maxNumero = codigosExistentes
+                    .Select(c => System.Text.RegularExpressions.Regex.Match(c, @"BOD-(\d+)$"))
+                    .Where(m => m.Success)
+                    .Select(m => int.Parse(m.Groups[1].Value))
+                    .DefaultIfEmpty(0)
+                    .Max();
+                model.Codigo = $"BOD-{(maxNumero + 1):D2}";
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    break;
+                }
+                // shortcut: N altas simultáneas necesitan hasta N intentos; si llegara a haber más de 5 a la vez, usar un bloqueo
+                catch (DbUpdateException ex) when (intento < 5 && Middleware.ErroresBaseDatos.EsClaveDuplicada(ex))
+                {
+                }
+            }
 
             await _auditService.RegistrarAsync("Crear Bodega", "Bodegas", 
                 $"Bodega creada: {model.Codigo} - {model.Nombre}");
@@ -306,9 +321,8 @@ namespace PickingApp.Controllers
             ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.CodigoUbicacion)}");
 
             motivo = (motivo ?? string.Empty).Trim();
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
 
-            if (userRole == Roles.Supervisor && string.IsNullOrWhiteSpace(motivo))
+            if (User.IsInRole(Roles.Supervisor) && string.IsNullOrWhiteSpace(motivo))
             {
                 ModelState.AddModelError(string.Empty, "Debe indicar el motivo de la edición.");
             }
@@ -342,10 +356,17 @@ namespace PickingApp.Controllers
                 return await Reintentar();
             }
 
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var productoNuevo = producto.Id == 0;
 
-            if (userRole == Roles.Administrador)
+            var impedimento = await ReglasUbicacion.ValidarCambioAsync(_context, ubicacionExistente,
+                cambiaProducto: productoNuevo || producto.Id != ubicacionExistente.ProductoId, quedaActiva: model.Activa);
+            if (impedimento != null)
+            {
+                ModelState.AddModelError(string.Empty, impedimento);
+                return await Reintentar();
+            }
+
+            if (User.IsInRole(Roles.Administrador))
             {
                 if (productoNuevo) _context.Productos.Add(producto);
 
@@ -367,28 +388,21 @@ namespace PickingApp.Controllers
             {
                 // Supervisor: solicitar edición de ubicación (requiere aprobación del Administrador).
                 // El producto nuevo no se crea todavía: sus datos viajan en la solicitud.
-                var cambios = new List<CambioSolicitud>();
-                void AgregarCambio(string campo, string anterior, string nuevo)
-                {
-                    if (!string.Equals(anterior, nuevo, StringComparison.Ordinal))
-                    {
-                        cambios.Add(new CambioSolicitud { Campo = campo, Anterior = anterior, Nuevo = nuevo });
-                    }
-                }
+                var cambios = new ListaCambios();
 
                 var productoAnterior = ubicacionExistente.Producto;
                 var textoProductoAnterior = productoAnterior != null ? $"{productoAnterior.Codigo} · {productoAnterior.Nombre}" : "-";
-                AgregarCambio(CamposUbicacion.Codigo, ubicacionExistente.CodigoUbicacion, codigoUbicacionNuevo);
-                AgregarCambio(CamposUbicacion.Estado, ubicacionExistente.Activa ? "Activa" : "Inactiva", model.Activa ? "Activa" : "Inactiva");
-                AgregarCambio(CamposUbicacion.Producto, textoProductoAnterior,
+                cambios.Agregar(CamposUbicacion.Codigo, ubicacionExistente.CodigoUbicacion, codigoUbicacionNuevo);
+                cambios.Agregar(CamposUbicacion.Estado, ubicacionExistente.Activa ? "Activa" : "Inactiva", model.Activa ? "Activa" : "Inactiva");
+                cambios.Agregar(CamposUbicacion.Producto, textoProductoAnterior,
                     $"{producto.Codigo} · {producto.Nombre}{(productoNuevo ? " (nuevo)" : "")}");
                 if (productoNuevo)
                 {
                     var nombreCategoria = producto.CategoriaProductoId.HasValue
                         ? (await _context.CategoriasProducto.FindAsync(producto.CategoriaProductoId.Value))?.Nombre ?? "Sin clasificar"
                         : "Sin clasificar";
-                    AgregarCambio(CamposUbicacion.CategoriaProductoNuevo, "-", nombreCategoria);
-                    AgregarCambio(CamposUbicacion.UnidadesProductoNuevo, "-", producto.UnidadesPorCaja.ToString());
+                    cambios.Agregar(CamposUbicacion.CategoriaProductoNuevo, "-", nombreCategoria);
+                    cambios.Agregar(CamposUbicacion.UnidadesProductoNuevo, "-", producto.UnidadesPorCaja.ToString());
                 }
 
                 // Sin cambios no hay nada que aprobar; una segunda solicitud sobre la misma ubicación
@@ -402,7 +416,7 @@ namespace PickingApp.Controllers
                     return await Reintentar();
                 }
 
-                var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionUbicacion, userId, new SolicitudEdicionUbicacion
+                await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.EdicionUbicacion, new SolicitudEdicionUbicacion
                 {
                     UbicacionId = ubicacionExistente.Id,
                     BodegaId = ubicacionExistente.BodegaId,
@@ -425,20 +439,7 @@ namespace PickingApp.Controllers
                         CategoriaProductoId = producto.CategoriaProductoId,
                         UnidadesPorCaja = producto.UnidadesPorCaja
                     }
-                });
-
-                _context.Solicitudes.Add(solicitud);
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    RolDestinoId = Roles.IdAdministrador,
-                    Titulo = "Solicitud de Edición de Ubicación",
-                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó modificar la ubicación {ubicacionExistente.CodigoUbicacion}.",
-                    Tipo = TiposNotificacion.Info,
-                    FechaCreacion = DateTime.Now,
-                    Enlace = "/Solicitudes/Index"
-                });
-
-                await _context.SaveChangesAsync();
+                }, "Solicitud de Edición de Ubicación", $"modificar la ubicación {ubicacionExistente.CodigoUbicacion}", TiposNotificacion.Info);
 
                 await _auditService.RegistrarAsync("Solicitud Edición Ubicación", "Solicitudes",
                     $"Solicitud de edición enviada para ubicación {ubicacionExistente.CodigoUbicacion}. Motivo: {motivo}");
@@ -450,6 +451,7 @@ namespace PickingApp.Controllers
         }
 
         // CU-20 y CU-21: Eliminar o Solicitar Eliminación de Ubicación
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarUbicacion(int id, string? motivo)
@@ -462,8 +464,6 @@ namespace PickingApp.Controllers
 
             if (ubicacion == null) return NotFound();
 
-            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Usuario";
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Si tiene pedidos asociados, no se puede eliminar
             if (ubicacion.DetallesPedido.Any())
@@ -473,7 +473,7 @@ namespace PickingApp.Controllers
             }
 
             // Administrador: Eliminación Directa
-            if (userRole == Roles.Administrador)
+            if (User.IsInRole(Roles.Administrador))
             {
                 _context.Ubicaciones.Remove(ubicacion);
                 await _context.SaveChangesAsync();
@@ -484,7 +484,7 @@ namespace PickingApp.Controllers
                 TempData["SuccessMessage"] = $"Ubicación '{ubicacion.CodigoUbicacion}' eliminada del sistema.";
             }
             // Supervisor: Solicitar Eliminación (CU-20)
-            else if (userRole == Roles.Supervisor)
+            else
             {
                 motivo = (motivo ?? string.Empty).Trim();
                 var pendiente = await SolicitudesPendientes.DeUbicacionAsync(_context, ubicacion.Id);
@@ -496,36 +496,19 @@ namespace PickingApp.Controllers
                     return RedirectToAction(nameof(Detalle), new { id = ubicacion.BodegaId });
                 }
 
-                var solicitud = Solicitud.Nueva(TiposSolicitud.EliminacionUbicacion, userId, new SolicitudEliminacionUbicacion
+                await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.EliminacionUbicacion, new SolicitudEliminacionUbicacion
                 {
                     UbicacionId = ubicacion.Id,
                     CodigoUbicacion = ubicacion.CodigoUbicacion,
                     BodegaCodigo = ubicacion.Bodega?.Codigo,
                     Producto = ubicacion.Producto != null ? $"{ubicacion.Producto.Codigo} · {ubicacion.Producto.Nombre}" : "Sin producto",
                     Motivo = motivo
-                });
-
-                _context.Solicitudes.Add(solicitud);
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    RolDestinoId = Roles.IdAdministrador,
-                    Titulo = "Solicitud de Eliminación de Ubicación",
-                    Mensaje = $"El {User.DescripcionParaNotificacion()} solicitó eliminar la ubicación {ubicacion.CodigoUbicacion}.",
-                    Tipo = TiposNotificacion.Warning,
-                    FechaCreacion = DateTime.Now,
-                    Enlace = "/Solicitudes/Index"
-                });
-
-                await _context.SaveChangesAsync();
+                }, "Solicitud de Eliminación de Ubicación", $"eliminar la ubicación {ubicacion.CodigoUbicacion}", TiposNotificacion.Warning);
 
                 await _auditService.RegistrarAsync("Solicitud Eliminación Ubicación", "Solicitudes", 
                     $"Supervisor solicitó eliminación de ubicación {ubicacion.CodigoUbicacion}. Motivo: {motivo}");
 
                 TempData["SuccessMessage"] = $"Se ha generado la solicitud de eliminación para la ubicación '{ubicacion.CodigoUbicacion}'. Requiere aprobación del Administrador.";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "No tienes permisos para realizar o solicitar esta acción.";
             }
 
             return RedirectToAction(nameof(Detalle), new { id = ubicacion.BodegaId });

@@ -34,7 +34,7 @@ namespace PickingApp.Controllers
             }
 
             var tiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
-            var jornadaMinutos = await ObtenerMaxHorasJornadaAsync() * 60;
+            var jornadaMinutos = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada) * 60;
             return View(new DividirPedidoViewModel
             {
                 Pedido = pedido,
@@ -116,26 +116,8 @@ namespace PickingApp.Controllers
             var resumen = new List<string>();
             for (var k = 1; k <= partes; k++)
             {
-                var parte = new Pedido
-                {
-                    CodigoPedido = codigos[k - 1],
-                    BodegaId = pedido.BodegaId,
-                    Prioridad = pedido.Prioridad,
-                    Estado = PedidoEstados.Pendiente,
-                    FechaCarga = pedido.FechaCarga,
-                    PedidoPadreId = pedido.Id,
-                    NumeroParte = k,
-                    Detalles = detalles
-                        .Where(d => reparto[(d.Id, k)] > 0)
-                        .Select(d => new DetallePedido
-                        {
-                            CodigoProducto = d.CodigoProducto,
-                            NombreProducto = d.NombreProducto,
-                            Cantidad = reparto[(d.Id, k)],
-                            UbicacionId = d.UbicacionId
-                        })
-                        .ToList()
-                };
+                var parte = pedido.NuevaParte(k);
+                parte.Detalles = detalles.Where(d => reparto[(d.Id, k)] > 0).Select(d => d.Copia(reparto[(d.Id, k)])).ToList();
                 _context.Pedidos.Add(parte);
                 resumen.Add($"{parte.CodigoPedido} ({parte.Detalles.Sum(d => d.Cantidad)} uds)");
             }
@@ -144,7 +126,7 @@ namespace PickingApp.Controllers
             pedido.Estado = PedidoEstados.Dividido;
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Dividir Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(AccionesLog.DividirPedido, "Pedidos",
                 $"Pedido {pedido.CodigoPedido} dividido en {partes} partes: {string.Join(", ", resumen)}.");
 
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' dividido en {partes} partes. Ahora puede asignar cada parte.";

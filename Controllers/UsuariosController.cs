@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +22,6 @@ namespace PickingApp.Controllers
             _auditService = auditService;
         }
 
-        // Listar usuarios del sistema
         public async Task<IActionResult> Index()
         {
             var usuarios = await _context.Usuarios
@@ -33,7 +32,6 @@ namespace PickingApp.Controllers
             return View(usuarios);
         }
 
-        // Crear usuario
         [HttpGet]
         public IActionResult Crear()
         {
@@ -99,7 +97,6 @@ namespace PickingApp.Controllers
             model.FechaRegistro = DateTime.Now;
             model.IntentosFallidos = 0;
 
-            // Add marca el usuario como nuevo y SaveChangesAsync ejecuta el INSERT en MySQL
             _context.Usuarios.Add(model);
             await _context.SaveChangesAsync();
 
@@ -123,14 +120,31 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Editar(int id, string nombreCompleto, string identificacion, int rolId, string estado)
+        public async Task<IActionResult> Editar(int id,
+            [Required(ErrorMessage = "El nombre completo es obligatorio.")]
+            [StringLength(100, ErrorMessage = "El nombre completo admite hasta {1} caracteres.")] string nombreCompleto,
+            [StringLength(30, ErrorMessage = "La identificación admite hasta {1} dígitos.")]
+            [RegularExpression(@"^\d*$", ErrorMessage = "La identificación solo debe contener números.")] string? identificacion,
+            int rolId, string estado)
         {
             var usuario = await _context.Usuarios.FindAsync(id);
             if (usuario == null) return NotFound();
 
             if (!Roles.Catalogo.Any(r => r.Id == rolId) || !EstadosUsuario.Todos.Contains(estado))
             {
-                TempData["ErrorMessage"] = "El rol o el estado seleccionado no es válido.";
+                ModelState.AddModelError(string.Empty, "El rol o el estado seleccionado no es válido.");
+            }
+            if (!ModelState.IsValid)
+            {
+                TempData["ErrorMessage"] = ModelState.PrimerError();
+                return RedirectToAction(nameof(Editar), new { id });
+            }
+
+            // Quien edita es un Administrador activo (SesionUsuario lo comprueba en cada petición). Si no puede
+            // cambiarse su propio rol ni estado, siempre queda al menos un Administrador con acceso al sistema.
+            if (id == User.IdUsuario() && (rolId != usuario.RolId || estado != usuario.Estado))
+            {
+                TempData["ErrorMessage"] = "No puedes cambiar tu propio rol ni tu estado. Pídeselo a otro Administrador.";
                 return RedirectToAction(nameof(Editar), new { id });
             }
 
@@ -158,7 +172,6 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Desbloquear usuario
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Desbloquear(int id)

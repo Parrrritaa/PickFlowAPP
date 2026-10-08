@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -60,7 +60,7 @@ namespace PickingApp.Controllers
                     .OrderByDescending(p => p.FechaFinalizacion)
                     .ToListAsync();
 
-                await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos Empleado",
+                await _auditService.RegistrarAsync("Exportar PDF Reporte Tiempos Empleado", "Reportes",
                     $"Reporte individual de {empleado.NombreCompleto} ({empleado.Identificacion}), periodo: {periodo.Descripcion}. {pedidosEmpleado.Count} pedidos.");
 
                 var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
@@ -87,10 +87,9 @@ namespace PickingApp.Controllers
                 .OrderBy(i => i.Empleado)
                 .ToList();
 
-            await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos Empleado",
+            await _auditService.RegistrarAsync("Exportar PDF Reporte Tiempos Empleado", "Reportes",
                 $"Reporte general de todos los empleados, periodo: {periodo.Descripcion}.");
 
-            // Genera el PDF y lo envía al navegador como descarga
             var pdfBytes = _reportService.GenerarReporteTiemposPorEmpleadoPdf(datos, periodo);
             return File(pdfBytes, "application/pdf", $"Reporte_Tiempos_Empleados_{periodo.ParaArchivo}.pdf");
         }
@@ -115,7 +114,7 @@ namespace PickingApp.Controllers
                     .OrderByDescending(p => p.FechaFinalizacion)
                     .ToListAsync();
 
-                await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos General",
+                await _auditService.RegistrarAsync("Exportar PDF Reporte Tiempos General", "Reportes",
                     $"Reporte individual de la bodega {bodega.Codigo}, periodo: {periodo.Descripcion}. {pedidosBodega.Count} pedidos.");
 
                 var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
@@ -139,7 +138,7 @@ namespace PickingApp.Controllers
                 .OrderBy(i => i.Bodega)
                 .ToList();
 
-            await RegistrarExportacionAsync("Exportar PDF Reporte Tiempos General",
+            await _auditService.RegistrarAsync("Exportar PDF Reporte Tiempos General", "Reportes",
                 $"Reporte general de todas las bodegas, periodo: {periodo.Descripcion}.");
 
             var pdfBytes = _reportService.GenerarReporteGeneralTiemposPdf(datos, periodo);
@@ -173,7 +172,7 @@ namespace PickingApp.Controllers
 
             var pedidos = await query.OrderByDescending(p => p.FechaCarga).ToListAsync();
 
-            await RegistrarExportacionAsync("Exportar PDF Pedidos por Periodo",
+            await _auditService.RegistrarAsync("Exportar PDF Pedidos por Periodo", "Reportes",
                 $"{pedidos.Count} pedidos, periodo: {periodo.Descripcion}. {filtro ?? "Todas las bodegas"}.");
 
             var pdfBytes = _reportService.GenerarReportePedidosPorPeriodoPdf(pedidos, periodo, filtro);
@@ -210,7 +209,7 @@ namespace PickingApp.Controllers
             var pedidos = await query.OrderByDescending(p => p.FechaCarga).ToListAsync();
             var filtro = string.IsNullOrEmpty(estado) ? null : $"Solo pedidos {NombreEstadoPlural(estado).ToLowerInvariant()}";
 
-            await RegistrarExportacionAsync("Exportar PDF Completados Cancelados Reasignados",
+            await _auditService.RegistrarAsync("Exportar PDF Completados Cancelados Reasignados", "Reportes",
                 $"{pedidos.Count} registros, periodo: {periodo.Descripcion}. {filtro ?? "Todos los estados"}.");
 
             var pdfBytes = _reportService.GenerarReporteCompletadosCanceladosReasignadosPdf(pedidos, periodo, filtro);
@@ -242,11 +241,6 @@ namespace PickingApp.Controllers
         {
             TempData["ErrorMessage"] = mensaje;
             return RedirectToAction(nameof(Index));
-        }
-
-        private async Task RegistrarExportacionAsync(string accion, string detalle)
-        {
-            await _auditService.RegistrarAsync(accion, "Reportes", detalle);
         }
     }
 }

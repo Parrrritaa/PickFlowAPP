@@ -1,4 +1,4 @@
-using PickingApp.Models;
+﻿using PickingApp.Models;
 
 namespace PickingApp.Services
 {
@@ -21,6 +21,7 @@ namespace PickingApp.Services
         private readonly HashSet<Pedido> _cancelarAntes = new();
         private Pedido? _cancelarEnProceso;
         private readonly Dictionary<Pedido, LogSistema> _logAsignacion = new();
+        private readonly IReadOnlyList<Usuario> _usuarios;
 
         public DateTime Ahora { get; }
         public Usuario Supervisor { get; }
@@ -32,10 +33,12 @@ namespace PickingApp.Services
         public List<LogSistema> Logs { get; } = new();
         public List<Notificacion> Notificaciones { get; } = new();
 
+        // usuarios: quienes reciben los avisos dirigidos a un rol
         public SimulacionDemostracion(DateTime ahora, Random azar, List<Empleado> empleados, int margenInicioMinutos,
-            Usuario supervisor, Usuario administrador)
+            Usuario supervisor, Usuario administrador, IReadOnlyList<Usuario> usuarios)
         {
             Ahora = ahora;
+            _usuarios = usuarios;
             _azar = azar;
             _margen = margenInicioMinutos;
             Supervisor = supervisor;
@@ -43,6 +46,9 @@ namespace PickingApp.Services
             // Unos empleados son más rápidos que el estándar y otros más lentos: así el rendimiento de cada uno varía
             _operarios = empleados.Select(e => new Operario { Empleado = e, Factor = 0.8 + _azar.NextDouble() * 0.45 }).ToList();
         }
+
+        // El prefijo distingue lo simulado de lo que hicieron de verdad los usuarios: el LOG sigue siendo evidencia
+        private const string PrefijoLog = "[Demostración] ";
 
         public void Log(DateTime fecha, Usuario usuario, string accion, string detalle, string modulo = "Pedidos") =>
             Logs.Add(new LogSistema
@@ -53,20 +59,25 @@ namespace PickingApp.Services
                 Rol = usuario.NombreRol,
                 Accion = accion,
                 Modulo = modulo,
-                Detalle = detalle
+                Detalle = PrefijoLog + detalle
             });
 
         public void LogCarga(DateTime fecha, List<Pedido> lote) =>
-            Log(fecha, Supervisor, "Carga Excel Pedidos",
+            Log(fecha, Supervisor, AccionesLog.CargaExcelPedidos,
                 $"Se procesó el archivo 'Pedidos_{fecha:yyyyMMdd_HHmm}.xlsx' registrando {lote.Count} pedidos ({lote.Sum(p => p.Detalles.Count)} líneas de productos).");
 
+        // Igual que Avisos.AlRolAsync: una copia por cada usuario del rol
+        public void NotificarRol(DateTime fecha, int rolId, string titulo, string mensaje, string tipo, string enlace, bool? leida = null)
+        {
+            foreach (var usuario in _usuarios.Where(u => u.RolId == rolId))
+                NotificarUsuario(fecha, usuario.Id, titulo, mensaje, tipo, enlace, leida);
+        }
+
         // Las notificaciones de días anteriores ya se leyeron; las de hoy quedan en la campana
-        public void Notificar(DateTime fecha, string titulo, string mensaje, string tipo, string enlace, int? rolDestinoId = null,
-            int? usuarioDestinoId = null, bool? leida = null) =>
+        public void NotificarUsuario(DateTime fecha, int usuarioId, string titulo, string mensaje, string tipo, string enlace, bool? leida = null) =>
             Notificaciones.Add(new Notificacion
             {
-                RolDestinoId = rolDestinoId,
-                UsuarioDestinoId = usuarioDestinoId,
+                UsuarioDestinoId = usuarioId,
                 Titulo = titulo,
                 Mensaje = mensaje,
                 Tipo = tipo,
@@ -164,7 +175,7 @@ namespace PickingApp.Services
             var enCurso = trabajo.Where(p => p.EstaEnCurso).ToList();
             // Primero quienes están en su jornada a esta hora: son los que podrían tener un pedido en curso ahora
             var activos = _operarios.Where(o => o.Empleado.FechaIngreso.Date <= Ahora.Date)
-                .OrderByDescending(o => EnJornada(o.Empleado, Ahora.TimeOfDay)).ToList();
+                .OrderByDescending(o => o.Empleado.TrabajaA(Ahora.TimeOfDay)).ToList();
             List<Operario> Libres() => activos.Where(o => enCurso.All(p => p.EmpleadoId != o.Empleado.Id)).ToList();
 
             // Pendientes de hoy para tomar: primero los simulados; de la última carga siempre quedan al menos 2
@@ -217,7 +228,7 @@ namespace PickingApp.Services
                     var fin = p.FechaFinalizacion!.Value;
                     var cambio = p.FechaInicioProceso!.Value.AddMinutes(p.TiempoProcesamientoMinutos!.Value * 0.4);
                     Logs.Remove(_logAsignacion[p]);
-                    Logs.RemoveAll(l => l.Accion == "Completar Pedido" && l.Detalle.StartsWith($"Pedido {p.CodigoPedido} "));
+                    Logs.RemoveAll(l => l.Accion == AccionesLog.CompletarPedido && l.Detalle.StartsWith($"{PrefijoLog}Pedido {p.CodigoPedido} "));
                     Asignar(p, anterior, p.FechaAsignacion!.Value, p.TiempoEstandarMinutos!.Value);
                     Reasignar(p, destino!, cambio, p.TiempoEstandarMinutos!.Value, MotivosReasignacion());
                     Completar(p, fin);
@@ -256,9 +267,9 @@ namespace PickingApp.Services
                     FechaAtencion = atendida ? atencionFecha : null,
                     ObservacionesAtencion = atendida ? atencion : null
                 });
-                Notificar(fecha, "Novedad en Pedido", $"Se registró una novedad de tipo '{tipo}' en el pedido {p.CodigoPedido}.",
-                    TiposNotificacion.Warning, $"/Pedidos/Detalle/{p.Id}", rolDestinoId: Roles.IdAdministrador, leida: atendida);
-                Log(fecha, Supervisor, "Registrar Novedad", $"Novedad registrada en pedido {p.CodigoPedido}: [{tipo}] {descripcion}");
+                NotificarRol(fecha, Roles.IdAdministrador, "Novedad en Pedido", $"Se registró una novedad de tipo '{tipo}' en el pedido {p.CodigoPedido}.",
+                    TiposNotificacion.Warning, $"/Pedidos/Detalle/{p.Id}", leida: atendida);
+                Log(fecha, Supervisor, AccionesLog.RegistrarNovedad, $"Novedad registrada en pedido {p.CodigoPedido}: [{tipo}] {descripcion}");
             }
             return novedades;
         }
@@ -267,7 +278,7 @@ namespace PickingApp.Services
         public void LogAtenciones(List<NovedadPedido> novedades)
         {
             foreach (var n in novedades.Where(n => n.Atendida))
-                Log(n.FechaAtencion!.Value, Administrador, "Atender Novedad", $"Novedad #{n.Id} del pedido {n.Pedido!.CodigoPedido} marcada como atendida.");
+                Log(n.FechaAtencion!.Value, Administrador, AccionesLog.AtenderNovedad, $"Novedad #{n.Id} del pedido {n.Pedido!.CodigoPedido} marcada como atendida.");
         }
 
         private void ElegirCancelaciones(List<Pedido> trabajo)
@@ -285,7 +296,7 @@ namespace PickingApp.Services
             var estimado = Estimado(tiempoEstandar, o);
             p.Asignar(o.Empleado.Id, momento.AddMinutes(_margen), estimado, tiempoEstandar);
             p.FechaAsignacion = momento;
-            Log(momento, Supervisor, "Asignar Pedido",
+            Log(momento, Supervisor, AccionesLog.AsignarPedido,
                 $"Pedido {p.CodigoPedido} asignado al empleado {o.Empleado.NombreCompleto}. Estimado: {Formato.Duracion(estimado)} (estándar {Formato.Duracion(tiempoEstandar)} × rendimiento {o.Factor:0.00})");
             _logAsignacion[p] = Logs[^1];
         }
@@ -296,7 +307,7 @@ namespace PickingApp.Services
             var estimado = Estimado(tiempoEstandar, o);
             p.Reasignar(o.Empleado.Id, motivo, momento.AddMinutes(_margen), estimado, tiempoEstandar);
             p.FechaAsignacion = momento;
-            Log(momento, Supervisor, "Reasignar Pedido",
+            Log(momento, Supervisor, AccionesLog.ReasignarPedido,
                 $"Pedido {p.CodigoPedido} reasignado de {anterior} a {o.Empleado.NombreCompleto}. Estimado: {Formato.Duracion(estimado)}. Motivo: {motivo}");
         }
 
@@ -305,8 +316,8 @@ namespace PickingApp.Services
             p.Estado = PedidoEstados.Completado;
             p.ConfirmacionFisica = true;
             p.FechaFinalizacion = fin;
-            p.TiempoProcesamientoMinutos = Math.Round(Math.Max(1, (fin - p.FechaInicioProceso!.Value).TotalMinutes), 1);
-            Log(fin, Supervisor, "Completar Pedido",
+            p.TiempoProcesamientoMinutos = Pedido.CalcularTiempoProcesamiento(p.FechaInicioProceso!.Value, fin);
+            Log(fin, Supervisor, AccionesLog.CompletarPedido,
                 $"Pedido {p.CodigoPedido} marcado como completado con entrega física. Tiempo real calculado: {p.TiempoProcesamientoMinutos} min");
         }
 
@@ -316,18 +327,13 @@ namespace PickingApp.Services
             p.Estado = PedidoEstados.Cancelado;
             p.MotivoCancelacion = motivo;
             p.FechaFinalizacion = momento;
-            Log(momento, Supervisor, "Cancelar Pedido", $"Pedido {p.CodigoPedido} cancelado. Motivo: {motivo}");
+            Log(momento, Supervisor, AccionesLog.CancelarPedido, $"Pedido {p.CodigoPedido} cancelado. Motivo: {motivo}");
         }
 
         // Minutos reales: el estándar ajustado por el ritmo del empleado, con la variación de cada día
         private double Real(double tiempoEstandar, Operario o) => Math.Max(3, tiempoEstandar * o.Factor * (0.85 + _azar.NextDouble() * 0.35));
 
         private static double Estimado(double tiempoEstandar, Operario o) => Math.Round(Math.Max(1.0, tiempoEstandar * o.Factor), 1);
-
-        // Misma regla de jornada que PickingEngine (incluye turnos que cruzan la medianoche)
-        private static bool EnJornada(Empleado e, TimeSpan hora) => e.HorarioEntrada < e.HorarioSalida
-            ? hora >= e.HorarioEntrada && hora <= e.HorarioSalida
-            : hora >= e.HorarioEntrada || hora <= e.HorarioSalida;
 
         // Jornada que cruza la medianoche: la salida es al día siguiente
         private static DateTime Salida(Operario o, DateTime dia) =>

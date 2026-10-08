@@ -1,4 +1,4 @@
-﻿// JavaScript compartido por todas las páginas (se carga en _Layout.cshtml y _LayoutLogin.cshtml).
+// JavaScript compartido por todas las páginas (se carga en _Layout.cshtml y _LayoutLogin.cshtml).
 // Cada bloque escucha eventos en el documento y actúa solo sobre los elementos marcados con sus
 // atributos data-*, así funciona en cualquier vista sin repetir código.
 
@@ -515,7 +515,7 @@ window.addEventListener('pageshow', function (e) {
         var peticion = fetch(form.action, {
             method: 'POST',
             body: new FormData(form),
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            headers: { 'X-Requested-With': 'fetch' },
             credentials: 'same-origin'
         }).then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -883,12 +883,13 @@ window.addEventListener('pageshow', function (e) {
     var pagina = document.querySelector('.pf-main-wrapper');
     if (pagina) {
         var raiz = document.scrollingElement || document.documentElement;
-        var rebotePagina = crearRebote({
+        var zonaPagina = {
             capa: pagina,
             enInicio: function () { return raiz.scrollTop <= 0; },
             enFinal: function () { return raiz.scrollTop + window.innerHeight >= raiz.scrollHeight - 1; },
             desplazable: function () { return raiz.scrollHeight > window.innerHeight + 1; }
-        });
+        };
+        var rebotePagina = crearRebote(zonaPagina);
 
         // La rueda sobre una zona con su propio desplazamiento (menú, textos largos...) no mueve la página
         function dentroDeOtraZona(el) {
@@ -901,7 +902,10 @@ window.addEventListener('pageshow', function (e) {
 
         window.addEventListener('wheel', function (e) {
             // Con un diálogo abierto la página no se desplaza y el diálogo se movería con ella
-            if (document.body.classList.contains('modal-open') || dentroDeOtraZona(e.target)) return;
+            if (document.body.classList.contains('modal-open')) return;
+            // Recorrer el DOM (getComputedStyle) solo cuando la página ya está en el borde hacia el que se empuja
+            var empujaBorde = pasoRueda(e) < 0 ? zonaPagina.enInicio() : zonaPagina.enFinal();
+            if (empujaBorde && dentroDeOtraZona(e.target)) return;
             rebotePagina.rueda(e);
         }, { passive: true });
     }

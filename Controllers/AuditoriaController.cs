@@ -256,7 +256,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Configuracion));
             }
 
-            var r = await _datosDemostracion.GenerarAsync(int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+            var r = await _datosDemostracion.GenerarAsync(User.IdUsuario());
 
             await _auditService.RegistrarAsync("Cargar Datos de Demostración", "Mantenimiento",
                 $"Se simularon {DatosDemostracion.DiasSimulados} días de uso: {r.Pedidos} pedidos ({r.Completados} completados, {r.Cancelados} cancelados, " +
@@ -287,14 +287,12 @@ namespace PickingApp.Controllers
                 query = query.Where(l => l.FechaHora <= f);
             }
 
-            var registrosAEliminar = await query.ToListAsync();
-            _context.LogsSistema.RemoveRange(registrosAEliminar);
-            await _context.SaveChangesAsync();
+            var eliminados = await query.ExecuteDeleteAsync();
 
-            await _auditService.RegistrarAsync("Depuración de LOGs", "Auditoría", 
-                $"Se eliminaron {registrosAEliminar.Count} registros del historial de LOG.");
+            await _auditService.RegistrarAsync("Depuración de LOGs", "Auditoría",
+                $"Se eliminaron {eliminados} registros del historial de LOG.");
 
-            TempData["SuccessMessage"] = $"Se han depurado {registrosAEliminar.Count} registros del LOG del sistema. Los registros de seguridad, autenticación y mantenimiento se conservaron.";
+            TempData["SuccessMessage"] = $"Se han depurado {eliminados} registros del LOG del sistema. Los registros de seguridad, autenticación y mantenimiento se conservaron.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -315,22 +313,27 @@ namespace PickingApp.Controllers
                 return View("LimpiarBaseDatos");
             }
 
-            // Eliminar dependientes: Novedades, DetallesPedido, Pedidos, Solicitudes, Notificaciones
-            _context.NovedadesPedido.RemoveRange(_context.NovedadesPedido);
-            _context.DetallesPedido.RemoveRange(_context.DetallesPedido);
-            _context.Pedidos.RemoveRange(_context.Pedidos);
-            _context.Solicitudes.RemoveRange(_context.Solicitudes);
-            _context.Notificaciones.RemoveRange(_context.Notificaciones);
-
-            // Opcional: vaciar el LOG. El registro de esta limpieza se escribe después, así queda como primer registro.
+            // Igual que EliminarHistorialPedidos: DELETE directo sin cargar las filas, primero las tablas hijas y las
+            // partes de los pedidos divididos, todo en una transacción
             var logsEliminados = 0;
-            if (limpiarLog)
+            await using (var transaccion = await _context.Database.BeginTransactionAsync())
             {
-                logsEliminados = await _context.LogsSistema.CountAsync();
-                _context.LogsSistema.RemoveRange(_context.LogsSistema);
+                await _context.NovedadesPedido.ExecuteDeleteAsync();
+                await _context.DetallesPedido.ExecuteDeleteAsync();
+                await _context.Pedidos.Where(p => p.PedidoPadreId != null).ExecuteDeleteAsync();
+                await _context.Pedidos.ExecuteDeleteAsync();
+                await _context.Solicitudes.ExecuteDeleteAsync();
+                await _context.Notificaciones.ExecuteDeleteAsync();
+
+                // Opcional: vaciar el LOG. El registro de esta limpieza se escribe después, así queda como primer registro.
+                if (limpiarLog)
+                {
+                    logsEliminados = await _context.LogsSistema.ExecuteDeleteAsync();
+                }
+                await transaccion.CommitAsync();
             }
 
-            await _context.SaveChangesAsync();
+            // Fuera de la transacción: en MySQL, ALTER TABLE confirma cualquier transacción abierta
 
             var tablasAReiniciar = new List<string> { "NovedadesPedido", "DetallesPedido", "Pedidos", "Solicitudes", "Notificaciones" };
             if (limpiarLog)
