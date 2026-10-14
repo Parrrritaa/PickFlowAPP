@@ -46,7 +46,7 @@
         <div class="col-md-3">
             <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
                 <div class="text-secondary fw-semibold small mb-1">Estado</div>
-                <div class="fw-bold fs-3" style="color: #3B71CA;">@pedido.Estado</div>
+                <div class="fw-bold fs-3" style="color: var(--pf-blue);">@pedido.Estado</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -86,7 +86,7 @@
             }
             else
             {
-                <span class="fst-italic" style="color: #4B5563;">Sin bodega</span>
+                <span class="fst-italic" style="color: var(--pf-ink2);">Sin bodega</span>
             }
         </div>
         @if (pedido.Detalles.Any())
@@ -219,7 +219,7 @@
                                     }
                                     else
                                     {
-                                        <span style="color: #4B5563;">@categoriaPredeterminada <span class="small">(por defecto)</span></span>
+                                        <span style="color: var(--pf-ink2);">@categoriaPredeterminada <span class="small">(por defecto)</span></span>
                                     }
                                 </td>
                                 <td>@d.Cantidad</td>
@@ -231,7 +231,7 @@
                                     else
                                     {
                                         @* Nunca se inventa una ubicación: se indica que falta *@
-                                        <span class="fst-italic" style="color: #4B5563;">Sin ubicación</span>
+                                        <span class="fst-italic" style="color: var(--pf-ink2);">Sin ubicación</span>
                                     }
                                 </td>
                             </tr>
@@ -348,10 +348,10 @@
             }
             else if (pedido.EstaEnCurso)
             {
-                <button type="button" class="btn-pf-blue" style="background-color: #52A447;" data-bs-toggle="modal" data-bs-target="#modalCompletar">
+                <button type="button" class="btn-pf-green" data-bs-toggle="modal" data-bs-target="#modalCompletar">
                     Marcar Completado
                 </button>
-                <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-blue" style="background-color: #F59E0B;">
+                <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-gray">
                     Reasignar
                 </a>
             }
@@ -456,7 +456,7 @@
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="submit" class="btn-pf-blue" style="background-color: #DC2626;">Confirmar Cancelación</button>
+                    <button type="submit" class="btn-pf-red">Confirmar Cancelación</button>
                 </div>
             </form>
         </div>
@@ -485,7 +485,7 @@
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn-pf-blue" style="background-color: #52A447;">Marcar como Completado</button>
+                    <button type="submit" class="btn-pf-green">Marcar como Completado</button>
                 </div>
             </form>
         </div>

@@ -1,7 +1,7 @@
 @model PickingApp.Models.ViewModels.PedidosIndexViewModel
 @{
     var pedidos = Model.Pedidos;
-    ViewData["Title"] = "Gestión de pedidos";
+    ViewData["Title"] = "Pedidos";
     var bodegas = Model.Bodegas;
     var empleados = Model.Empleados;
     var filtroEstado = Model.FiltroEstado;
@@ -27,9 +27,35 @@
         ? new[] { (PedidoEstados.Dividido, "En curso (dividido)"), (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") }
         : new[] { (PedidoEstados.Pendiente, "Pendiente"), (PedidoEstados.Asignado, "Asignado"), (PedidoEstados.Reasignado, "Reasignado"),
                   (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") };
+
+    // Punto de color de cada estado (el mismo de las cifras del Inicio) y color del texto de la prioridad
+    string ClaseEstado(string estado) => estado switch
+    {
+        PedidoEstados.Pendiente => "is-pendiente",
+        PedidoEstados.Asignado => "is-asignado",
+        PedidoEstados.Reasignado => "is-reasignado",
+        PedidoEstados.Completado => "is-completado",
+        PedidoEstados.Cancelado => "is-cancelado",
+        _ => "is-dividido"
+    };
+    string ClasePrioridad(string prioridad) => prioridad switch { "Alta" => "is-alta", "Baja" => "is-baja", _ => "is-media" };
 }
 
-<h1 class="pf-page-title">Gestión de pedidos</h1>
+<div class="pf-titulo-fila">
+    <div>
+        <h1 class="pf-page-title">Pedidos</h1>
+        <p class="pf-page-sub">
+            @if (verDivididos)
+            {
+                @($"{Model.Paginacion.TotalRegistros} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+            }
+            else
+            {
+                @($"{Model.Paginacion.TotalRegistros} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+            }
+        </p>
+    </div>
+</div>
 
 <nav class="pf-vista-tabs mb-3" aria-label="Tipo de pedidos">
     <a asp-action="Index" class="@(verDivididos ? "" : "activo")" aria-current="@(verDivididos ? null : "page")">Pedidos</a>
@@ -42,26 +68,7 @@
     </a>
 </nav>
 
-<div class="mockup-card">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <span class="text-muted fw-semibold">
-            @if (verDivididos)
-            {
-                @($"{Model.Paginacion.TotalRegistros} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
-            }
-            else
-            {
-                @($"{Model.Paginacion.TotalRegistros} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
-            }
-        </span>
-        <div>
-            @* asp-action genera el enlace a /Pedidos/CargarExcel; el color sale de la clase .btn-pf-blue en site.css *@
-            <a asp-action="CargarExcel" class="btn-pf-blue">
-                + Cargar Excel
-            </a>
-        </div>
-    </div>
-
+<div class="mockup-card pf-card-lista">
     @if (verDivididos)
     {
         <p class="pf-seccion-desc small mb-3">
@@ -176,11 +183,11 @@
                                 </div>
                             </div>
                         </th>
-                        <th class="text-center">
-                            Acción
+                        <th class="text-end">
+                            <span class="visually-hidden">Abrir</span>
                             @if (hayFiltros)
                             {
-                                <a asp-action="Index" asp-route-vista="@(verDivididos ? "divididos" : null)" class="d-block small fw-semibold text-decoration-none mt-1">
+                                <a asp-action="Index" asp-route-vista="@(verDivididos ? "divididos" : null)" class="pf-link-btn">
                                     <i class="bi bi-x-circle"></i> Limpiar filtros
                                 </a>
                             }
@@ -196,7 +203,7 @@
                             var finalizadas = partesPedido.Count(pa => PickingApp.Models.PedidoEstados.Finalizados.Contains(pa.Estado));
                             var tienePartes = verDivididos && partesPedido.Any();
                             <tr class="@(verDivididos ? "pf-fila-dividido" : "")">
-                                <td class="fw-semibold">
+                                <td>
                                     @if (tienePartes)
                                     {
                                         <button type="button" class="pf-btn-toggle-partes" data-target="partes-@p.Id"
@@ -205,14 +212,14 @@
                                             <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                         </button>
                                     }
-                                    @p.CodigoPedido
+                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="pf-codigo">@p.CodigoPedido</a>
                                     @if (verDivididos)
                                     {
                                         <div class="text-secondary small fw-normal">@partesPedido.Count partes · @finalizadas finalizada(s)</div>
                                     }
                                 </td>
-                                <td>@p.FechaCarga.ToString("dd/MM/yyyy")</td>
-                                <td>@p.Prioridad</td>
+                                <td class="text-secondary pf-num" title="@p.FechaCarga.ToString("dd/MM/yyyy HH:mm")">@p.FechaCarga.ToString("dd/MM/yyyy")</td>
+                                <td><span class="pf-prioridad @ClasePrioridad(p.Prioridad)">@p.Prioridad</span></td>
                                 <td>
                                     @if (p.Bodega != null)
                                     {
@@ -221,14 +228,14 @@
                                     }
                                     else
                                     {
-                                        <span class="fst-italic" style="color: #4B5563;">Sin bodega</span>
+                                        <span class="fst-italic" style="color: var(--pf-ink2);">Sin bodega</span>
                                     }
                                 </td>
-                                <td>@p.Estado</td>
-                                <td>@(verDivididos ? "Por partes" : p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
-                                <td class="text-center">
-                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
-                                        Ver
+                                <td><span class="pf-estado-punto @ClaseEstado(p.Estado)">@(p.Estado == PedidoEstados.Dividido ? "En curso (dividido)" : p.Estado)</span></td>
+                                <td class="@(verDivididos || p.Empleado == null ? "text-secondary" : "")">@(verDivididos ? "Por partes" : p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                <td class="text-end">
+                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="pf-btn-abrir" aria-label="Abrir @p.CodigoPedido" title="Abrir">
+                                        <partial name="_Icono" model='"derecha"' />
                                     </a>
                                 </td>
                             </tr>
@@ -246,18 +253,18 @@
                                     <td>
                                         <span class="pf-fila-parte__codigo">
                                             <i class="bi bi-arrow-return-right" aria-hidden="true"></i>
-                                            @pa.CodigoPedido
+                                            <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-codigo">@pa.CodigoPedido</a>
                                         </span>
                                         <div class="text-secondary small">@pa.Detalles.Sum(d => d.Cantidad) uds</div>
                                     </td>
                                     <td></td>
-                                    <td>@pa.Prioridad</td>
+                                    <td><span class="pf-prioridad @ClasePrioridad(pa.Prioridad)">@pa.Prioridad</span></td>
                                     <td></td>
-                                    <td>@pa.Estado</td>
-                                    <td>@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
-                                    <td class="text-center">
-                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-gray" style="padding: 4px 20px; font-size: 14px;">
-                                            Ver
+                                    <td><span class="pf-estado-punto @ClaseEstado(pa.Estado)">@pa.Estado</span></td>
+                                    <td class="@(pa.Empleado == null ? "text-secondary" : "")">@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                    <td class="text-end">
+                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-btn-abrir" aria-label="Abrir @pa.CodigoPedido" title="Abrir">
+                                            <partial name="_Icono" model='"derecha"' />
                                         </a>
                                     </td>
                                 </tr>

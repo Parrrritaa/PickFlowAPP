@@ -4,14 +4,13 @@
     Layout = "_LayoutLogin";
 }
 
-<div class="pf-login-card">
-    <div class="text-center mb-4">
-        <h3 class="fw-bold" style="color: #00204A;">Verificar código</h3>
-        <p class="text-muted small">
-            Si <strong>@Model.Correo</strong> está registrado, te enviamos un código de 6 dígitos.
-            Ingrésalo junto con tu nueva contraseña.
-        </p>
-    </div>
+<main class="pf-login-card">
+    <a class="pf-login-marca" asp-action="Login">Pick<span>Flow</span></a>
+    <h1 class="pf-login-titulo">Verificar código</h1>
+    <p class="pf-login-sub">
+        Si <strong>@Model.Correo</strong> está registrado, te enviamos un código de 6 dígitos.
+        Escríbelo junto con tu contraseña nueva.
+    </p>
 
     @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
     {
@@ -27,30 +26,22 @@
         @Html.AntiForgeryToken()
         <input type="hidden" asp-for="Correo" />
 
-        <div class="mb-3 text-start">
-            <label asp-for="Codigo" class="visually-hidden">Código de verificación</label>
-            <input asp-for="Codigo" class="pf-login-input" placeholder="Código de verificación" inputmode="numeric" pattern="\d*" maxlength="6" autocomplete="one-time-code" required />
-            <span asp-validation-for="Codigo" class="text-danger small"></span>
-        </div>
+        <label asp-for="Codigo" class="pf-login-etiqueta">Código de verificación</label>
+        <input asp-for="Codigo" class="pf-login-input mb-1" placeholder="000000" inputmode="numeric" pattern="\d*" maxlength="6" autocomplete="one-time-code" required />
+        <span asp-validation-for="Codigo" class="text-danger small d-block mb-2"></span>
 
-        <div class="mb-3 text-start">
-            <label asp-for="NewPassword" class="visually-hidden">Nueva contraseña</label>
-            <input asp-for="NewPassword" type="password" class="pf-login-input" placeholder="Nueva contraseña" autocomplete="new-password" required />
-            <span asp-validation-for="NewPassword" class="text-danger small"></span>
-        </div>
+        <label asp-for="NewPassword" class="pf-login-etiqueta">Nueva contraseña</label>
+        <input asp-for="NewPassword" type="password" class="pf-login-input mb-1" autocomplete="new-password" required />
+        <span asp-validation-for="NewPassword" class="text-danger small d-block mb-2"></span>
 
-        <div class="mb-3 text-start">
-            <label asp-for="ConfirmPassword" class="visually-hidden">Confirmar nueva contraseña</label>
-            <input asp-for="ConfirmPassword" type="password" class="pf-login-input" placeholder="Confirmar nueva contraseña" autocomplete="new-password" required />
-            <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
-        </div>
+        <label asp-for="ConfirmPassword" class="pf-login-etiqueta">Confirmar nueva contraseña</label>
+        <input asp-for="ConfirmPassword" type="password" class="pf-login-input mb-1" autocomplete="new-password" required />
+        <span asp-validation-for="ConfirmPassword" class="text-danger small d-block mb-2"></span>
 
         <button type="submit" class="btn-pf-login">
             Restablecer contraseña
         </button>
 
-        <div class="mt-2">
-            <a asp-action="SolicitarRecuperacion" class="pf-login-link">Reenviar código</a>
-        </div>
     </form>
-</div>
+    <p class="pf-login-pie">¿No te llegó? <a asp-action="SolicitarRecuperacion" class="pf-login-link">Reenviar código</a></p>
+</main>

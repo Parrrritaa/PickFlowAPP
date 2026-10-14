@@ -4,27 +4,22 @@
     Layout = "_LayoutLogin";
 }
 
-<div class="pf-login-card">
-    <div class="text-center mb-4">
-        <h3 class="fw-bold" style="color: #00204A;">Recuperar contraseña</h3>
-        <p class="text-muted small">Ingresa tu correo y te enviaremos un código de verificación para restablecer tu contraseña</p>
-    </div>
+<main class="pf-login-card">
+    <a class="pf-login-marca" asp-action="Login">Pick<span>Flow</span></a>
+    <h1 class="pf-login-titulo">Recuperar contraseña</h1>
+    <p class="pf-login-sub">Escribe tu correo y te enviaremos un código para crear una contraseña nueva.</p>
 
     <form asp-action="SolicitarRecuperacion" method="post">
         @Html.AntiForgeryToken()
 
-        <div class="mb-3 text-start">
-            <label asp-for="Correo" class="visually-hidden">Correo electrónico</label>
-            <input asp-for="Correo" class="pf-login-input" placeholder="Correo electrónico" autocomplete="email" required />
-            <span asp-validation-for="Correo" class="text-danger small"></span>
-        </div>
+        <label asp-for="Correo" class="pf-login-etiqueta">Correo</label>
+        <input asp-for="Correo" class="pf-login-input mb-1" placeholder="nombre@empresa.com" autocomplete="email" required />
+        <span asp-validation-for="Correo" class="text-danger small d-block mb-2"></span>
 
         <button type="submit" class="btn-pf-login">
             Enviar código de verificación
         </button>
 
-        <div class="mt-2">
-            <a asp-action="Login" class="pf-login-link">Volver a iniciar sesión</a>
-        </div>
     </form>
-</div>
+    <p class="pf-login-pie"><a asp-action="Login" class="pf-login-link">Volver a iniciar sesión</a></p>
+</main>

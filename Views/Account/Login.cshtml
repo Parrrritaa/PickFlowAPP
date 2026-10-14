@@ -4,16 +4,15 @@
     Layout = "_LayoutLogin";
 }
 
-<div class="pf-login-card">
-    <div class="text-center mb-4">
-        <!-- Logo de PickFlow -->
-        <img src="~/images/pickflow-logo.jpg" alt="PickFlow" style="height: 110px; object-fit: contain;" class="mb-1" />
-    </div>
+<main class="pf-login-card">
+    <a class="pf-login-marca" asp-controller="Home" asp-action="Index">Pick<span>Flow</span></a>
+    <h1 class="pf-login-titulo">Bienvenido de nuevo</h1>
+    <p class="pf-login-sub">Entra con el correo de tu cuenta.</p>
 
     @{ var erroresGenerales = ViewData.ModelState[string.Empty]?.Errors.Select(e => e.ErrorMessage).ToList() ?? new List<string>(); }
     @* Siempre presente (oculto si no hay error): el script del final escribe aquí los errores sin recargar.
        role="alert" hace que el lector de pantalla lo anuncie al cambiar. *@
-    <div class="alert alert-danger py-2 text-start small mb-3 pf-login-aviso" id="pfLoginAviso" role="alert" hidden="@(!erroresGenerales.Any())">
+    <div class="alert alert-danger py-2 small mb-3 pf-login-aviso" id="pfLoginAviso" role="alert" hidden="@(!erroresGenerales.Any())">
         @foreach (var error in erroresGenerales)
         {
             <div>@error</div>
@@ -22,7 +21,7 @@
 
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success py-2 text-start small mb-3" role="alert">
+        <div class="alert alert-success py-2 small mb-3" role="alert">
             @TempData["SuccessMessage"]
         </div>
     }
@@ -32,27 +31,23 @@
     <form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post" id="pfLoginForm" novalidate>
         @Html.AntiForgeryToken()
 
-        <div class="mb-2">
-            <label asp-for="Correo" class="visually-hidden">Correo electrónico</label>
-            <input asp-for="Correo" class="pf-login-input" placeholder="Correo electrónico" autocomplete="username" />
-            <span asp-validation-for="Correo" class="text-danger small d-block text-start mb-2"></span>
-        </div>
+        <label asp-for="Correo" class="pf-login-etiqueta">Correo</label>
+        <input asp-for="Correo" class="pf-login-input mb-1" placeholder="nombre@empresa.com" autocomplete="username" />
+        <span asp-validation-for="Correo" class="text-danger small d-block mb-3"></span>
 
-        <div class="mb-2">
-            <label asp-for="Password" class="visually-hidden">Contraseña</label>
-            <input asp-for="Password" class="pf-login-input" placeholder="Contraseña" type="password" autocomplete="current-password" />
-            <span asp-validation-for="Password" class="text-danger small d-block text-start mb-2"></span>
+        <div class="pf-login-fila">
+            <label asp-for="Password" class="pf-login-etiqueta">Contraseña</label>
+            <a asp-action="SolicitarRecuperacion" class="pf-login-link">¿La olvidaste?</a>
         </div>
+        <input asp-for="Password" class="pf-login-input mb-1" type="password" autocomplete="current-password" />
+        <span asp-validation-for="Password" class="text-danger small d-block mb-2"></span>
 
         <button type="submit" class="btn-pf-login">
             Iniciar sesión
         </button>
-
-        <div>
-            <a asp-action="SolicitarRecuperacion" class="pf-login-link">¿Olvidaste tu contraseña?</a>
-        </div>
     </form>
-</div>
+    <p class="pf-login-pie">¿Aún no tienes cuenta? Pídela al administrador de tu bodega.</p>
+</main>
 
 @section Scripts {
     <script src="~/js/paginas/login.js" asp-append-version="true"></script>

@@ -12,16 +12,13 @@
     }
 }
 
-<div class="container py-3">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card border-0 shadow-sm rounded-4">
-                <div class="card-header bg-white py-3 border-bottom">
-                    <h5 class="fw-bold mb-0 text-primary">
-                        <i class="bi bi-sliders me-2"></i> Configuración de Parámetros y Auditoría
-                    </h5>
-                </div>
-                <div class="card-body p-4">
+<h1 class="pf-page-title">Configuración</h1>
+<div class="pf-form-ancho">
+    <div>
+        <div>
+            <div class="mockup-card">
+                <p class="pf-seccion-desc mb-4">Parámetros de auditoría, seguridad y asignación de PickFlow.</p>
+                <div>
                     <form asp-action="GuardarConfiguracion" method="post">
                         @Html.AntiForgeryToken()
 

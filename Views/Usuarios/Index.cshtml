@@ -7,7 +7,7 @@
 
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <h4 class="fw-bold mb-0" style="color: #1F2937;">Usuarios registrados</h4>
+        <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Usuarios registrados</h4>
         <a asp-action="Crear" class="btn-pf-blue">
             + Nuevo usuario
         </a>
@@ -34,18 +34,20 @@
                             <td>@u.NombreCompleto</td>
                             <td>@u.NombreRol</td>
                             <td>@u.Estado</td>
-                            <td class="text-center d-flex gap-2 justify-content-center">
-                                <a asp-action="Editar" asp-route-id="@u.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
-                                    Editar
-                                </a>
-                                @if (u.Estado == EstadosUsuario.Bloqueado)
-                                {
-                                    <form asp-action="Desbloquear" method="post" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@u.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Desbloquear</button>
-                                    </form>
-                                }
+                            <td class="text-center">
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <a asp-action="Editar" asp-route-id="@u.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
+                                        Editar
+                                    </a>
+                                    @if (u.Estado == EstadosUsuario.Bloqueado)
+                                    {
+                                        <form asp-action="Desbloquear" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@u.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Desbloquear</button>
+                                        </form>
+                                    }
+                                </div>
                             </td>
                         </tr>
                     }

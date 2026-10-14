@@ -14,7 +14,7 @@
 <h1 class="pf-page-title">Bodegas y ubicaciones</h1>
 
 <div class="mockup-card mb-4">
-    <h4 class="fw-bold mb-3" style="color: #1F2937;">Buscar producto</h4>
+    <h4 class="fw-bold mb-3" style="color: var(--pf-ink);">Buscar producto</h4>
     <p class="pf-seccion-desc small mb-3">Busca un producto por código o nombre para saber en qué bodega está y qué ubicación tiene.</p>
     <form method="get" asp-action="Index" class="d-flex gap-2 flex-wrap">
         @if (activoEstado)
@@ -75,7 +75,7 @@
 
 <div class="mockup-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <h4 class="fw-bold mb-0" style="color: #1F2937;">Bodegas registradas</h4>
+        <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Bodegas registradas</h4>
         @if (userRole == Roles.Administrador)
         {
             <a asp-action="Crear" class="btn-pf-blue">
@@ -190,7 +190,7 @@
                     </div>
                     <div class="modal-footer border-0">
                         <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn-pf-blue" style="background-color: #DC2626;">Confirmar</button>
+                        <button type="submit" class="btn-pf-red">Confirmar</button>
                     </div>
                 </form>
             </div>

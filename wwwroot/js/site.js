@@ -163,194 +163,119 @@ document.addEventListener('show.bs.modal', function (e) {
     });
 });
 
-// Menú lateral desplegable.
-// Escritorio: se oculta/muestra empujando el contenido y el estado se recuerda en este navegador.
-// Pantallas angostas: se superpone al contenido, arranca oculto y se cierra con Escape o tocando fuera.
+// Píldora de la barra superior: un solo fondo que se desliza de la opción anterior a la nueva al cambiar de
+// apartado. Sale hacia la opción con el clic (sin retrasar la navegación) y la página siguiente la recibe
+// donde quedó, guardada en sessionStorage, para terminar el recorrido. Sin JavaScript la opción activa
+// conserva su propio fondo.
 (function () {
-    var root = document.documentElement;
-
-    // Quita el bloqueo de animación de la carga inicial (lo pone el script del <head> del layout)
-    requestAnimationFrame(function () {
-        requestAnimationFrame(function () { root.classList.remove('pf-sin-transicion'); });
-    });
-
-    var sidebar = document.getElementById('pfSidebar');
-    var backdrop = document.getElementById('pfSidebarBackdrop');
-    var botones = document.querySelectorAll('[data-menu-toggle]');
-    if (!sidebar || !botones.length) return;
-    var btnMenu = sidebar.querySelector('[data-menu-toggle]');
-    var btnHeader = document.querySelector('.pf-menu-toggle--header');
-
-    var pantallaAngosta = window.matchMedia('(max-width: 991.98px)');
-
-    function menuVisible() {
-        return pantallaAngosta.matches
-            ? root.classList.contains('pf-sidebar-open')
-            : !root.classList.contains('pf-sidebar-collapsed');
-    }
-
-    // Con solo los íconos a la vista, el nombre de cada opción sale como tooltip
-    function actualizarTooltips() {
-        var soloIconos = !pantallaAngosta.matches && root.classList.contains('pf-sidebar-collapsed');
-        sidebar.querySelectorAll('.pf-nav-link, .btn-pf-logout').forEach(function (el) {
-            var t = el.querySelector('.pf-nav-text, .pf-logout-text');
-            if (!t) return;
-            if (soloIconos) el.title = t.textContent.trim();
-            else el.removeAttribute('title');
-        });
-    }
-
-    function sincronizarBoton() {
-        actualizarTooltips();
-        var visible = menuVisible();
-        var texto = visible ? 'Ocultar menú' : 'Mostrar menú';
-        botones.forEach(function (b) {
-            b.setAttribute('aria-expanded', visible ? 'true' : 'false');
-            b.setAttribute('aria-label', texto);
-            b.title = texto;
-        });
-    }
-
-    function mostrarMenu(visible) {
-        if (pantallaAngosta.matches) {
-            root.classList.toggle('pf-sidebar-open', visible);
-        } else {
-            root.classList.toggle('pf-sidebar-collapsed', !visible);
-            try { localStorage.setItem('pf-menu', visible ? 'visible' : 'oculto'); } catch (e) { }
-        }
-        sincronizarBoton();
-
-        // El foco pasa al botón que queda visible: en pantallas anchas el menú nunca desaparece (queda la barra de íconos)
-        var destino = (visible || !pantallaAngosta.matches) ? btnMenu : btnHeader;
-        if (destino) destino.focus({ preventScroll: true });
-    }
-
-    botones.forEach(function (b) {
-        b.addEventListener('click', function () { mostrarMenu(!menuVisible()); });
-    });
-
-    if (backdrop) {
-        backdrop.addEventListener('click', function () { mostrarMenu(false); });
-    }
-
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && pantallaAngosta.matches && menuVisible()) {
-            mostrarMenu(false);
-        }
-    });
-
-    // Al cruzar el punto de corte se cierra el panel superpuesto y el botón refleja el modo actual
-    pantallaAngosta.addEventListener('change', function () {
-        root.classList.remove('pf-sidebar-open');
-        sincronizarBoton();
-    });
-
-    sincronizarBoton();
-})();
-
-// Píldora de selección del menú lateral: al cambiar de apartado, el fondo azul se desliza de la opción anterior
-// a la nueva. Empieza a moverse con el clic (sin retrasar la navegación) y la página siguiente la recibe donde
-// quedó, guardada en sessionStorage, para terminar el recorrido. También se conserva el desplazamiento del menú.
-(function () {
-    var nav = document.querySelector('.pf-nav');
-    var zona = document.querySelector('.pf-sidebar-scroll');
-    var activaOriginal = nav && nav.querySelector('.pf-nav-link.active');
-    if (!nav || !activaOriginal) return;
-
-    var CLAVE = 'pf-menu-pildora';
+    var nav = document.getElementById('pfTopnav');
+    if (!nav) return;
+    var CLAVE = 'pf-barra-pildora';
     var VIGENCIA_MS = 5000; // más tiempo entre páginas ya no es "cambiar de apartado"
 
-    var pildora = document.createElement('li'); // dentro de la lista <ul>: un <li> decorativo
-    pildora.className = 'pf-nav-pildora';
+    function activa() {
+        return nav.querySelector('.pf-topnav-link[aria-current="page"], .pf-topnav-link.activo');
+    }
+
+    var pildora = document.createElement('span');
+    pildora.className = 'pf-topnav-pildora';
     pildora.setAttribute('aria-hidden', 'true');
     nav.prepend(pildora);
     nav.classList.add('pf-con-pildora');
 
-    function colocar(y, alto, animar) {
+    // Posición de una opción dentro de la barra (las de grupo están dentro de su .dropdown)
+    function medir(el) {
+        var caja = el.getBoundingClientRect();
+        return { x: caja.left - nav.getBoundingClientRect().left, ancho: caja.width };
+    }
+
+    function colocar(x, ancho, animar) {
         pildora.classList.toggle('pf-animando', animar && !pfReducirMovimiento());
-        pildora.style.translate = '0 ' + y + 'px';
-        pildora.style.height = alto + 'px';
+        pildora.style.width = ancho + 'px';
+        pildora.style.transform = 'translateX(' + x + 'px)';
+        pildora.hidden = !ancho;
     }
 
-    function irA(link, animar) {
-        colocar(link.offsetTop, link.offsetHeight, animar);
-        if (!animar || pfReducirMovimiento()) return;
-        link.classList.remove('pf-llega');
-        void link.offsetWidth; // reinicia la animación del ícono
-        link.classList.add('pf-llega');
+    function irA(el, animar) {
+        if (!el) { colocar(0, 0, false); return; }
+        var m = medir(el);
+        colocar(m.x, m.ancho, animar);
     }
 
-    function marcarActiva(link) {
-        nav.querySelectorAll('.pf-nav-link.active').forEach(function (l) {
-            l.classList.remove('active');
-            l.removeAttribute('aria-current');
-        });
-        link.classList.add('active');
-        link.setAttribute('aria-current', 'page');
-    }
-
-    // Llegada a la página: desde la posición guardada (si se vino del menú hace un momento) o directo a la activa
+    // Llegada a la página: desde la posición guardada (si se vino de la barra hace un momento) o directo a la activa
     var guardado = null;
     try { guardado = JSON.parse(sessionStorage.getItem(CLAVE) || 'null'); } catch (e) { }
     try { sessionStorage.removeItem(CLAVE); } catch (e) { }
-    var reciente = guardado && Date.now() - guardado.t < VIGENCIA_MS;
-
-    activaOriginal.setAttribute('aria-current', 'page');
-    if (reciente && zona) zona.scrollTop = guardado.scroll;
-
-    if (reciente && Math.abs(guardado.y - activaOriginal.offsetTop) > 1) {
-        colocar(guardado.y, guardado.alto, false);
-        // Tres cuadros: el layout quita el bloqueo de transiciones de la carga inicial en los dos primeros
+    var destino = activa();
+    if (guardado && Date.now() - guardado.t < VIGENCIA_MS && guardado.ancho && destino) {
+        colocar(guardado.x, guardado.ancho, false);
         requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-                requestAnimationFrame(function () { irA(activaOriginal, true); });
-            });
+            requestAnimationFrame(function () { irA(destino, true); });
         });
     } else {
-        irA(activaOriginal, false);
+        irA(destino, false);
     }
 
-    // La opción activa queda a la vista si el desplazamiento guardado la dejó fuera
-    if (zona) {
-        var arriba = activaOriginal.offsetTop - zona.scrollTop;
-        if (arriba < 0 || arriba + activaOriginal.offsetHeight > zona.clientHeight) {
-            activaOriginal.scrollIntoView({ block: 'nearest', behavior: pfReducirMovimiento() ? 'auto' : 'smooth' });
-        }
-    }
+    // La fuente Geist llega después del primer pintado y cambia el ancho de las opciones
+    if (document.fonts) document.fonts.ready.then(function () { irA(activa(), false); });
+    window.addEventListener('resize', function () { irA(activa(), false); });
 
-    // Clic normal en otra opción: la píldora sale ya hacia ella mientras carga la página
-    nav.addEventListener('click', function (e) {
-        var link = e.target.closest('.pf-nav-link');
-        if (!link || link.classList.contains('active')) return;
-        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // nueva pestaña o ventana
-        marcarActiva(link);
-        irA(link, true);
+    // Clic normal en una opción directa o en una opción de un panel: la píldora sale ya hacia ella
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('.pf-topnav > a.pf-topnav-link, .pf-panel-opcion');
+        if (!link || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        var objetivo = link.classList.contains('pf-panel-opcion')
+            ? link.closest('.dropdown').querySelector('.pf-topnav-link')
+            : link;
+        if (objetivo === activa()) return;
+        irA(objetivo, true);
     });
 
-    // Al salir se guarda dónde va la píldora (puede estar a mitad de camino) y el desplazamiento del menú
+    // Al salir se guarda dónde va la píldora (puede estar a mitad de camino)
     window.addEventListener('pagehide', function () {
         var caja = pildora.getBoundingClientRect();
-        var y = caja.top - nav.getBoundingClientRect().top;
         try {
-            sessionStorage.setItem(CLAVE, JSON.stringify({ y: y, alto: caja.height, scroll: zona ? zona.scrollTop : 0, t: Date.now() }));
+            sessionStorage.setItem(CLAVE, JSON.stringify({ x: caja.left - nav.getBoundingClientRect().left, ancho: caja.width, t: Date.now() }));
         } catch (e) { }
     });
 
-    // Volver con el botón Atrás restaura la página desde la caché tal como quedó al hacer clic:
-    // la píldora regresa a la opción de esta página
+    // Volver con el botón Atrás restaura la página desde la caché tal como quedó al hacer clic
     window.addEventListener('pageshow', function (e) {
         if (!e.persisted) return;
         try { sessionStorage.removeItem(CLAVE); } catch (err) { }
-        marcarActiva(activaOriginal);
-        irA(activaOriginal, true);
+        irA(activa(), true);
     });
+})();
 
-    // El alto de las opciones cambia al mostrar u ocultar el menú (barra de íconos) o al cambiar el tamaño
-    window.addEventListener('resize', function () { irA(nav.querySelector('.pf-nav-link.active') || activaOriginal, false); });
-    document.querySelectorAll('[data-menu-toggle]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            setTimeout(function () { irA(nav.querySelector('.pf-nav-link.active') || activaOriginal, false); }, 320);
-        });
+// Hoja de navegación en pantallas angostas: baja desde la barra; se cierra con Escape, tocando fuera
+// o al pasar a una pantalla ancha.
+(function () {
+    var root = document.documentElement;
+    var boton = document.getElementById('pfMenuMovil');
+    var hoja = document.getElementById('pfHoja');
+    var fondo = document.getElementById('pfHojaFondo');
+    if (!boton || !hoja) return;
+
+    function mostrar(abrir) {
+        root.classList.toggle('pf-hoja-abierta', abrir);
+        boton.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+        boton.setAttribute('aria-label', abrir ? 'Cerrar menú' : 'Abrir menú');
+        if (abrir) {
+            var actual = hoja.querySelector('[aria-current="page"]') || hoja.querySelector('a');
+            if (actual) actual.focus({ preventScroll: true });
+        }
+    }
+
+    boton.addEventListener('click', function () { mostrar(!root.classList.contains('pf-hoja-abierta')); });
+    if (fondo) fondo.addEventListener('click', function () { mostrar(false); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && root.classList.contains('pf-hoja-abierta')) {
+            mostrar(false);
+            boton.focus();
+        }
+    });
+    window.matchMedia('(min-width: 1021px)').addEventListener('change', function (m) {
+        if (m.matches) mostrar(false);
     });
 })();
 
@@ -702,7 +627,7 @@ window.addEventListener('pageshow', function (e) {
     revisarCodigo();
 })();
 
-// Rebote elástico al llegar al inicio o al final de una zona desplazable (menú lateral y página),
+// Rebote elástico al llegar al inicio o al final de la página,
 // como en iOS y macOS: el contenido se estira con resistencia y vuelve con un resorte suave.
 // La capa recibe .pf-rebotando y --pf-rebote; el CSS mueve sus hijos con "translate".
 (function () {
@@ -861,23 +786,6 @@ window.addEventListener('pageshow', function (e) {
         return { rueda: rueda, inicioToque: inicioToque, moverToque: moverToque, soltar: soltar };
     }
 
-    // Menú lateral: se mueven sus opciones dentro de la zona desplazable (con rueda, trackpad y dedo)
-    var menu = document.querySelector('.pf-sidebar-scroll');
-    var opciones = menu && menu.querySelector('.pf-nav');
-    if (opciones) {
-        var reboteMenu = crearRebote({
-            capa: opciones,
-            enInicio: function () { return menu.scrollTop <= 0; },
-            enFinal: function () { return menu.scrollTop + menu.clientHeight >= menu.scrollHeight - 1; },
-            desplazable: function () { return menu.scrollHeight > menu.clientHeight + 1; }
-        });
-        menu.addEventListener('wheel', reboteMenu.rueda, { passive: true });
-        menu.addEventListener('touchstart', reboteMenu.inicioToque, { passive: true });
-        menu.addEventListener('touchmove', reboteMenu.moverToque, { passive: false });
-        menu.addEventListener('touchend', reboteMenu.soltar);
-        menu.addEventListener('touchcancel', reboteMenu.soltar);
-    }
-
     // Página: solo con rueda o trackpad. En pantallas táctiles el navegador ya tiene su propio efecto
     // (y deslizar hacia abajo para recargar), así que no se reemplaza.
     var pagina = document.querySelector('.pf-main-wrapper');
@@ -891,7 +799,7 @@ window.addEventListener('pageshow', function (e) {
         };
         var rebotePagina = crearRebote(zonaPagina);
 
-        // La rueda sobre una zona con su propio desplazamiento (menú, textos largos...) no mueve la página
+        // La rueda sobre una zona con su propio desplazamiento (tablas, textos largos...) no mueve la página
         function dentroDeOtraZona(el) {
             for (; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
                 var overflow = getComputedStyle(el).overflowY;
@@ -909,4 +817,259 @@ window.addEventListener('pageshow', function (e) {
             rebotePagina.rueda(e);
         }, { passive: true });
     }
+})();
+
+// Apariencia (Sistema / Claro / Oscuro) en el menú de la cuenta. La elección se guarda en este navegador;
+// con "Sistema" se sigue el tema del equipo, también si cambia con la página abierta. El <head> ya aplicó
+// data-theme antes de pintar (Views/Shared/_Cabecera.cshtml); aquí solo se cambia y se avisa con "pf-tema"
+// para que las gráficas vuelvan a dibujarse con los colores nuevos.
+(function () {
+    var root = document.documentElement;
+    var grupo = document.getElementById('pfTema');
+    var sistemaOscuro = window.matchMedia('(prefers-color-scheme: dark)');
+    var ORDEN = ['sistema', 'claro', 'oscuro'];
+
+    function guardado() {
+        var t = null;
+        try { t = localStorage.getItem('pf-tema'); } catch (e) { }
+        return t === 'claro' || t === 'oscuro' ? t : 'sistema';
+    }
+
+    function aplicar(eleccion) {
+        var oscuro = eleccion === 'oscuro' || (eleccion === 'sistema' && sistemaOscuro.matches);
+        var nuevo = oscuro ? 'dark' : 'light';
+        if (root.getAttribute('data-theme') !== nuevo) {
+            root.setAttribute('data-theme', nuevo);
+            document.dispatchEvent(new CustomEvent('pf-tema', { detail: { oscuro: oscuro } }));
+        }
+        if (!grupo) return;
+        grupo.style.setProperty('--pf-tema-i', ORDEN.indexOf(eleccion));
+        grupo.querySelectorAll('[data-tema]').forEach(function (b) {
+            b.setAttribute('aria-checked', b.dataset.tema === eleccion ? 'true' : 'false');
+        });
+    }
+
+    aplicar(guardado());
+
+    sistemaOscuro.addEventListener('change', function () {
+        if (guardado() === 'sistema') aplicar('sistema');
+    });
+
+    if (!grupo) return;
+    grupo.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-tema]');
+        if (!b) return;
+        e.stopPropagation(); // el menú de la cuenta sigue abierto para ver el cambio
+        try {
+            if (b.dataset.tema === 'sistema') localStorage.removeItem('pf-tema');
+            else localStorage.setItem('pf-tema', b.dataset.tema);
+        } catch (err) { }
+        aplicar(b.dataset.tema);
+    });
+
+    // Radios con flechas, como un control segmentado nativo
+    grupo.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        var botones = Array.prototype.slice.call(grupo.querySelectorAll('[data-tema]'));
+        var i = botones.indexOf(document.activeElement);
+        var sig = botones[(i + (e.key === 'ArrowRight' ? 1 : botones.length - 1)) % botones.length];
+        sig.focus();
+        sig.click();
+    });
+})();
+
+// Aviso flotante (TempData de éxito): sube desde abajo, se queda unos segundos y baja por el mismo camino.
+// Si el puntero o el foco están encima, espera; el botón lo cierra antes.
+(function () {
+    var aviso = document.getElementById('pfAviso');
+    if (!aviso) return;
+    var temporizador = null;
+
+    function cerrar() {
+        aviso.classList.add('pf-aviso--oculto');
+        window.setTimeout(function () { aviso.remove(); }, 450);
+    }
+
+    function programar() {
+        window.clearTimeout(temporizador);
+        temporizador = window.setTimeout(cerrar, 5000);
+    }
+
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () { aviso.classList.remove('pf-aviso--oculto'); });
+    });
+    programar();
+
+    aviso.addEventListener('mouseenter', function () { window.clearTimeout(temporizador); });
+    aviso.addEventListener('mouseleave', programar);
+    aviso.addEventListener('focusin', function () { window.clearTimeout(temporizador); });
+    aviso.addEventListener('focusout', programar);
+    aviso.querySelector('[data-pf-aviso-cerrar]').addEventListener('click', cerrar);
+})();
+
+// Paleta de comandos: Ctrl K (o Cmd K) o el botón "Buscar" de la barra. Las opciones salen de la
+// navegación, así cada rol solo ve los apartados que puede abrir. Se abre y se cierra sin animación porque
+// se usa muchas veces al día.
+(function () {
+    var paleta = document.getElementById('pfPaleta');
+    var campo = document.getElementById('pfPaletaCampo');
+    var lista = document.getElementById('pfPaletaLista');
+    var boton = document.getElementById('pfBuscarBtn');
+    if (!paleta || !campo || !lista) return;
+
+    // Cada opción: { texto, grupo, url, icono (nodo svg clonado), nota, claves (texto para buscar) }.
+    // Salen de la hoja de navegación (Views/Shared/_Layout.cshtml), que tiene todos los apartados del rol.
+    var opciones = [];
+    var grupoActual = '';
+    var hoja = document.getElementById('pfHoja');
+    if (hoja) {
+        Array.prototype.forEach.call(hoja.children, function (el) {
+            if (el.classList.contains('pf-hoja-grupo')) {
+                grupoActual = el.textContent.trim();
+                return;
+            }
+            if (!el.classList.contains('pf-hoja-link')) return;
+            var texto = el.querySelector('.pf-hoja-texto').textContent.trim();
+            var badge = el.querySelector('.pf-nav-badge');
+            var svg = el.querySelector('svg');
+            opciones.push({
+                texto: texto,
+                grupo: grupoActual || 'Apartados',
+                url: el.href,
+                icono: svg ? svg.cloneNode(true) : null,
+                nota: badge ? badge.textContent.trim() + ' sin atender' : '',
+                claves: (texto + ' ' + grupoActual).toLowerCase()
+            });
+        });
+    }
+    var cuenta = document.querySelector('.pf-cuenta-menu a.dropdown-item');
+    if (cuenta) {
+        opciones.push({
+            texto: cuenta.textContent.trim(), grupo: 'Cuenta', url: cuenta.href,
+            icono: cuenta.querySelector('svg') ? cuenta.querySelector('svg').cloneNode(true) : null,
+            nota: '', claves: 'cambiar contraseña clave cuenta'
+        });
+    }
+
+    // Sin tildes ni mayúsculas: "configuracion" encuentra "Configuración"
+    function normalizar(t) {
+        return t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    var visibles = [];
+    var elegido = 0;
+    var anterior = null;
+
+    function pintar() {
+        var q = normalizar(campo.value.trim());
+        visibles = opciones.filter(function (o) { return !q || normalizar(o.claves).indexOf(q) >= 0; });
+        if (elegido >= visibles.length) elegido = 0;
+        lista.replaceChildren();
+
+        if (!visibles.length) {
+            var vacio = document.createElement('li');
+            vacio.className = 'pf-paleta-vacia';
+            vacio.textContent = 'Nada coincide con «' + campo.value.trim() + '».';
+            lista.appendChild(vacio);
+            campo.removeAttribute('aria-activedescendant');
+            return;
+        }
+
+        var ultimoGrupo = null;
+        visibles.forEach(function (o, i) {
+            if (o.grupo !== ultimoGrupo) {
+                ultimoGrupo = o.grupo;
+                var g = document.createElement('li');
+                g.className = 'pf-paleta-grupo';
+                g.setAttribute('role', 'presentation');
+                g.textContent = o.grupo;
+                lista.appendChild(g);
+            }
+            var li = document.createElement('li');
+            li.className = 'pf-paleta-opcion';
+            li.id = 'pfPaletaOpcion' + i;
+            li.setAttribute('role', 'option');
+            li.setAttribute('aria-selected', i === elegido ? 'true' : 'false');
+            if (o.icono) li.appendChild(o.icono.cloneNode(true));
+            var t = document.createElement('span');
+            t.textContent = o.texto;
+            li.appendChild(t);
+            if (o.nota) {
+                var n = document.createElement('span');
+                n.className = 'pf-paleta-opcion-nota';
+                n.textContent = o.nota;
+                li.appendChild(n);
+            }
+            li.addEventListener('mousemove', function () {
+                if (elegido !== i) { elegido = i; marcar(); }
+            });
+            li.addEventListener('click', function () { abrir(o); });
+            lista.appendChild(li);
+        });
+        marcar();
+    }
+
+    function marcar() {
+        lista.querySelectorAll('.pf-paleta-opcion').forEach(function (li, i) {
+            li.setAttribute('aria-selected', i === elegido ? 'true' : 'false');
+        });
+        var actual = document.getElementById('pfPaletaOpcion' + elegido);
+        if (actual) {
+            campo.setAttribute('aria-activedescendant', actual.id);
+            actual.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function abrir(o) {
+        window.location.href = o.url;
+    }
+
+    function mostrar() {
+        if (!paleta.hidden) return;
+        anterior = document.activeElement;
+        paleta.hidden = false;
+        campo.value = '';
+        elegido = 0;
+        pintar();
+        campo.focus();
+    }
+
+    function ocultar() {
+        if (paleta.hidden) return;
+        paleta.hidden = true;
+        if (anterior && anterior.focus) anterior.focus({ preventScroll: true });
+    }
+
+    if (boton) boton.addEventListener('click', mostrar);
+    paleta.querySelectorAll('[data-pf-paleta-cerrar]').forEach(function (b) { b.addEventListener('click', ocultar); });
+    campo.addEventListener('input', function () { elegido = 0; pintar(); });
+
+    campo.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!visibles.length) return;
+            elegido = (elegido + (e.key === 'ArrowDown' ? 1 : visibles.length - 1)) % visibles.length;
+            marcar();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (visibles[elegido]) abrir(visibles[elegido]);
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            if (paleta.hidden) mostrar(); else ocultar();
+        } else if (e.key === 'Escape' && !paleta.hidden) {
+            e.preventDefault();
+            ocultar();
+        } else if (e.key === 'Tab' && !paleta.hidden) {
+            // El foco queda dentro del diálogo: solo el campo y el botón Esc
+            var foco = [campo, paleta.querySelector('.pf-paleta-campo button')];
+            var i = foco.indexOf(document.activeElement);
+            e.preventDefault();
+            foco[(i + (e.shiftKey ? foco.length - 1 : 1)) % foco.length].focus();
+        }
+    });
 })();

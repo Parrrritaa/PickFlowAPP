@@ -2,9 +2,25 @@
 // (reporte-dashboard.js): colores, frase de resumen y configuración de Chart.js para cada tipo de gráfica.
 window.PfGrafica = (function () {
     // El color sigue a la categoría, no a su posición: los estados mantienen los colores de la franja del Dashboard
-    const COLOR_ESTADO = { Pendiente: '#3B71CA', Asignado: '#EB7D26', Completado: '#52A447', Cancelado: '#DC2626', Reasignado: '#1F2937' };
+    const COLOR_ESTADO = { Pendiente: '#3B71CA', Asignado: '#EB7D26', Completado: '#52A447', Cancelado: '#DC2626', Reasignado: '#5F6673' };
     const CATEGORICA = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
     const COLOR_UNICO = '#3B71CA';
+
+    // Colores de la gráfica según la apariencia (los tokens de site.css). La imagen del PDF va siempre en claro.
+    function tinta(exportar) {
+        const claro = { fondo: '#FFFFFF', texto: '#4B5563', rejilla: 'rgba(31,41,55,0.08)', eje: 'rgba(31,41,55,0.2)', tooltip: '#0F1B2D', neutro: '#5F6673', centro: '#1F2937', apoyo: '#6B7280' };
+        if (exportar) return claro;
+        const css = getComputedStyle(document.documentElement);
+        const v = (nombre, porDefecto) => css.getPropertyValue(nombre).trim() || porDefecto;
+        return {
+            fondo: v('--pf-surface', claro.fondo),
+            texto: v('--pf-ink2', claro.texto),
+            rejilla: v('--pf-line', claro.rejilla),
+            eje: v('--pf-line2', claro.eje),
+            tooltip: document.documentElement.getAttribute('data-theme') === 'dark' ? '#164079' : claro.tooltip,
+            neutro: v('--pf-neutral-fill', claro.neutro)
+        };
+    }
     const TITULOS = { estado: 'Pedidos por estado', prioridad: 'Pedidos por prioridad', bodega: 'Pedidos por bodega', empleado: 'Pedidos por empleado (top 8)', dia: 'Pedidos cargados por día' };
     const ESTADO_EN_FRASE = { Pendiente: 'pendientes', Asignado: 'en proceso', Completado: 'completados', Cancelado: 'cancelados', Reasignado: 'reasignados' };
 
@@ -13,8 +29,11 @@ window.PfGrafica = (function () {
     const pedidos = n => n === 1 ? '1 pedido' : n + ' pedidos';
     const porcentaje = (v, total) => total ? Math.round(v * 100 / total) : 0;
 
-    function colores(cats, agrupar) {
-        if (agrupar === 'estado') return cats.map(c => COLOR_ESTADO[c.clave] || COLOR_UNICO);
+    function colores(cats, agrupar, exportar) {
+        if (agrupar === 'estado') {
+            const neutro = tinta(exportar).neutro;
+            return cats.map(c => c.clave === 'Reasignado' ? neutro : COLOR_ESTADO[c.clave] || COLOR_UNICO);
+        }
         return cats.map((_, i) => CATEGORICA[i % CATEGORICA.length]);
     }
 
@@ -40,11 +59,12 @@ window.PfGrafica = (function () {
         const cats = datos.categorias;
         const circ = esCircular(tipo);
         const porPunto = circ || agrupar === 'estado';
-        const cols = colores(cats, agrupar);
+        const cols = colores(cats, agrupar, exportar);
+        const t = tinta(exportar);
         const horizontal = tipo === 'hbar';
         const linea = tipo === 'line' || tipo === 'area';
         const tipoChart = tipo === 'hbar' ? 'bar' : tipo === 'area' ? 'line' : tipo;
-        const borde = exportar ? '#FFFFFF' : '#E6E9EC';
+        const borde = t.fondo;
 
         const dataset = { label: TITULOS[agrupar], data: cats.map(c => c.valor) };
         if (circ) {
@@ -71,9 +91,10 @@ window.PfGrafica = (function () {
             dataset.maxBarThickness = 44;
         }
 
-        const grid = { color: 'rgba(31,41,55,0.08)' };
-        const ejes = { ticks: { color: '#4B5563', precision: 0 }, grid, border: { display: false }, beginAtZero: true };
-        const ejeCat = { ticks: { color: '#4B5563', maxRotation: 0, autoSkip: true }, grid: { display: false }, border: { color: 'rgba(31,41,55,0.2)' } };
+        const grid = { color: t.rejilla };
+        const fuente = { family: "'Geist', system-ui, sans-serif", size: 12 };
+        const ejes = { ticks: { color: t.texto, precision: 0, font: fuente }, grid, border: { display: false }, beginAtZero: true };
+        const ejeCat = { ticks: { color: t.texto, maxRotation: 0, autoSkip: true, font: fuente }, grid: { display: false }, border: { color: t.eje } };
 
         // Total en el centro de la dona: en pantalla es HTML superpuesto; en el PDF se dibuja en el lienzo
         const centroPdf = {
@@ -84,10 +105,10 @@ window.PfGrafica = (function () {
                 const x = (ca.left + ca.right) / 2, y = (ca.top + ca.bottom) / 2;
                 ctx.save();
                 ctx.textAlign = 'center';
-                ctx.fillStyle = '#1F2937';
+                ctx.fillStyle = t.centro;
                 ctx.font = '700 34px sans-serif';
                 ctx.fillText(String(datos.total), x, y + 6);
-                ctx.fillStyle = '#6B7280';
+                ctx.fillStyle = t.apoyo;
                 ctx.font = '14px sans-serif';
                 ctx.fillText('pedidos', x, y + 28);
                 ctx.restore();
@@ -114,10 +135,11 @@ window.PfGrafica = (function () {
                 scales: circ ? {} : (horizontal ? { x: ejes, y: ejeCat } : { x: ejeCat, y: ejes }),
                 plugins: {
                     legend: exportar && porPunto
-                        ? { display: true, position: 'bottom', labels: { color: '#4B5563', usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, padding: 14, font: { size: 13 } } }
+                        ? { display: true, position: 'bottom', labels: { color: t.texto, usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, padding: 14, font: { size: 13 } } }
                         : { display: false },
                     tooltip: {
-                        backgroundColor: '#1F2937', padding: 10, cornerRadius: 8, displayColors: porPunto,
+                        backgroundColor: t.tooltip, padding: 10, cornerRadius: 10, displayColors: porPunto,
+                        titleFont: { family: "'Geist', system-ui, sans-serif", weight: '600' }, bodyFont: { family: "'Geist', system-ui, sans-serif" },
                         callbacks: {
                             label: ctx => {
                                 const v = ctx.parsed.y ?? ctx.parsed.x ?? ctx.parsed;

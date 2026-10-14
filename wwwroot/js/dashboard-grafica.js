@@ -227,6 +227,14 @@
 
     el('pfVerTabla').addEventListener('click', () => { estado.tabla = !estado.tabla; dibujar(); });
 
+    // Al cambiar de apariencia la gráfica se vuelve a crear con los colores nuevos (sin animación de entrada)
+    document.addEventListener('pf-tema', () => {
+        if (!estado.datos) return;
+        if (grafica) { grafica.destroy(); grafica = null; }
+        dibujada = null;
+        dibujar();
+    });
+
     // Los números de la franja cuentan desde cero al abrir el dashboard (una vez, y nunca con movimiento reducido)
     if (!sinMovimiento.matches) {
         const valores = kpis.map(k => k.querySelector('.pf-kpi-valor'));

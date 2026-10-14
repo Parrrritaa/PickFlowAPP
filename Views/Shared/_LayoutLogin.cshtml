@@ -1,98 +1,42 @@
+@* Plantilla de las pantallas sin sesión (iniciar sesión, recuperar contraseña, base de datos no disponible).
+   Detrás del formulario va el plano de una bodega vista desde arriba con la ruta de un pedido. *@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - PickFlow</title>
-    @* Logo de la pestaña; asp-append-version cambia la URL si se reemplaza el icono, para que el navegador no muestre el viejo *@
-    <link rel="icon" href="~/favicon.ico" sizes="any" asp-append-version="true" />
-    <link rel="apple-touch-icon" href="~/images/apple-touch-icon.png" asp-append-version="true" />
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <style>
-        body {
-            background-color: #00204A;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            padding: 20px;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-        }
-        .pf-login-card {
-            background-color: #FFFFFF;
-            border-radius: 36px;
-            width: 100%;
-            max-width: 440px;
-            padding: 44px 38px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-            text-align: center;
-        }
-        .pf-login-input {
-            border: 1.5px solid #CBD5E1;
-            border-radius: 10px;
-            height: 48px;
-            padding: 10px 16px;
-            font-size: 15px;
-            width: 100%;
-            color: #1F2937;
-            background-color: #FFFFFF;
-            margin-bottom: 16px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .pf-login-input:focus {
-            border-color: #3B71CA;
-            box-shadow: 0 0 0 3px rgba(59, 113, 202, 0.15);
-        }
-        .pf-login-input::placeholder {
-            color: #9CA3AF;
-        }
-        /* El fondo azul que Chrome pone al autocompletar no se puede cambiar con background-color:
-           se tapa con una sombra interior blanca para que el campo se vea igual que los demás */
-        .pf-login-input:-webkit-autofill {
-            box-shadow: 0 0 0 1000px #FFFFFF inset;
-        }
-        .pf-login-input:-webkit-autofill:focus {
-            box-shadow: 0 0 0 1000px #FFFFFF inset, 0 0 0 3px rgba(59, 113, 202, 0.15);
-        }
-        .pf-login-input.pf-login-input--error:-webkit-autofill,
-        .pf-login-input.pf-login-input--error:-webkit-autofill:focus {
-            box-shadow: 0 0 0 1000px #FFFFFF inset, 0 0 0 3px rgba(220, 38, 38, 0.15);
-        }
-        .btn-pf-login {
-            background-color: #EB7D26;
-            color: #FFFFFF;
-            font-size: 16px;
-            font-weight: 700;
-            border-radius: 10px;
-            border: none;
-            width: 100%;
-            padding: 12px;
-            margin-top: 6px;
-            margin-bottom: 16px;
-            transition: background-color 0.15s;
-        }
-        .btn-pf-login:hover {
-            background-color: #D96E1D;
-            color: #FFFFFF;
-        }
-        .pf-login-link {
-            color: #00204A;
-            font-size: 15px;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .pf-login-link:hover {
-            text-decoration: underline;
-            color: #3B71CA;
-        }
-    </style>
+    <partial name="_Cabecera" />
 </head>
 <body>
-    @RenderBody()
+    <div class="pf-acceso">
+        <svg class="pf-acceso-plano" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none">
+            <g class="pf-racks" stroke-width="1.5">
+                @for (var x = 120; x <= 1320; x += 150)
+                {
+                    <rect x="@x" y="150" width="36" height="280" rx="5"></rect>
+                    <rect x="@x" y="490" width="36" height="280" rx="5"></rect>
+                }
+            </g>
+            <g class="pf-pasillos" font-size="12" text-anchor="middle">
+                <text x="213" y="128">PAS01</text>
+                <text x="363" y="128">PAS02</text>
+                <text x="513" y="128">PAS03</text>
+                <text x="663" y="128">PAS04</text>
+                <text x="813" y="128">PAS05</text>
+                <text x="963" y="128">PAS06</text>
+                <text x="1113" y="128">PAS07</text>
+                <text x="1263" y="128">PAS08</text>
+            </g>
+            <path class="pf-ruta-pedido" pathLength="1" d="M40 830 H213 V460 H513 V110 H813 V460 H1113 V830 H1400"
+                  stroke="#EB7D26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+            <g fill="#EB7D26" stroke-width="4">
+                <circle class="pf-parada" style="animation-delay: 0.7s" cx="213" cy="610" r="9"></circle>
+                <circle class="pf-parada" style="animation-delay: 1.0s" cx="513" cy="250" r="9"></circle>
+                <circle class="pf-parada" style="animation-delay: 1.35s" cx="813" cy="330" r="9"></circle>
+                <circle class="pf-parada" style="animation-delay: 1.75s" cx="1113" cy="660" r="9"></circle>
+            </g>
+        </svg>
+
+        @RenderBody()
+    </div>
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
