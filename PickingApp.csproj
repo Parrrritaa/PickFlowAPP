@@ -31,4 +31,9 @@
     <None Remove="Tests\**" />
   </ItemGroup>
 
+  <!-- Plantillas de correo: EmailService las lee desde la raíz de la app al enviar -->
+  <ItemGroup>
+    <None Update="Plantillas\**" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -22,7 +22,7 @@ namespace PickingApp.Tests
         {
             public string? UltimoCodigo { get; private set; }
 
-            public Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo)
+            public Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo, bool esCambioContrasena)
             {
                 UltimoCodigo = codigo;
                 return Task.CompletedTask;

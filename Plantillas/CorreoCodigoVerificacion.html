@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>{{TITULO}} · PickFlow</title>
+  <!--
+    Plantilla de correo de PickFlow para el código de verificación de 6 dígitos.
+    Sirve para los dos flujos: recuperar contraseña y confirmar un cambio de contraseña.
+
+    Marcadores (todos se reemplazan con texto codificado en HTML):
+      {{TITULO}}   "Recupera tu contraseña"  |  "Confirma el cambio de contraseña"
+      {{INTRO}}    párrafo que explica por qué llega el correo
+      {{NOMBRE}}   nombre completo del usuario
+      {{CODIGO}}   código de 6 dígitos
+      {{CORREO}}   correo del destinatario
+      {{FECHA}}    fecha y hora de la solicitud, ej. "15/10/2026 2:52 p. m."
+      {{ANIO}}     año actual
+
+    El logo se adjunta como recurso embebido con ContentId = "logo-pickflow".
+  -->
+  <style>
+    /* Solo lo que no se puede poner en línea; el resto va en atributos style para Outlook y Gmail */
+    body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table { border-collapse: collapse; }
+    img { border: 0; line-height: 100%; outline: none; text-decoration: none; display: block; }
+    a { color: #9A4A0E; }
+    @media only screen and (max-width: 620px) {
+      .contenedor { width: 100% !important; }
+      .relleno { padding-left: 24px !important; padding-right: 24px !important; }
+      .codigo { font-size: 34px !important; letter-spacing: 8px !important; }
+      .titulo { font-size: 24px !important; line-height: 30px !important; }
+    }
+    @media (prefers-color-scheme: dark) {
+      .fondo { background-color: #0B1220 !important; }
+      .tarjeta { background-color: #131C2B !important; border-color: #263247 !important; }
+      .tinta { color: #E8ECF2 !important; }
+      .tinta2 { color: #A7B0BE !important; }
+      .etiqueta { background-color: #0F1726 !important; border-color: #33415A !important; border-top-color: #EB7D26 !important; }
+      .acento { color: #F5A35F !important; }
+      .codigo { color: #FFFFFF !important; }
+      .aviso { background-color: #2A1E0F !important; border-color: #5C3A10 !important; }
+      .aviso-txt { color: #F2C98F !important; }
+      .logo-fondo { background-color: #FFFFFF !important; }
+    }
+  </style>
+  <!--[if mso]>
+  <style>
+    body, table, td, p, a { font-family: Segoe UI, Arial, sans-serif !important; }
+    .codigo { font-family: Consolas, 'Courier New', monospace !important; }
+  </style>
+  <![endif]-->
+</head>
+<body class="fondo" style="margin:0; padding:0; background-color:#F4F5F7;">
+
+  <!-- Texto de vista previa en la bandeja de entrada (oculto en el cuerpo) -->
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#F4F5F7; opacity:0;">
+    Tu código de PickFlow es {{CODIGO}}. Vence en 10 minutos.
+    &#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="fondo" style="background-color:#F4F5F7;">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="contenedor" style="width:600px; max-width:600px;">
+
+          <!-- Logo -->
+          <tr>
+            <td style="padding:0 0 16px 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="logo-fondo" style="background-color:#FFFFFF; border-radius:12px; padding:6px 10px;">
+                    <img src="cid:logo-pickflow" width="120" height="65" alt="PickFlow"
+                         style="display:block; width:120px; height:auto; font-family:Segoe UI, Arial, sans-serif; font-size:18px; font-weight:700; color:#0F1B2D;">
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Tarjeta principal -->
+          <tr>
+            <td class="tarjeta" style="background-color:#FFFFFF; border:1px solid #E3E6EB; border-radius:16px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+                <!-- Encabezado -->
+                <tr>
+                  <td class="relleno" style="padding:40px 48px 8px 48px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                    <h1 class="titulo tinta" style="margin:0 0 20px 0; font-size:28px; line-height:34px; font-weight:700; letter-spacing:-0.3px; color:#0F1B2D;">
+                      {{TITULO}}
+                    </h1>
+                    <p class="tinta" style="margin:0 0 12px 0; font-size:16px; line-height:24px; color:#0F1B2D;">
+                      Hola, <strong>{{NOMBRE}}</strong>:
+                    </p>
+                    <p class="tinta2" style="margin:0; font-size:16px; line-height:24px; color:#5F6673;">
+                      {{INTRO}}
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Código: se presenta como la etiqueta de una ubicación de bodega -->
+                <tr>
+                  <td class="relleno" style="padding:28px 48px 8px 48px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="etiqueta"
+                           style="background-color:#F8F9FB; border:1px solid #CDD2D9; border-radius:12px; border-top:6px solid #EB7D26;">
+                      <tr>
+                        <td style="padding:18px 24px 4px 24px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:13px; line-height:18px; font-weight:600; color:#5F6673;" class="tinta2">
+                          Tu código de verificación
+                        </td>
+                      </tr>
+                      <tr>
+                        <td align="center" style="padding:8px 24px 6px 24px;">
+                          <!-- letter-spacing en lugar de celdas separadas para que el código se copie sin espacios -->
+                          <span class="codigo" style="display:inline-block; font-family:'SF Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:42px; line-height:52px; font-weight:700; letter-spacing:12px; color:#0F1B2D; padding-left:12px;">{{CODIGO}}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="acento" align="center" style="padding:0 24px 20px 24px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:14px; line-height:20px; color:#9A4A0E;">
+                          Vence en <strong>10 minutos</strong> y solo sirve una vez.
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Pasos -->
+                <tr>
+                  <td class="relleno" style="padding:24px 48px 8px 48px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                    <p class="tinta" style="margin:0 0 12px 0; font-size:15px; line-height:22px; font-weight:600; color:#0F1B2D;">
+                      Cómo usarlo
+                    </p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td class="acento" width="28" valign="top" style="padding:0 0 10px 0; font-size:15px; line-height:22px; font-weight:700; color:#9A4A0E;">1.</td>
+                        <td class="tinta2" valign="top" style="padding:0 0 10px 0; font-size:15px; line-height:22px; color:#5F6673;">Vuelve a la pantalla de PickFlow donde lo solicitaste.</td>
+                      </tr>
+                      <tr>
+                        <td class="acento" width="28" valign="top" style="padding:0 0 10px 0; font-size:15px; line-height:22px; font-weight:700; color:#9A4A0E;">2.</td>
+                        <td class="tinta2" valign="top" style="padding:0 0 10px 0; font-size:15px; line-height:22px; color:#5F6673;">Escribe los 6 dígitos tal como aparecen arriba.</td>
+                      </tr>
+                      <tr>
+                        <td class="acento" width="28" valign="top" style="padding:0; font-size:15px; line-height:22px; font-weight:700; color:#9A4A0E;">3.</td>
+                        <td class="tinta2" valign="top" style="padding:0; font-size:15px; line-height:22px; color:#5F6673;">Si el código venció, pide uno nuevo desde la misma pantalla.</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Aviso de seguridad -->
+                <tr>
+                  <td class="relleno" style="padding:24px 48px 40px 48px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="aviso"
+                           style="background-color:#FDF3E6; border:1px solid #F3D3A8; border-radius:12px;">
+                      <tr>
+                        <td class="aviso-txt" style="padding:16px 20px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:14px; line-height:21px; color:#8A4B08;">
+                          <strong>¿No fuiste tú?</strong> Ignora este correo: tu contraseña no cambiará sin este código.
+                          Nadie de PickFlow te pedirá el código por teléfono, chat o correo; no lo compartas.
+                          Si recibes estos correos sin haberlos pedido, avisa al administrador del sistema.
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Pie -->
+          <tr>
+            <td class="relleno" style="padding:24px 48px 8px 48px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:13px; line-height:20px; color:#5F6673;">
+              <p class="tinta2" style="margin:0 0 10px 0;">
+                <strong class="tinta" style="color:#0F1B2D;">Este correo es automático. No lo respondas:</strong>
+                esta dirección no recibe mensajes. Si necesitas ayuda, contacta al administrador de PickFlow de tu empresa.
+              </p>
+              <p class="tinta2" style="margin:0 0 10px 0;">
+                Solicitud registrada el {{FECHA}} para la cuenta {{CORREO}}.
+              </p>
+              <p class="tinta2" style="margin:0;">
+                © {{ANIO}} PickFlow · Gestión de picking y bodegas
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

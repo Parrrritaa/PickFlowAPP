@@ -338,7 +338,7 @@ namespace PickingApp.Controllers
 
                 try
                 {
-                    await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo);
+                    await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo, esCambioContrasena: false);
                     await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Solicitud Código Recuperación", "Seguridad",
                         "Se generó y envió un código de verificación para recuperar la contraseña.");
                 }
@@ -467,7 +467,7 @@ namespace PickingApp.Controllers
 
             try
             {
-                await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo);
+                await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo, esCambioContrasena: true);
                 await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Solicitud Código Cambio Contraseña", "Seguridad",
                     "Se envió un código de verificación al correo para confirmar el cambio de contraseña.");
             }
