@@ -1,13 +1,12 @@
-﻿@model PickingApp.Models.ViewModels.LoginViewModel
+@model PickingApp.Models.ViewModels.LoginViewModel
 @{
     ViewData["Title"] = "Iniciar sesión";
     Layout = "_LayoutLogin";
 }
 
 <main class="pf-login-card">
-    <a class="pf-login-marca" asp-controller="Home" asp-action="Index">Pick<span>Flow</span></a>
-    <h1 class="pf-login-titulo">Bienvenido de nuevo</h1>
-    <p class="pf-login-sub">Entra con el correo de tu cuenta.</p>
+    <h1 class="pf-login-titulo">Iniciar sesión</h1>
+    <p class="pf-login-sub">Entra con el correo y la contraseña de tu cuenta de PickFlow.</p>
 
     @{ var erroresGenerales = ViewData.ModelState[string.Empty]?.Errors.Select(e => e.ErrorMessage).ToList() ?? new List<string>(); }
     @* Siempre presente (oculto si no hay error): el script del final escribe aquí los errores sin recargar.
@@ -32,20 +31,30 @@
         @Html.AntiForgeryToken()
 
         <label asp-for="Correo" class="pf-login-etiqueta">Correo</label>
-        <input asp-for="Correo" class="pf-login-input mb-1" placeholder="nombre@empresa.com" autocomplete="username" />
-        <span asp-validation-for="Correo" class="text-danger small d-block mb-3"></span>
-
-        <div class="pf-login-fila">
-            <label asp-for="Password" class="pf-login-etiqueta">Contraseña</label>
-            <a asp-action="SolicitarRecuperacion" class="pf-login-link">¿La olvidaste?</a>
+        <div class="pf-login-campo">
+            <span class="pf-login-campo-ico"><partial name="_Icono" model='"correo"' /></span>
+            <input asp-for="Correo" class="pf-login-input" placeholder="nombre@empresa.com" autocomplete="username" autofocus />
         </div>
-        <input asp-for="Password" class="pf-login-input mb-1" type="password" autocomplete="current-password" />
-        <span asp-validation-for="Password" class="text-danger small d-block mb-2"></span>
+        <span asp-validation-for="Correo" class="pf-login-error"></span>
+
+        <label asp-for="Password" class="pf-login-etiqueta">Contraseña</label>
+        <div class="pf-login-campo">
+            <span class="pf-login-campo-ico"><partial name="_Icono" model='"candado"' /></span>
+            @* data-pf-mostrar="texto": site.js pone "Mostrar"/"Ocultar" escrito en vez del ojito *@
+            <input asp-for="Password" class="pf-login-input" type="password" autocomplete="current-password" data-pf-mostrar="texto" />
+        </div>
+        <span asp-validation-for="Password" class="pf-login-error"></span>
 
         <button type="submit" class="btn-pf-login">
             Iniciar sesión
         </button>
     </form>
+
+    <div class="pf-login-separador">
+        <span>¿Olvidaste tu contraseña?</span>
+    </div>
+    <a asp-action="SolicitarRecuperacion" class="btn-pf-login-sec">Recuperar contraseña</a>
+
     <p class="pf-login-pie">¿Aún no tienes cuenta? Pídela al administrador de tu bodega.</p>
 </main>
 

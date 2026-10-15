@@ -1,5 +1,7 @@
 @* Plantilla de las pantallas sin sesión (iniciar sesión, recuperar contraseña, base de datos no disponible).
-   Detrás del formulario va el plano de una bodega vista desde arriba con la ruta de un pedido. *@
+   Dos columnas: a la izquierda la marca sobre el plano de una bodega vista desde arriba, donde se dibuja la ruta
+   de un pedido hasta el despacho; a la derecha el formulario de cada vista (@RenderBody). En pantallas angostas
+   la marca queda como una franja arriba. *@
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,39 +9,94 @@
 </head>
 <body>
     <div class="pf-acceso">
-        <svg class="pf-acceso-plano" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none">
-            <g class="pf-racks" stroke-width="1.5">
-                @for (var x = 120; x <= 1320; x += 150)
-                {
-                    <rect x="@x" y="150" width="36" height="280" rx="5"></rect>
-                    <rect x="@x" y="490" width="36" height="280" rx="5"></rect>
-                }
-            </g>
-            <g class="pf-pasillos" font-size="12" text-anchor="middle">
-                <text x="213" y="128">PAS01</text>
-                <text x="363" y="128">PAS02</text>
-                <text x="513" y="128">PAS03</text>
-                <text x="663" y="128">PAS04</text>
-                <text x="813" y="128">PAS05</text>
-                <text x="963" y="128">PAS06</text>
-                <text x="1113" y="128">PAS07</text>
-                <text x="1263" y="128">PAS08</text>
-            </g>
-            <path class="pf-ruta-pedido" pathLength="1" d="M40 830 H213 V460 H513 V110 H813 V460 H1113 V830 H1400"
-                  stroke="#EB7D26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
-            <g fill="#EB7D26" stroke-width="4">
-                <circle class="pf-parada" style="animation-delay: 0.7s" cx="213" cy="610" r="9"></circle>
-                <circle class="pf-parada" style="animation-delay: 1.0s" cx="513" cy="250" r="9"></circle>
-                <circle class="pf-parada" style="animation-delay: 1.35s" cx="813" cy="330" r="9"></circle>
-                <circle class="pf-parada" style="animation-delay: 1.75s" cx="1113" cy="660" r="9"></circle>
-            </g>
-        </svg>
+        <aside class="pf-acceso-marca">
+            <svg class="pf-acceso-plano" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMaxYMid slice" fill="none">
+                <g class="pf-racks" stroke-width="1.5">
+                    @for (var x = 120; x <= 1320; x += 150)
+                    {
+                        <rect x="@x" y="150" width="36" height="280" rx="5"></rect>
+                        <rect x="@x" y="490" width="36" height="280" rx="5"></rect>
+                    }
+                </g>
+                <g class="pf-pasillos" font-size="12" text-anchor="middle">
+                    <text x="213" y="128">PAS01</text>
+                    <text x="363" y="128">PAS02</text>
+                    <text x="513" y="128">PAS03</text>
+                    <text x="663" y="128">PAS04</text>
+                    <text x="813" y="128">PAS05</text>
+                    <text x="963" y="128">PAS06</text>
+                    <text x="1113" y="128">PAS07</text>
+                    <text x="1263" y="128">PAS08</text>
+                    <text x="1400" y="868">DESPACHO</text>
+                </g>
+                <path class="pf-ruta-pedido" pathLength="1" d="M40 830 H213 V460 H513 V110 H813 V460 H1113 V830 H1400"
+                      stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+                <g class="pf-paradas" stroke-width="4">
+                    <circle class="pf-parada" style="animation-delay: 0.7s" cx="213" cy="610" r="9"></circle>
+                    <circle class="pf-parada" style="animation-delay: 1.0s" cx="513" cy="250" r="9"></circle>
+                    <circle class="pf-parada" style="animation-delay: 1.35s" cx="813" cy="330" r="9"></circle>
+                    <circle class="pf-parada" style="animation-delay: 1.75s" cx="1113" cy="660" r="9"></circle>
+                </g>
+                @* Punto de llegada: anillo blanco con centro naranja *@
+                <circle class="pf-despacho" cx="1400" cy="830" r="15" stroke-width="5"></circle>
+                @* Punta que va dibujando la ruta; solo aparece si se anima (ver el script del final) *@
+                <circle class="pf-recorredor" r="7" opacity="0">
+                    <set attributeName="opacity" to="1" begin="pfRecorrido.begin" />
+                    <set attributeName="opacity" to="0" begin="pfRecorrido.end" />
+                    <animateMotion id="pfRecorrido" begin="indefinite" dur="1.8s" fill="freeze"
+                                   calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines="0.77 0 0.175 1"
+                                   path="M40 830 H213 V460 H513 V110 H813 V460 H1113 V830 H1400" />
+                </circle>
+            </svg>
 
-        @RenderBody()
+            <div class="pf-acceso-contenido">
+                <div class="pf-acceso-logo">
+                    <span class="pf-acceso-logo-baldosa"><img src="~/images/apple-touch-icon.png" alt="" /></span>
+                    <span class="pf-acceso-logo-texto">
+                        <strong>PickFlow</strong>
+                        <span>Gestión de picking en bodega</span>
+                    </span>
+                </div>
+
+                <p class="pf-acceso-titular">Del Excel al despacho, <span>sin perder un pedido.</span></p>
+                <p class="pf-acceso-bajada">Carga los pedidos del día, repártelos entre los auxiliares disponibles y sigue cada alistamiento hasta completarlo.</p>
+
+                <section class="pf-acceso-tarjeta" aria-labelledby="pfAccesoTarjetaTitulo">
+                    <h2 class="pf-acceso-tarjeta-titulo" id="pfAccesoTarjetaTitulo">Qué puedes hacer aquí</h2>
+                    <ul>
+                        <li>
+                            <span class="pf-acceso-tarjeta-ico"><partial name="_Icono" model='"excel"' /></span>
+                            <span><strong>Cargar</strong>Sube el Excel con los pedidos y sus productos.</span>
+                        </li>
+                        <li>
+                            <span class="pf-acceso-tarjeta-ico"><partial name="_Icono" model='"empleados"' /></span>
+                            <span><strong>Asignar</strong>Cada pedido va a un auxiliar según su disponibilidad.</span>
+                        </li>
+                        <li>
+                            <span class="pf-acceso-tarjeta-ico"><partial name="_Icono" model='"reportes"' /></span>
+                            <span><strong>Seguir</strong>Revisa el avance y los tiempos frente al estándar.</span>
+                        </li>
+                    </ul>
+                </section>
+            </div>
+        </aside>
+
+        <div class="pf-acceso-form">
+            @RenderBody()
+        </div>
     </div>
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        // La punta recorre la ruta al mismo ritmo con que se dibuja (0,35 s de espera, 1,8 s de trazo).
+        // Con movimiento reducido no se inicia y la ruta aparece completa.
+        (function () {
+            var recorrido = document.getElementById('pfRecorrido');
+            if (!recorrido || !recorrido.beginElement || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            setTimeout(function () { recorrido.beginElement(); }, 350);
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

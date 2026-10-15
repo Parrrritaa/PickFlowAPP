@@ -5,7 +5,6 @@
 }
 
 <main class="pf-login-card">
-    <a class="pf-login-marca" asp-action="Login">Pick<span>Flow</span></a>
     <h1 class="pf-login-titulo">Recuperar contraseña</h1>
     <p class="pf-login-sub">Escribe tu correo y te enviaremos un código para crear una contraseña nueva.</p>
 
@@ -13,8 +12,11 @@
         @Html.AntiForgeryToken()
 
         <label asp-for="Correo" class="pf-login-etiqueta">Correo</label>
-        <input asp-for="Correo" class="pf-login-input mb-1" placeholder="nombre@empresa.com" autocomplete="email" required />
-        <span asp-validation-for="Correo" class="text-danger small d-block mb-2"></span>
+        <div class="pf-login-campo">
+            <span class="pf-login-campo-ico"><partial name="_Icono" model='"correo"' /></span>
+            <input asp-for="Correo" class="pf-login-input" placeholder="nombre@empresa.com" autocomplete="email" required />
+        </div>
+        <span asp-validation-for="Correo" class="pf-login-error"></span>
 
         <button type="submit" class="btn-pf-login">
             Enviar código de verificación

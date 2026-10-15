@@ -137,17 +137,26 @@ document.addEventListener('DOMContentLoaded', function () {
         wrapper.style.marginBottom = getComputedStyle(input).marginBottom;
         input.style.marginBottom = '0';
 
+        // data-pf-mostrar="texto" (inicio de sesión): el botón dice "Mostrar"/"Ocultar" en vez del ojito
+        var conTexto = input.dataset.pfMostrar === 'texto';
+
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'pf-password-toggle';
+        btn.className = 'pf-password-toggle' + (conTexto ? ' pf-password-toggle--texto' : '');
         btn.setAttribute('aria-label', 'Mostrar contraseña');
-        btn.innerHTML = '<i class="bi bi-eye" aria-hidden="true"></i>';
+        btn.innerHTML = conTexto ? 'Mostrar' : '<i class="bi bi-eye" aria-hidden="true"></i>';
         wrapper.appendChild(btn);
 
         btn.addEventListener('click', function () {
             var mostrar = input.type === 'password';
             input.type = mostrar ? 'text' : 'password';
             btn.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+
+            if (conTexto) {
+                btn.textContent = mostrar ? 'Ocultar' : 'Mostrar';
+                input.focus({ preventScroll: true });
+                return;
+            }
 
             var iconoViejo = btn.querySelector('i');
             var icono = document.createElement('i');
