@@ -161,7 +161,7 @@
                                 <td class="text-end">@pa.Detalles.Sum(d => d.Cantidad)</td>
                                 <td class="text-end">@PickingApp.Services.Formato.Duracion(pa.TiempoEstandarMinutos ?? tiemposPartes.GetValueOrDefault(pa.Id))</td>
                                 <td class="text-center">
-                                    <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">Ver</a>
+                                    <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-blue" data-fila-abre style="padding: 4px 20px; font-size: 14px;">Ver</a>
                                 </td>
                             </tr>
                         }

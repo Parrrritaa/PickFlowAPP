@@ -3282,6 +3282,12 @@ hr {
 }
 
 /* Formularios largos de una sola columna (Configuración, Limpiar base de datos) */
+/* Filas que se abren con un clic en cualquier parte (ver site.js) */
+tr:has(> td > [data-fila-abre], > td > * > [data-fila-abre], > td > * > * > [data-fila-abre]),
+li:has([data-fila-abre]) {
+    cursor: pointer;
+}
+
 .pf-form-ancho {
     max-width: 820px;
     margin-inline: auto;

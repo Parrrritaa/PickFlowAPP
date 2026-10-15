@@ -213,7 +213,7 @@
                             data-inicio="@(conAvance ? inicio!.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null)"
                             data-estimado="@(conAvance ? estimado!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null)">
                             <div class="pf-reciente-fila">
-                                <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@pedido.Id" class="pf-recientes-codigo pf-mono">@pedido.CodigoPedido</a>
+                                <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@pedido.Id" class="pf-recientes-codigo pf-mono" data-fila-abre>@pedido.CodigoPedido</a>
                                 <span class="pf-reciente-estado" style="--dot: @(coloresEstado.GetValueOrDefault(pedido.Estado, "var(--pf-neutral-fill)"))">
                                     @if (pedido.Estado == PickingApp.Models.PedidoEstados.Completado)
                                     {

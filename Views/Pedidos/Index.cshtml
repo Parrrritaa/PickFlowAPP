@@ -234,7 +234,7 @@
                                 <td><span class="pf-estado-punto @ClaseEstado(p.Estado)">@(p.Estado == PedidoEstados.Dividido ? "En curso (dividido)" : p.Estado)</span></td>
                                 <td class="@(verDivididos || p.Empleado == null ? "text-secondary" : "")">@(verDivididos ? "Por partes" : p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
                                 <td class="text-end">
-                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="pf-btn-abrir" aria-label="Abrir @p.CodigoPedido" title="Abrir">
+                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="pf-btn-abrir" data-fila-abre aria-label="Abrir @p.CodigoPedido" title="Abrir">
                                         <partial name="_Icono" model='"derecha"' />
                                     </a>
                                 </td>
@@ -263,7 +263,7 @@
                                     <td><span class="pf-estado-punto @ClaseEstado(pa.Estado)">@pa.Estado</span></td>
                                     <td class="@(pa.Empleado == null ? "text-secondary" : "")">@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
                                     <td class="text-end">
-                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-btn-abrir" aria-label="Abrir @pa.CodigoPedido" title="Abrir">
+                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-btn-abrir" data-fila-abre aria-label="Abrir @pa.CodigoPedido" title="Abrir">
                                             <partial name="_Icono" model='"derecha"' />
                                         </a>
                                     </td>

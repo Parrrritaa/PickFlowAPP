@@ -36,6 +36,18 @@ document.addEventListener('click', function (e) {
     btn.setAttribute('aria-expanded', expandido ? 'true' : 'false');
 });
 
+// Filas que se abren con un clic en cualquier parte: siguen al enlace [data-fila-abre] de esa fila
+// (no al de una fila anidada). Los enlaces, botones y campos de la fila conservan su propio clic.
+document.addEventListener('click', function (e) {
+    if (e.target.closest('a, button, input, select, textarea, label')) return;
+    var fila = e.target.closest('tr, li');
+    if (!fila) return;
+    var enlace = Array.prototype.find.call(fila.querySelectorAll('[data-fila-abre]'), function (a) {
+        return a.closest('tr, li') === fila;
+    });
+    if (enlace) enlace.click();
+});
+
 // Pestañas de vista (Pedidos / Divididos): al elegir otra pestaña, la píldora blanca se desliza
 // hasta ella y al terminar se navega. Sin JavaScript siguen siendo enlaces con su propio fondo.
 (function () {

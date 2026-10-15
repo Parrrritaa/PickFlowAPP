@@ -118,7 +118,7 @@ else
                     {
                         <tr class="@(f.CuentaParaRendimiento ? "" : "pf-fila-no-cuenta")">
                             <td class="fw-semibold">
-                                <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@f.PedidoId" class="text-decoration-none">@f.CodigoPedido</a>
+                                <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@f.PedidoId" class="text-decoration-none" data-fila-abre>@f.CodigoPedido</a>
                                 @if (!f.CuentaParaRendimiento)
                                 {
                                     <div class="small text-muted fw-normal">Antes del reinicio: no cuenta para el rendimiento</div>

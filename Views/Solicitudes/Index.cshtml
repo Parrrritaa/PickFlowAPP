@@ -190,13 +190,13 @@
                                 <td class="text-center">
                                     @if (Model.EsBandeja)
                                     {
-                                        <a asp-action="Revisar" asp-route-id="@s.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
+                                        <a asp-action="Revisar" asp-route-id="@s.Id" class="btn-pf-blue" data-fila-abre style="padding: 4px 20px; font-size: 14px;">
                                             @(pendiente ? "Revisar" : "Ver")
                                         </a>
                                     }
                                     else
                                     {
-                                        <a asp-action="Detalle" asp-route-id="@s.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">Ver</a>
+                                        <a asp-action="Detalle" asp-route-id="@s.Id" class="btn-pf-blue" data-fila-abre style="padding: 4px 20px; font-size: 14px;">Ver</a>
                                     }
                                 </td>
                             </tr>
