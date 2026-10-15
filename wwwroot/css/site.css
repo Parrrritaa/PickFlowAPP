@@ -3284,6 +3284,7 @@ hr {
 /* Formularios largos de una sola columna (Configuración, Limpiar base de datos) */
 .pf-form-ancho {
     max-width: 820px;
+    margin-inline: auto;
 }
 
 /* Subtítulos de grupo dentro de un formulario */
