@@ -50,26 +50,23 @@ namespace PickingApp.Services
                 EnableSsl = true
             };
 
-            // El texto plano queda como respaldo para clientes que no muestran HTML
+            // Sin Body: el único contenido es la vista HTML con el logo de abajo
             using var mensaje = new MailMessage
             {
                 From = new MailAddress(senderEmail, senderName),
-                Subject = $"{titulo} - PickFlow",
-                Body = $"Hola {nombreDestinatario},\n\n" +
-                       $"{intro}\n\n" +
-                       $"Tu código de verificación es: {codigo}\n\n" +
-                       "Este código es válido por 10 minutos. Si no solicitaste este código, ignora este mensaje.\n\n" +
-                       "Este correo es automático. No lo respondas.",
-                IsBodyHtml = false
+                Subject = $"{titulo} - PickFlow"
             };
             mensaje.To.Add(destinatarioEmail);
 
             // El logo va embebido (cid:) porque Gmail bloquea imágenes en data: y rutas locales
             var vistaHtml = AlternateView.CreateAlternateViewFromString(html, System.Text.Encoding.UTF8, MediaTypeNames.Text.Html);
-            var logo = new LinkedResource(Path.Combine(_env.WebRootPath, "images", "pickflow-logo.jpg"), MediaTypeNames.Image.Jpeg)
+            // Versión blanca y naranja con fondo transparente, para el encabezado azul de la plantilla
+            var logo = new LinkedResource(new MemoryStream(Convert.FromBase64String(LogoCorreo.Base64)), MediaTypeNames.Image.Png)
             {
                 ContentId = LogoContentId
             };
+            // Sin nombre, Gmail muestra el logo en la bandeja como un adjunto "noname"
+            logo.ContentType.Name = "pickflow-logo.png";
             vistaHtml.LinkedResources.Add(logo);
             mensaje.AlternateViews.Add(vistaHtml);
 

@@ -26,6 +26,14 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public void ElLogoEnBase64EsUnPngValido()
+        {
+            var bytes = Convert.FromBase64String(LogoCorreo.Base64);
+
+            Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, bytes[..4]);   // firma de PNG
+        }
+
+        [Fact]
         public void CodificaElNombreParaQueNoSeInyecteHtml()
         {
             var html = EmailService.ConstruirHtml("{{NOMBRE}}", "", "", "<script>alert(1)</script>", "", "", DateTime.Now);
