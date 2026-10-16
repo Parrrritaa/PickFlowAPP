@@ -49,6 +49,14 @@
         boton.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>Iniciando sesión…';
         try {
             var r = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'fetch' } });
+            // Demasiados intentos desde esta conexión (límite "InicioSesion" de Program.cs): el aviso va en el mismo cuadro
+            if (r.status === 429) {
+                mostrarErrores({ '': [await r.text()] });
+                temblar();
+                boton.disabled = false;
+                boton.innerHTML = textoBoton;
+                return;
+            }
             if (!r.ok) throw new Error(r.status);
             var datos = await r.json();
             if (datos.ok) {

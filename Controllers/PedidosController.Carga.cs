@@ -10,6 +10,11 @@ namespace PickingApp.Controllers
     // Carga de pedidos desde Excel (CU-23). Parte de PedidosController: mismas rutas (/Pedidos/...) y dependencias.
     public partial class PedidosController
     {
+        // Un Excel de pedidos pesa unos pocos KB: 5 MB deja margen de sobra y evita que un archivo enorme
+        // (o un .xlsx comprimido que se infla al abrirlo) consuma la memoria del servidor.
+        private const long MaxBytesExcel = 5 * 1024 * 1024;
+        private const string MensajeExcelMuyGrande = "El archivo pesa más de 5 MB. Un Excel de pedidos normalmente pesa unos pocos KB: revisa que sea el archivo correcto.";
+
         // CU-23: Cargar archivo Excel de pedidos
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
@@ -32,6 +37,12 @@ namespace PickingApp.Controllers
             if (!archivoExcel.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 TempData["ErrorMessage"] = "El archivo no cumple con la estructura esperada. Debe ser un archivo de Excel (.xlsx). Verifica el formato e inténtalo nuevamente.";
+                return View();
+            }
+
+            if (archivoExcel.Length > MaxBytesExcel)
+            {
+                TempData["ErrorMessage"] = MensajeExcelMuyGrande;
                 return View();
             }
 
@@ -89,6 +100,11 @@ namespace PickingApp.Controllers
                     tipoValido = false,
                     errores = new[] { "El archivo debe ser un Excel (.xlsx) con contenido." }
                 });
+            }
+
+            if (archivoExcel!.Length > MaxBytesExcel)
+            {
+                return Json(new { valido = false, tipoValido = false, errores = new[] { MensajeExcelMuyGrande } });
             }
 
             using var stream = archivoExcel!.OpenReadStream();

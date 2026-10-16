@@ -357,9 +357,19 @@ namespace PickingApp.Controllers
         // registros vuelvan a empezar en 1 (evita IDs de pedidos con números muy altos).
         private async Task ReiniciarAutoincrementoAsync(params string[] tablas)
         {
+            // Un nombre de tabla no puede ir como parámetro en SQL, así que se compara contra las tablas
+            // reales del modelo de EF antes de armar la sentencia: aunque mañana el nombre llegara de otro
+            // lado, nada que no sea una tabla de PickFlow puede terminar dentro del ALTER TABLE.
+            var tablasDelModelo = _context.Model.GetEntityTypes()
+                .Select(t => t.GetTableName())
+                .Where(n => n != null)
+                .ToHashSet(StringComparer.Ordinal);
+
             foreach (var tabla in tablas)
             {
-                // Los nombres de tabla vienen de listas fijas del código, no de entrada del usuario.
+                if (!tablasDelModelo.Contains(tabla))
+                    throw new InvalidOperationException($"'{tabla}' no es una tabla del modelo de PickFlow.");
+
 #pragma warning disable EF1002
                 await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tabla}` AUTO_INCREMENT = 1");
 #pragma warning restore EF1002

@@ -71,11 +71,40 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(15),
                 QueueLimit = 0
             }));
+
+    // Intentos de inicio de sesión por IP. El bloqueo por intentos fallidos es por cuenta y no aplica al
+    // Administrador (para no dejar el sistema sin quien lo administre); este límite frena probar contraseñas sin fin.
+    // shortcut: 20 cada 5 min por IP; si toda la bodega sale a internet por la misma IP y se queda corto, súbelo.
+    options.AddPolicy("InicioSesion", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "desconocida",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0
+            }));
+
+    // Límite general contra la saturación del servidor: por usuario con sesión, o por IP sin ella.
+    // Holgado para el uso normal (navegar, filtrar, gráficas); los archivos estáticos no cuentan
+    // porque UseStaticFiles responde antes de UseRateLimiter.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.Identity?.IsAuthenticated == true
+                ? "usuario:" + httpContext.User.Identity.Name
+                : "ip:" + (httpContext.Connection.RemoteIpAddress?.ToString() ?? "desconocida"),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 300,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
     options.OnRejected = async (context, cancellationToken) =>
     {
         context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
         await context.HttpContext.Response.WriteAsync(
-            "Demasiados intentos desde esta conexión. Espera unos minutos e inténtalo de nuevo.", cancellationToken);
+            "Demasiadas solicitudes seguidas desde esta conexión. Espera unos minutos e inténtalo de nuevo.", cancellationToken);
     };
 });
 
@@ -108,17 +137,29 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Cabeceras de seguridad en todas las respuestas: ninguna otra página puede mostrar PickFlow dentro de un marco
+// (evita que la disfracen para engañar clics) y el navegador no adivina tipos de archivo distintos al declarado.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next();
+});
+
 app.UseStaticFiles();
 
 // Antes de UseRouting para que la página de aviso pase de nuevo por el enrutamiento
 app.UseMiddleware<ErrorBaseDatosMiddleware>();
 
 app.UseRouting();
-app.UseRateLimiter();
 
 // UseAuthentication lee la cookie de sesión y llena User (nombre, correo, rol);
-// UseAuthorization aplica los [Authorize(Roles = ...)] de los controladores
+// UseAuthorization aplica los [Authorize(Roles = ...)] de los controladores.
+// UseRateLimiter va después de UseAuthentication para que el límite general sepa quién hace la petición.
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 // Ruta por defecto: /Controlador/Accion/id. Por ejemplo, /Pedidos/Detalle/5 llama a PedidosController.Detalle(5)

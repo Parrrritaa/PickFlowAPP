@@ -465,6 +465,12 @@ code {
     outline: none;
 }
 
+/* Con teclado no basta el fondo tenue del hover: el foco lleva además un anillo del acento */
+.pf-panel-opcion:focus-visible {
+    outline: 2px solid var(--pf-accent);
+    outline-offset: -2px;
+}
+
 .pf-panel-ico {
     flex: none;
     width: 36px;

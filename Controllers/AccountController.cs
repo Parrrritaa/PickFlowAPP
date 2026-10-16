@@ -97,6 +97,7 @@ namespace PickingApp.Controllers
         // valida aquí a mano y no con [ValidateAntiForgeryToken]: ese atributo responde con un 400 en blanco cuando
         // el formulario quedó viejo, y en el inicio de sesión eso tiene salida (ver abajo).
         [HttpPost]
+        [EnableRateLimiting("InicioSesion")]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
