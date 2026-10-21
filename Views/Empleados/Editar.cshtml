@@ -17,14 +17,14 @@
 
 <h1 class="pf-page-title">Editar empleado</h1>
 
-<div class="mockup-card">
-    <div class="mockup-info-banner">
+<div class="pf-card">
+    <div class="pf-info-banner">
         Complete la información del empleado. Los campos marcados con * son obligatorios
     </div>
 
     @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
     {
-        <div class="mockup-alert-warning mb-4">
+        <div class="pf-alert-warning mb-4">
             @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
             {
                 <div>@error.ErrorMessage</div>
@@ -39,45 +39,45 @@
         <input type="hidden" asp-for="NombreCompleto" id="hiddenNombreCompleto" />
 
         <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Nombres <span class="text-danger">*</span></label>
-                <input type="text" id="inputNombres" class="mockup-input" value="@nombres" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Nombres <span class="text-danger">*</span></label>
+                <input type="text" id="inputNombres" class="pf-input" value="@nombres" required />
             </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Apellidos <span class="text-danger">*</span></label>
-                <input type="text" id="inputApellidos" class="mockup-input" value="@apellidos" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Apellidos <span class="text-danger">*</span></label>
+                <input type="text" id="inputApellidos" class="pf-input" value="@apellidos" required />
             </div>
         </div>
 
         <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Numero de documento <span class="text-danger">*</span></label>
-                <input class="mockup-input" value="@Model.Identificacion" disabled style="background-color: var(--pf-hover) !important;" />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Numero de documento <span class="text-danger">*</span></label>
+                <input class="pf-input" value="@Model.Identificacion" disabled style="background-color: var(--pf-hover) !important;" />
             </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Correo electronico <span class="text-danger">*</span></label>
-                <input asp-for="Correo" type="email" class="mockup-input" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Correo electronico <span class="text-danger">*</span></label>
+                <input asp-for="Correo" type="email" class="pf-input" required />
                 <span asp-validation-for="Correo" class="text-danger small"></span>
             </div>
         </div>
 
         <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Fecha de ingreso <span class="text-danger">*</span></label>
-                <input asp-for="FechaIngreso" type="date" class="mockup-input" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Fecha de ingreso <span class="text-danger">*</span></label>
+                <input asp-for="FechaIngreso" type="date" class="pf-input" required />
                 <span asp-validation-for="FechaIngreso" class="text-danger small"></span>
             </div>
         </div>
 
         <div class="row mb-4">
-            <div class="col-md-3 mockup-form-group">
-                <label class="mockup-label">Hora de entrada <span class="text-danger">*</span></label>
-                <input asp-for="HorarioEntrada" type="time" class="mockup-input" required />
+            <div class="col-md-3 pf-form-group">
+                <label class="pf-label">Hora de entrada <span class="text-danger">*</span></label>
+                <input asp-for="HorarioEntrada" type="time" class="pf-input" required />
                 <span asp-validation-for="HorarioEntrada" class="text-danger small"></span>
             </div>
-            <div class="col-md-3 mockup-form-group">
-                <label class="mockup-label">Hora de salida <span class="text-danger">*</span></label>
-                <input asp-for="HorarioSalida" type="time" class="mockup-input" required />
+            <div class="col-md-3 pf-form-group">
+                <label class="pf-label">Hora de salida <span class="text-danger">*</span></label>
+                <input asp-for="HorarioSalida" type="time" class="pf-input" required />
                 <span asp-validation-for="HorarioSalida" class="text-danger small"></span>
             </div>
         </div>
@@ -85,9 +85,9 @@
         @if (!esAdministrador)
         {
             <div class="row mb-4">
-                <div class="col-12 mockup-form-group">
-                    <label class="mockup-label">Motivo de la edición <span class="text-danger">*</span></label>
-                    <textarea name="motivo" class="mockup-input" style="height: 90px;" placeholder="Explique por qué se está modificando este empleado" required>@motivo</textarea>
+                <div class="col-12 pf-form-group">
+                    <label class="pf-label">Motivo de la edición <span class="text-danger">*</span></label>
+                    <textarea name="motivo" class="pf-input" style="height: 90px;" placeholder="Explique por qué se está modificando este empleado" required>@motivo</textarea>
                 </div>
             </div>
         }

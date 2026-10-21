@@ -11,7 +11,7 @@
 
 <h1 class="pf-page-title">@ViewData["Title"]</h1>
 
-<div class="mockup-card">
+<div class="pf-card">
     <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
         <h4 class="fw-bold text-dark mb-0">Solicitud SOL-@s.Id</h4>
         <partial name="_EstadoSolicitud" model="s.Estado" />
@@ -40,7 +40,7 @@
 
     @if (Model.Aviso != null && s.Estado == EstadosSolicitud.Pendiente)
     {
-        <div class="mockup-alert-warning mt-0 mb-4" role="status">
+        <div class="pf-alert-warning mt-0 mb-4" role="status">
             <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>@Model.Aviso
         </div>
     }
@@ -75,7 +75,7 @@
                 </p>
             }
             <div class="table-responsive">
-                <table class="mockup-table">
+                <table class="pf-table">
                     <thead>
                         <tr>
                             <th>Campo</th>
@@ -105,7 +105,7 @@
     }
     else if (Model.EsEdicion)
     {
-        <div class="mockup-info-banner mb-4">
+        <div class="pf-info-banner mb-4">
             No se detectaron cambios en los campos @(s.TipoSolicitudId == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
         </div>
     }
@@ -114,7 +114,7 @@
     {
         <div class="mb-4">
             <h5 class="fw-bold text-dark mb-2">Motivo de la solicitud</h5>
-            <div class="mockup-info-banner mb-0">@Model.Motivo</div>
+            <div class="pf-info-banner mb-0">@Model.Motivo</div>
         </div>
     }
 
@@ -152,7 +152,7 @@
             <div class="mb-4">
                 <label class="h5 fw-bold text-dark mb-1" for="txtMotivoRechazo">Motivo del rechazo</label>
                 <div class="form-text small mt-0 mb-2" id="ayudaMotivoRechazo">Obligatorio solo si la rechaza. El solicitante lo verá.</div>
-                <textarea name="motivoRechazo" id="txtMotivoRechazo" class="mockup-input" style="height: 90px;" maxlength="400"
+                <textarea name="motivoRechazo" id="txtMotivoRechazo" class="pf-input" style="height: 90px;" maxlength="400"
                           aria-describedby="ayudaMotivoRechazo"></textarea>
             </div>
 

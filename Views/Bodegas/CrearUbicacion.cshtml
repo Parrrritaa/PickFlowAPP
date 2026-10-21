@@ -6,14 +6,14 @@
 
 <h1 class="pf-page-title">Crear ubicación</h1>
 
-<div class="mockup-card">
-    <div class="mockup-info-banner">
+<div class="pf-card">
+    <div class="pf-info-banner">
         Complete la información de la ubicación que desea registrar en el sistema.
     </div>
 
     @if (!ViewData.ModelState.IsValid)
     {
-        <div class="mockup-alert-warning mb-3">
+        <div class="pf-alert-warning mb-3">
             @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
             {
                 <div>@error.ErrorMessage</div>
@@ -26,40 +26,40 @@
         <input type="hidden" asp-for="Ubicacion.BodegaId" />
 
         <div class="row mb-3">
-            <div class="col-md-12 mockup-form-group">
-                <label class="mockup-label">Bodega</label>
-                <input type="text" class="mockup-input" value="@bodega.Nombre" disabled style="background-color: var(--pf-hover) !important;" />
+            <div class="col-md-12 pf-form-group">
+                <label class="pf-label">Bodega</label>
+                <input type="text" class="pf-input" value="@bodega.Nombre" disabled style="background-color: var(--pf-hover) !important;" />
             </div>
         </div>
 
         <div class="row mb-3">
-            <div class="col-md-4 mockup-form-group">
-                <label class="mockup-label">Pasillo <span class="text-danger">*</span></label>
-                <input asp-for="Ubicacion.Pasillo" class="mockup-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
+            <div class="col-md-4 pf-form-group">
+                <label class="pf-label">Pasillo <span class="text-danger">*</span></label>
+                <input asp-for="Ubicacion.Pasillo" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
                 <span asp-validation-for="Ubicacion.Pasillo" class="text-danger small"></span>
             </div>
-            <div class="col-md-4 mockup-form-group">
-                <label class="mockup-label">Estante <span class="text-danger">*</span></label>
-                <input asp-for="Ubicacion.Estante" class="mockup-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
+            <div class="col-md-4 pf-form-group">
+                <label class="pf-label">Estante <span class="text-danger">*</span></label>
+                <input asp-for="Ubicacion.Estante" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
                 <span asp-validation-for="Ubicacion.Estante" class="text-danger small"></span>
             </div>
-            <div class="col-md-4 mockup-form-group">
-                <label class="mockup-label">Nivel <span class="text-danger">*</span></label>
-                <input asp-for="Ubicacion.Nivel" class="mockup-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
+            <div class="col-md-4 pf-form-group">
+                <label class="pf-label">Nivel <span class="text-danger">*</span></label>
+                <input asp-for="Ubicacion.Nivel" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
                 <span asp-validation-for="Ubicacion.Nivel" class="text-danger small"></span>
             </div>
         </div>
 
-        <div class="mockup-info-banner mb-3" style="font-size: 13px;">
+        <div class="pf-info-banner mb-3" style="font-size: 13px;">
             El código de la ubicación se genera automáticamente a partir de estos datos (ej: <strong>PAS01-EST02-NIV03</strong>).
         </div>
 
         <partial name="_SeleccionProducto" model="Model.Seleccion" />
 
         <div class="row mb-4">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Estado</label>
-                <select asp-for="Ubicacion.Activa" class="mockup-input">
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Estado</label>
+                <select asp-for="Ubicacion.Activa" class="pf-input">
                     <option value="true">Activa</option>
                     <option value="false">Inactiva</option>
                 </select>

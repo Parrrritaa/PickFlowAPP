@@ -9,7 +9,7 @@
 }
 
 <fieldset class="pf-campo pf-seleccion-producto mb-4" data-seleccion-producto>
-    <legend class="mockup-label">Producto <span class="text-danger">*</span></legend>
+    <legend class="pf-label">Producto <span class="text-danger">*</span></legend>
 
     <div class="pf-segmented mb-3" role="radiogroup" aria-label="Tipo de producto">
         <input type="radio" class="pf-seg-input" name="seleccion.Modo" id="modoExistente" value="@SeleccionProductoViewModel.ModoExistente"
@@ -22,11 +22,11 @@
     @* Producto existente: se elige de la lista; sus datos se muestran pero no se editan aquí *@
     <div data-si-modo="@SeleccionProductoViewModel.ModoExistente" hidden="@esNuevo">
         <label class="visually-hidden" for="buscarProductoUbicacion">Buscar producto</label>
-        <input type="search" id="buscarProductoUbicacion" class="mockup-input mb-2" placeholder="Buscar por código o nombre…"
+        <input type="search" id="buscarProductoUbicacion" class="pf-input mb-2" placeholder="Buscar por código o nombre…"
                autocomplete="off" data-buscar-producto hidden />
 
         <label class="visually-hidden" for="productoId">Producto</label>
-        <select name="seleccion.ProductoId" id="productoId" class="mockup-input pf-lista-productos" size="@Math.Min(6, Math.Max(3, Model.Productos.Count))" required
+        <select name="seleccion.ProductoId" id="productoId" class="pf-input pf-lista-productos" size="@Math.Min(6, Math.Max(3, Model.Productos.Count))" required
                 disabled="@esNuevo" data-lista-productos>
             @foreach (var p in Model.Productos)
             {
@@ -57,16 +57,16 @@
     @* Producto nuevo: se registra con esta ubicación. Su código (PROD-XXX) no puede existir *@
     <div data-si-modo="@SeleccionProductoViewModel.ModoNuevo" hidden="@(!esNuevo)">
         <div class="row">
-            <div class="col-md-6 mockup-form-group mb-3">
-                <label class="mockup-label" for="numeroProducto">Número de producto <span class="text-danger">*</span></label>
-                <input type="text" name="seleccion.NumeroProducto" id="numeroProducto" class="mockup-input" placeholder="100"
+            <div class="col-md-6 pf-form-group mb-3">
+                <label class="pf-label" for="numeroProducto">Número de producto <span class="text-danger">*</span></label>
+                <input type="text" name="seleccion.NumeroProducto" id="numeroProducto" class="pf-input" placeholder="100"
                        value="@Model.NumeroProducto" inputmode="numeric" pattern="\d{1,9}" maxlength="9" title="Solo números"
                        required disabled="@(!esNuevo)" aria-describedby="codigoProductoNuevo" data-numero-producto />
                 <div class="form-text small" id="codigoProductoNuevo" data-codigo-producto>El código se genera a partir del número (ej: PROD-100).</div>
             </div>
-            <div class="col-md-6 mockup-form-group mb-3">
-                <label class="mockup-label" for="nombreProducto">Nombre de producto <span class="text-danger">*</span></label>
-                <input type="text" name="seleccion.NombreProducto" id="nombreProducto" class="mockup-input" placeholder="Mouse Inalámbrico Logitech"
+            <div class="col-md-6 pf-form-group mb-3">
+                <label class="pf-label" for="nombreProducto">Nombre de producto <span class="text-danger">*</span></label>
+                <input type="text" name="seleccion.NombreProducto" id="nombreProducto" class="pf-input" placeholder="Mouse Inalámbrico Logitech"
                        value="@Model.NombreProducto" maxlength="150" required disabled="@(!esNuevo)" />
             </div>
         </div>
@@ -80,9 +80,9 @@
         </div>
 
         <div class="row">
-            <div class="col-md-6 mockup-form-group mb-3">
-                <label class="mockup-label" for="categoriaProductoId">Categoría del producto</label>
-                <select name="seleccion.CategoriaProductoId" id="categoriaProductoId" class="mockup-input" disabled="@(!esNuevo)">
+            <div class="col-md-6 pf-form-group mb-3">
+                <label class="pf-label" for="categoriaProductoId">Categoría del producto</label>
+                <select name="seleccion.CategoriaProductoId" id="categoriaProductoId" class="pf-input" disabled="@(!esNuevo)">
                     <option value="">Sin clasificar (usa «@Model.NombreCategoriaPredeterminada»)</option>
                     @foreach (var c in Model.Categorias)
                     {
@@ -91,9 +91,9 @@
                 </select>
                 <div class="form-text small">Define cuánto se tarda en recoger una unidad.</div>
             </div>
-            <div class="col-md-6 mockup-form-group mb-3">
-                <label class="mockup-label" for="unidadesPorCaja">Cantidad máx. de producto por caja</label>
-                <input type="number" name="seleccion.UnidadesPorCaja" id="unidadesPorCaja" class="mockup-input" min="1" max="@Producto.MaxUnidadesPorCaja" step="1"
+            <div class="col-md-6 pf-form-group mb-3">
+                <label class="pf-label" for="unidadesPorCaja">Cantidad máx. de producto por caja</label>
+                <input type="number" name="seleccion.UnidadesPorCaja" id="unidadesPorCaja" class="pf-input" min="1" max="@Producto.MaxUnidadesPorCaja" step="1"
                        value="@Model.UnidadesPorCaja" required disabled="@(!esNuevo)" />
                 <div class="form-text small">Unidades que trae la caja o empaque. Usa 1 si se recoge de a una unidad (ej. un monitor).</div>
             </div>

@@ -20,7 +20,7 @@
 <div class="row g-4">
     <!-- Columna izquierda: lista de bodegas (diapositiva 26) -->
     <div class="col-lg-4">
-        <div class="mockup-card h-100">
+        <div class="pf-card h-100">
             <h4 class="fw-bold text-dark mb-4">Bodegas</h4>
             <div class="d-flex flex-column gap-3">
                 @foreach (var b in todasBodegas)
@@ -41,7 +41,7 @@
 
     <!-- Columna derecha: ubicaciones registradas (diapositiva 26) -->
     <div class="col-lg-8">
-        <div class="mockup-card h-100">
+        <div class="pf-card h-100">
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                 <div>
                     <h4 class="fw-bold text-dark mb-1">@bodega.Nombre</h4>
@@ -59,7 +59,7 @@
             <form method="get" asp-action="Detalle" id="formFiltrosUbicaciones">
                 <input type="hidden" name="id" value="@bodega.Id" />
                 <div class="table-responsive">
-                    <table class="mockup-table" id="tablaUbicaciones">
+                    <table class="pf-table" id="tablaUbicaciones">
                         <thead>
                             <tr>
                                 <th>
@@ -186,7 +186,7 @@
                         <p>Ubicación: <strong id="eliminarUbicacionCodigo" data-pf-recibe="texto"></strong></p>
                         @if (userRole == Roles.Administrador)
                         {
-                            <div class="mockup-alert-warning mt-0 mb-3">
+                            <div class="pf-alert-warning mt-0 mb-3">
                                 Esta acción eliminará la ubicación directamente. Si tiene pedidos históricos asociados, no podrá eliminarse.
                             </div>
                         }

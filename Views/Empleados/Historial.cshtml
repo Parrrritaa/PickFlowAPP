@@ -36,7 +36,7 @@
 
 @if (Model.TotalCompletados == 0)
 {
-    <div class="mockup-card pf-notif-empty pf-historial-vacio pf-appear">
+    <div class="pf-card pf-notif-empty pf-historial-vacio pf-appear">
         <div class="pf-notif-empty-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></div>
         <div class="pf-notif-empty-title">Aún no hay pedidos completados</div>
         <div class="pf-notif-empty-text">Cuando @empleado.NombreCompleto complete su primer pedido, aquí verá su tiempo real frente al estimado.</div>
@@ -85,7 +85,7 @@ else
         </div>
     </div>
 
-    <div class="mockup-card pf-chart-card mb-4">
+    <div class="pf-card pf-chart-card mb-4">
         <div>
             <h2 class="pf-chart-h">Tiempo real y estimado por pedido</h2>
             <p class="pf-chart-resumen">
@@ -99,10 +99,10 @@ else
         </div>
     </div>
 
-    <div class="mockup-card">
+    <div class="pf-card">
         <h2 class="pf-card-h mb-3">Pedidos completados</h2>
         <div class="table-responsive">
-            <table class="mockup-table">
+            <table class="pf-table">
                 <thead>
                     <tr>
                         <th>Pedido</th>

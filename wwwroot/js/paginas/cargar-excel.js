@@ -246,7 +246,7 @@
         if (productoNuevo) card.appendChild(camposProducto(inc, prefijo, id, datos));
 
         var opciones = elemento('fieldset', 'pf-opciones');
-        opciones.appendChild(elemento('legend', 'mockup-label',
+        opciones.appendChild(elemento('legend', 'pf-label',
             nombreDistinto ? '¿Con qué nombre se carga?' : productoNuevo ? '¿Dónde se guarda?' : '¿De dónde se recoge?'));
         var lista = elemento('div', 'pf-opciones-lista');
         if (nombreDistinto) {
@@ -312,8 +312,8 @@
     }
 
     function campo(etiqueta, id, control, columnas) {
-        var col = elemento('div', columnas + ' mockup-form-group');
-        var label = elemento('label', 'mockup-label', etiqueta);
+        var col = elemento('div', columnas + ' pf-form-group');
+        var label = elemento('label', 'pf-label', etiqueta);
         label.htmlFor = id;
         control.id = id;
         col.append(label, control);
@@ -321,7 +321,7 @@
     }
 
     function entrada(nombre, valor, extra) {
-        var el = elemento('input', 'mockup-input');
+        var el = elemento('input', 'pf-input');
         el.name = nombre;
         el.value = valor == null ? '' : valor;
         el.required = true;
@@ -334,7 +334,7 @@
         fila.appendChild(campo('Nombre del producto', id + '-nombre',
             entrada(prefijo + 'NombreProducto', inc.nombreProducto, { maxlength: '150' }), 'col-12'));
 
-        var categoria = elemento('select', 'mockup-input');
+        var categoria = elemento('select', 'pf-input');
         categoria.name = prefijo + 'CategoriaProductoId';
         categoria.appendChild(new Option('Sin clasificar (usa «' + datos.categoriaPredeterminada + '»)', ''));
         (datos.categorias || []).forEach(function (c) {
@@ -351,7 +351,7 @@
         var detalle = elemento('div', 'pf-opcion-detalle');
         var fila = elemento('div', 'row g-2');
 
-        var bodega = elemento('select', 'mockup-input');
+        var bodega = elemento('select', 'pf-input');
         bodega.name = prefijo + 'BodegaId';
         bodega.required = true;
         (datos.bodegas || []).forEach(function (b) {

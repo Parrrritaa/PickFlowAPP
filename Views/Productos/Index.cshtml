@@ -13,7 +13,7 @@
 <h1 class="pf-page-title">Productos y categorías</h1>
 
 <!-- ===== Categorías de manipulación ===== -->
-<div class="mockup-card">
+<div class="pf-card">
     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
         <div>
             <h4 class="fw-bold mb-1 text-dark">Categorías de manipulación</h4>
@@ -29,7 +29,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="mockup-table">
+        <table class="pf-table">
             <thead>
                 <tr>
                     <th>Categoría</th>
@@ -91,7 +91,7 @@
 </div>
 
 <!-- ===== Clasificación de productos ===== -->
-<div class="mockup-card">
+<div class="pf-card">
     <form asp-action="GuardarClasificacion" method="post" id="formClasificacion">
         @Html.AntiForgeryToken()
         <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
@@ -103,7 +103,7 @@
             {
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <label class="visually-hidden" for="buscarProducto">Buscar producto</label>
-                    <input type="search" id="buscarProducto" class="mockup-search-input" placeholder="Buscar código o nombre..." />
+                    <input type="search" id="buscarProducto" class="pf-search-input" placeholder="Buscar código o nombre..." />
                     <label class="visually-hidden" for="filtroCategoria">Filtrar por categoría</label>
                     <select id="filtroCategoria" class="form-select form-select-sm" style="width: auto;">
                         <option value="">Todas las categorías</option>
@@ -132,7 +132,7 @@
             </div>
 
             <div class="table-responsive">
-                <table class="mockup-table" id="tablaProductos">
+                <table class="pf-table" id="tablaProductos">
                     <thead>
                         <tr>
                             <th>Código</th>

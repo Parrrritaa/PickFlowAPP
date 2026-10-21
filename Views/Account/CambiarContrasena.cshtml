@@ -5,10 +5,10 @@
 
 <h1 class="pf-page-title">Cambiar contraseña</h1>
 
-<div class="mockup-card" style="max-width: 680px;">
+<div class="pf-card" style="max-width: 680px;">
     @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
     {
-        <div class="mockup-alert-warning mb-4">
+        <div class="pf-alert-warning mb-4">
             @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
             {
                 <div>@error.ErrorMessage</div>
@@ -19,21 +19,21 @@
     <form asp-action="CambiarContrasena" method="post">
         @Html.AntiForgeryToken()
 
-        <div class="mockup-form-group mb-3">
-            <label asp-for="CurrentPassword" class="mockup-label">Contraseña actual <span class="text-danger">*</span></label>
-            <input asp-for="CurrentPassword" type="password" class="mockup-input" autocomplete="current-password" required />
+        <div class="pf-form-group mb-3">
+            <label asp-for="CurrentPassword" class="pf-label">Contraseña actual <span class="text-danger">*</span></label>
+            <input asp-for="CurrentPassword" type="password" class="pf-input" autocomplete="current-password" required />
             <span asp-validation-for="CurrentPassword" class="text-danger small"></span>
         </div>
 
-        <div class="mockup-form-group mb-3">
-            <label asp-for="NewPassword" class="mockup-label">Nueva contraseña <span class="text-danger">*</span></label>
-            <input asp-for="NewPassword" type="password" class="mockup-input" autocomplete="new-password" required />
+        <div class="pf-form-group mb-3">
+            <label asp-for="NewPassword" class="pf-label">Nueva contraseña <span class="text-danger">*</span></label>
+            <input asp-for="NewPassword" type="password" class="pf-input" autocomplete="new-password" required />
             <span asp-validation-for="NewPassword" class="text-danger small"></span>
         </div>
 
-        <div class="mockup-form-group mb-4">
-            <label asp-for="ConfirmPassword" class="mockup-label">Confirmar nueva contraseña <span class="text-danger">*</span></label>
-            <input asp-for="ConfirmPassword" type="password" class="mockup-input" autocomplete="new-password" required />
+        <div class="pf-form-group mb-4">
+            <label asp-for="ConfirmPassword" class="pf-label">Confirmar nueva contraseña <span class="text-danger">*</span></label>
+            <input asp-for="ConfirmPassword" type="password" class="pf-input" autocomplete="new-password" required />
             <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
         </div>
 

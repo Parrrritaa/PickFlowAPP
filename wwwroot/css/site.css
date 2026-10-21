@@ -961,7 +961,7 @@ html.pf-hoja-abierta .pf-hoja-fondo {
 }
 
 /* Tarjeta: superficie con borde fino sobre el fondo */
-.mockup-card {
+.pf-card {
     background-color: var(--pf-surface);
     border: 1px solid var(--pf-line);
     border-radius: var(--pf-radius-card);
@@ -1050,11 +1050,11 @@ html.pf-hoja-abierta .pf-hoja-fondo {
 }
 
 /* Formularios */
-.mockup-form-group {
+.pf-form-group {
     margin-bottom: 18px;
 }
 
-.mockup-label,
+.pf-label,
 .form-label {
     font-size: 14px;
     font-weight: 600;
@@ -1063,7 +1063,7 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     display: block;
 }
 
-.mockup-input {
+.pf-input {
     background-color: var(--pf-field) !important;
     border: 1px solid var(--pf-line2) !important;
     border-radius: var(--pf-radius-control) !important;
@@ -1076,25 +1076,25 @@ html.pf-hoja-abierta .pf-hoja-fondo {
                 box-shadow 150ms var(--pf-ease);
 }
 
-.mockup-input::placeholder,
+.pf-input::placeholder,
 .form-control::placeholder {
     color: var(--pf-ink3);
     opacity: 0.85;
 }
 
-.mockup-input:hover {
+.pf-input:hover {
     border-color: var(--pf-ink3) !important;
 }
 
-.mockup-input:focus {
+.pf-input:focus {
     border-color: var(--pf-accent) !important;
     outline: none;
     box-shadow: 0 0 0 3px var(--pf-pill) !important;
 }
 
 /* Solo lectura: se distingue de los campos editables sin parecer deshabilitado */
-.mockup-input[readonly],
-.mockup-input:disabled,
+.pf-input[readonly],
+.pf-input:disabled,
 .form-control[readonly],
 .form-control:disabled,
 .form-select:disabled {
@@ -1150,7 +1150,7 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     animation: pf-eye-flip 0.26s var(--pf-ease-out);
 }
 
-.mockup-info-banner {
+.pf-info-banner {
     display: flex;
     gap: 10px;
     background-color: var(--pf-blue-soft);
@@ -1162,19 +1162,19 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     margin-bottom: 20px;
 }
 
-.mockup-info-banner > .bi:first-child {
+.pf-info-banner > .bi:first-child {
     color: var(--pf-blue);
 }
 
 /* Tablas: encabezados discretos, filas separadas por una línea fina */
-.mockup-table {
+.pf-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 14px;
 }
 
-.mockup-table th {
+.pf-table th {
     font-size: 12px;
     font-weight: 500;
     color: var(--pf-ink3);
@@ -1184,7 +1184,7 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     white-space: nowrap;
 }
 
-.mockup-table td {
+.pf-table td {
     font-size: 14px;
     color: var(--pf-ink);
     padding: 13px 12px;
@@ -1192,26 +1192,26 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     border-bottom: 1px solid var(--pf-line);
 }
 
-.mockup-table tbody tr:last-child td {
+.pf-table tbody tr:last-child td {
     border-bottom: 0;
 }
 
-.mockup-table tbody tr {
+.pf-table tbody tr {
     transition: background-color 150ms var(--pf-ease);
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .mockup-table tbody tr:hover:not(.mockup-row-highlight) {
+    .pf-table tbody tr:hover:not(.pf-row-highlight) {
         background-color: var(--pf-hover);
     }
 }
 
-.mockup-row-highlight {
+.pf-row-highlight {
     background-color: var(--pf-green-soft) !important;
 }
 
 /* Caja de advertencia */
-.mockup-alert-warning {
+.pf-alert-warning {
     display: flex;
     align-items: baseline;
     gap: 8px;
@@ -1226,7 +1226,7 @@ html.pf-hoja-abierta .pf-hoja-fondo {
 }
 
 /* Zona para soltar archivos (Cargar Excel) */
-.mockup-upload-box {
+.pf-upload-box {
     border: 1.5px dashed var(--pf-line2);
     border-radius: 18px;
     padding: 40px 24px;
@@ -1235,12 +1235,12 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     transition: border-color var(--pf-duration-base) var(--pf-ease), background-color var(--pf-duration-base) var(--pf-ease);
 }
 
-.mockup-upload-box:hover {
+.pf-upload-box:hover {
     border-color: var(--pf-accent);
 }
 
 /* Tarjetas de reportes */
-.mockup-report-card {
+.pf-report-card {
     background-color: var(--pf-surface);
     border: 1px solid var(--pf-line);
     border-radius: var(--pf-radius-card);
@@ -1253,11 +1253,11 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     transition: border-color var(--pf-duration-base) var(--pf-ease);
 }
 
-.mockup-report-card:hover {
+.pf-report-card:hover {
     border-color: var(--pf-line2);
 }
 
-.mockup-report-card h3 {
+.pf-report-card h3 {
     font-size: 18px;
     font-weight: 600;
     letter-spacing: -0.015em;
@@ -1265,7 +1265,7 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     margin-bottom: 8px;
 }
 
-.mockup-report-card p {
+.pf-report-card p {
     font-size: 14px;
     color: var(--pf-ink2);
     margin-bottom: 20px;
@@ -1273,7 +1273,7 @@ html.pf-hoja-abierta .pf-hoja-fondo {
 }
 
 /* Barra de búsqueda sobre las listas */
-.mockup-search-input {
+.pf-search-input {
     background-color: var(--pf-surface);
     border: 1px solid var(--pf-line);
     border-radius: 12px;
@@ -1285,11 +1285,11 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     color: var(--pf-ink);
 }
 
-.mockup-search-input::placeholder {
+.pf-search-input::placeholder {
     color: var(--pf-ink3);
 }
 
-.mockup-search-input:focus {
+.pf-search-input:focus {
     outline: none;
     border-color: var(--pf-accent);
     box-shadow: 0 0 0 3px var(--pf-pill);
@@ -1648,7 +1648,7 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     to   { background-color: transparent; }
 }
 
-.mockup-table tbody tr.pf-row-flash td {
+.pf-table tbody tr.pf-row-flash td {
     animation: pf-row-flash 1.8s var(--pf-ease) 0.35s backwards;
 }
 
@@ -1998,7 +1998,7 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     color: var(--pf-ink2);
 }
 
-.mockup-table tbody tr.pf-fila-modificada td {
+.pf-table tbody tr.pf-fila-modificada td {
     background-color: var(--pf-blue-soft);
     transition: background-color var(--pf-duration-base) var(--pf-ease);
 }
@@ -2490,7 +2490,7 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 }
 
 /* Lista de productos: muestra varias filas a la vez para elegir sin abrir un desplegable */
-.mockup-input.pf-lista-productos {
+.pf-input.pf-lista-productos {
     height: auto;
     padding: 4px;
 }
@@ -2679,7 +2679,7 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 }
 
 /* Dentro de la tarjeta el espacio entre campos lo dan los márgenes de la fila (row g-*) */
-.pf-incidencia .mockup-form-group {
+.pf-incidencia .pf-form-group {
     margin-bottom: 0;
 }
 
@@ -2879,11 +2879,11 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 .pf-dash-fila { display: flex; flex-wrap: wrap; gap: 20px; align-items: stretch; }
 .pf-dash-grande { flex: 3 1 520px; min-width: 0; }
 .pf-dash-chica { flex: 2 1 340px; min-width: 0; }
-.pf-dash-fila .mockup-card { margin-bottom: 0; animation: pf-rise 420ms var(--pf-ease-out) 200ms backwards; }
-.pf-dash-chica .mockup-card { animation-delay: 250ms; }
+.pf-dash-fila .pf-card { margin-bottom: 0; animation: pf-rise 420ms var(--pf-ease-out) 200ms backwards; }
+.pf-dash-chica .pf-card { animation-delay: 250ms; }
 
 @media (prefers-reduced-motion: reduce) {
-    .pf-kpi, .pf-dash-fila .mockup-card { animation: none; }
+    .pf-kpi, .pf-dash-fila .pf-card { animation: none; }
 }
 /* Tarjeta de la gráfica */
 .pf-chart-card { display: flex; flex-direction: column; gap: 16px; }
@@ -3064,7 +3064,7 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; color: var(--pf-ink); white-space: nowrap;
 }
 .pf-pedido-estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot); }
-.mockup-table td.pf-sin-asignar { color: var(--pf-ink2); }
+.pf-table td.pf-sin-asignar { color: var(--pf-ink2); }
 /* ===== Reportes: reporte general del dashboard ===== */
 /* Tarjeta destacada: texto a la izquierda y los tipos de gráfica a la derecha */
 .pf-reporte-general { flex-direction: row; align-items: center; gap: 28px; text-align: left; }
@@ -3300,14 +3300,14 @@ li:has([data-fila-abre]) {
 }
 
 /* Subtítulos de grupo dentro de un formulario */
-.mockup-card h6.fw-bold {
+.pf-card h6.fw-bold {
     font-size: 15px;
     font-weight: 600 !important;
     color: var(--pf-ink) !important;
     letter-spacing: -0.01em;
 }
 
-.mockup-card h6.fw-bold .bi {
+.pf-card h6.fw-bold .bi {
     color: var(--pf-ink2);
 }
 
@@ -3366,11 +3366,11 @@ li:has([data-fila-abre]) {
 
 /* Flecha de las listas: el SVG de Bootstrap trae un gris fijo; en oscuro se usa el texto de apoyo */
 :root[data-theme="dark"] .form-select,
-:root[data-theme="dark"] select.mockup-input:not([multiple]):not([size]) {
+:root[data-theme="dark"] select.pf-input:not([multiple]):not([size]) {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23A9B6C9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
 }
 
-select.mockup-input:not([multiple]):not([size]) {
+select.pf-input:not([multiple]):not([size]) {
     appearance: none;
     padding-right: 38px;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%235F6673' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
@@ -3556,7 +3556,7 @@ select.mockup-input:not([multiple]):not([size]) {
     border-color: var(--pf-line);
 }
 
-/* Tablas de Bootstrap (las pocas que no usan .mockup-table) */
+/* Tablas de Bootstrap (las pocas que no usan .pf-table) */
 .table {
     --bs-table-bg: transparent;
     --bs-table-striped-bg: var(--pf-hover);
@@ -4551,23 +4551,23 @@ select.mockup-input:not([multiple]):not([size]) {
 }
 
 /* Botones dentro de las filas: más bajos y discretos para no competir con la acción principal de la página */
-.mockup-table td .btn-pf-blue,
-.mockup-table td .btn-pf-gray,
-.mockup-table td .btn-pf-green,
-.mockup-table td .btn-pf-red,
-.mockup-table td .btn-pf-outline-green {
+.pf-table td .btn-pf-blue,
+.pf-table td .btn-pf-gray,
+.pf-table td .btn-pf-green,
+.pf-table td .btn-pf-red,
+.pf-table td .btn-pf-outline-green {
     min-height: 32px;
     padding: 4px 14px !important;
     font-size: 13px !important;
     border-radius: 9px;
 }
 
-.mockup-table td .btn-pf-blue {
+.pf-table td .btn-pf-blue {
     background-color: var(--pf-pill);
     color: var(--pf-accent-text) !important;
 }
 
-.mockup-table td .btn-pf-blue:hover {
+.pf-table td .btn-pf-blue:hover {
     background-color: var(--pf-accent);
     color: var(--pf-on-accent) !important;
 }
@@ -4583,13 +4583,13 @@ select.mockup-input:not([multiple]):not([size]) {
     margin: 0;
 }
 
-.pf-card-lista .mockup-table th:first-child,
-.pf-card-lista .mockup-table td:first-child {
+.pf-card-lista .pf-table th:first-child,
+.pf-card-lista .pf-table td:first-child {
     padding-left: 22px;
 }
 
-.pf-card-lista .mockup-table th:last-child,
-.pf-card-lista .mockup-table td:last-child {
+.pf-card-lista .pf-table th:last-child,
+.pf-card-lista .pf-table td:last-child {
     padding-right: 18px;
 }
 

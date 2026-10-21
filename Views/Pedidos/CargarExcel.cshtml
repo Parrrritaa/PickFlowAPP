@@ -7,11 +7,11 @@
 
 <h1 class="pf-page-title">Cargar archivo Excel</h1>
 
-<div class="mockup-card">
+<div class="pf-card">
     <form asp-action="CargarExcel" method="post" enctype="multipart/form-data" id="formExcel">
         @Html.AntiForgeryToken()
 
-        <div class="mockup-upload-box mb-4">
+        <div class="pf-upload-box mb-4">
             <h3 class="fw-bold text-dark mb-2">Seleccionar archivo Excel</h3>
             <p class="text-secondary mb-4">Cargue el archivo previamente creado con los pedidos.</p>
 
@@ -26,7 +26,7 @@
 
         @if (errores != null && errores.Any())
         {
-            <div class="mockup-alert-warning mb-4">
+            <div class="pf-alert-warning mb-4">
                 <strong>Observaciones de validación encontradas:</strong>
                 <ul class="mb-0 mt-2">
                     @foreach (var err in errores)
@@ -42,7 +42,7 @@
             <h4 class="fw-bold text-dark mb-3">Resultado de validación</h4>
             <ul class="list-unstyled d-flex flex-column gap-2 mb-3" id="listaVerificaciones"></ul>
             <p class="fw-semibold mb-3" id="resumenValidacion"></p>
-            <div class="mockup-alert-warning mb-4" id="erroresValidacion" hidden>
+            <div class="pf-alert-warning mb-4" id="erroresValidacion" hidden>
                 <strong>Corrija estas filas y vuelva a validar:</strong>
                 <ul class="mb-0 mt-2" id="listaErroresValidacion"></ul>
             </div>

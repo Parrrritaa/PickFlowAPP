@@ -103,7 +103,7 @@
         tabla.innerHTML = '';
         if (!vacio) {
             const t = document.createElement('table');
-            t.className = 'mockup-table';
+            t.className = 'pf-table';
             t.innerHTML = '<thead><tr><th></th><th class="text-end">Pedidos</th><th class="text-end">%</th></tr></thead>';
             const tb = document.createElement('tbody');
             cats.forEach(c => {

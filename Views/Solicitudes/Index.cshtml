@@ -29,7 +29,7 @@
     </nav>
 }
 
-<div class="mockup-card">
+<div class="pf-card">
     <div class="mb-3">
         <span class="text-muted fw-semibold">
             @($"{Model.Solicitudes.Count} solicitud(es){(f.HayFiltros ? " con los filtros aplicados" : "")}")
@@ -44,7 +44,7 @@
     @* Los filtros viajan por GET en la URL y llegan a SolicitudesController como FiltrosSolicitudes *@
     <form method="get" asp-action="@accion" id="formFiltrosSolicitudes">
         <div class="table-responsive">
-            <table class="mockup-table">
+            <table class="pf-table">
                 <thead>
                     <tr>
                         <th>
