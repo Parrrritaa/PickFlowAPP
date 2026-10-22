@@ -62,7 +62,22 @@ namespace PickingApp.Models.ViewModels
         // Administrador (o Supervisor en registros) con la solicitud pendiente
         public bool PuedeResponder { get; set; }
 
+        // Opciones activas del catálogo para este tipo de solicitud, separadas por decisión
+        public List<ObservacionSolicitud> ObservacionesAprobar { get; set; } = new();
+        public List<ObservacionSolicitud> ObservacionesRechazar { get; set; } = new();
+
         // Volver a la bandeja (Index) o a "Mis solicitudes"
         public string AccionVolver { get; set; } = "Index";
+    }
+
+    // Views/Observaciones/Index.cshtml: catálogo de observaciones para responder solicitudes
+    public class ObservacionesIndexViewModel
+    {
+        public List<ObservacionSolicitud> Observaciones { get; init; } = new();
+
+        // Solicitudes respondidas con cada observación, por Id
+        public Dictionary<int, int> Usos { get; init; } = new();
+
+        public int? TipoFiltro { get; init; }
     }
 }

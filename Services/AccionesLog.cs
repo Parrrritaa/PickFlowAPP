@@ -14,6 +14,9 @@ namespace PickingApp.Services
         public const string AtenderNovedad = "Atender Novedad";
         public const string AprobarSolicitud = "Aprobar Solicitud";
         public const string RechazarSolicitud = "Rechazar Solicitud";
+        public const string CrearObservacion = "Crear Observación";
+        public const string ActivarObservacion = "Activar Observación";
+        public const string DesactivarObservacion = "Desactivar Observación";
         public const string SolicitudRegistroEmpleado = "Solicitud Registro Empleado";
         public const string SolicitudEdicionEmpleado = "Solicitud Edición Empleado";
         public const string SolicitudInactivarEmpleado = "Solicitud Inactivar Empleado";

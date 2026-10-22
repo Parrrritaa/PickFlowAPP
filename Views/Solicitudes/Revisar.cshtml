@@ -120,7 +120,7 @@
 
     @if (s.Estado != EstadosSolicitud.Pendiente)
     {
-        @* Respuesta del Administrador o Supervisor: quién, cuándo y, si se rechazó, por qué *@
+        @* Respuesta del Administrador o Supervisor: quién, cuándo y su observación *@
         <div class="mb-4">
             <h5 class="fw-bold text-dark mb-2">Respuesta</h5>
             <div class="bg-white rounded-3 p-3 shadow-sm">
@@ -134,10 +134,10 @@
                         }
                     </span>
                 </div>
-                @if (s.Estado == EstadosSolicitud.Rechazada)
+                @if (!string.IsNullOrWhiteSpace(s.TextoObservacion))
                 {
-                    <div class="text-secondary small fw-medium mt-3">Motivo del rechazo</div>
-                    <div class="fs-6 text-dark mt-1">@(string.IsNullOrWhiteSpace(s.MotivoRechazo) ? "No especificado" : s.MotivoRechazo)</div>
+                    <div class="text-secondary small fw-medium mt-3">Observación</div>
+                    <div class="fs-6 text-dark mt-1">@s.TextoObservacion</div>
                 }
             </div>
         </div>
@@ -145,22 +145,64 @@
 
     @if (Model.PuedeResponder)
     {
+        @* Primero la decisión: la lista solo ofrece las observaciones de este tipo de solicitud para esa decisión *@
         <form id="formAccionSolicitud" method="post">
             @Html.AntiForgeryToken()
             <input type="hidden" name="id" value="@s.Id" />
 
-            <div class="mb-4">
-                <label class="h5 fw-bold text-dark mb-1" for="txtMotivoRechazo">Motivo del rechazo</label>
-                <div class="form-text small mt-0 mb-2" id="ayudaMotivoRechazo">Obligatorio solo si la rechaza. El solicitante lo verá.</div>
-                <textarea name="motivoRechazo" id="txtMotivoRechazo" class="pf-input" style="height: 90px;" maxlength="400"
-                          aria-describedby="ayudaMotivoRechazo"></textarea>
+            <fieldset class="mb-4">
+                <legend class="h5 fw-bold text-dark mb-2">Decisión</legend>
+                <div class="pf-segmented" role="radiogroup" aria-label="Decisión" style="max-width: 360px;">
+                    <input type="radio" class="pf-seg-input" name="decision" id="decisionAprobar" value="@DecisionesSolicitud.Aprobar" checked />
+                    <label for="decisionAprobar">Aprobar</label>
+                    <input type="radio" class="pf-seg-input" name="decision" id="decisionRechazar" value="@DecisionesSolicitud.Rechazar" />
+                    <label for="decisionRechazar">Rechazar</label>
+                </div>
+            </fieldset>
+
+            @foreach (var (decision, opciones, obligatoria) in new[]
+            {
+                (DecisionesSolicitud.Aprobar, Model.ObservacionesAprobar, false),
+                (DecisionesSolicitud.Rechazar, Model.ObservacionesRechazar, true)
+            })
+            {
+                var activa = decision == DecisionesSolicitud.Aprobar;
+                <div class="mb-4" data-decision="@decision" hidden="@(!activa)">
+                    <label class="h5 fw-bold text-dark mb-1" for="observacion@(decision)">Observación</label>
+                    <div class="form-text small mt-0 mb-2" id="ayudaObservacion@(decision)">
+                        @(obligatoria ? "Obligatoria. El solicitante la verá." : "Opcional. El solicitante la verá.")
+                    </div>
+                    <select name="observacion" id="observacion@(decision)" class="pf-input" aria-describedby="ayudaObservacion@(decision)"
+                            required="@obligatoria" disabled="@(!activa)" data-lista-observacion>
+                        @if (obligatoria)
+                        {
+                            <option value="" disabled selected>Elija una observación…</option>
+                        }
+                        else
+                        {
+                            <option value="" selected>Sin observación</option>
+                        }
+                        @foreach (var o in opciones)
+                        {
+                            <option value="@o.Id">@o.Texto</option>
+                        }
+                        <option value="@ObservacionSolicitud.ValorOtro">Otro (escribir la observación)</option>
+                    </select>
+                </div>
+            }
+
+            <div class="mb-4" data-otro hidden>
+                <label class="h6 fw-bold text-dark mb-1" for="txtObservacion">Escriba la observación</label>
+                <div class="form-text small mt-0 mb-2" id="ayudaObservacionOtro">Al menos @ObservacionSolicitud.MinimoTextoLibre caracteres, escrita con palabras.</div>
+                <textarea name="observacionRespuesta" id="txtObservacion" class="pf-input" style="height: 90px;"
+                          minlength="@ObservacionSolicitud.MinimoTextoLibre" maxlength="400" aria-describedby="ayudaObservacionOtro" disabled></textarea>
             </div>
 
             <div class="d-flex flex-wrap gap-3">
-                <button type="submit" formaction="@Url.Action("Aprobar")" class="btn-pf-green" data-aprobar>
+                <button type="submit" formaction="@Url.Action("Aprobar")" class="btn-pf-green" data-boton="@DecisionesSolicitud.Aprobar">
                     Aprobar solicitud
                 </button>
-                <button type="submit" formaction="@Url.Action("Rechazar")" class="btn-pf-red" data-rechazar>
+                <button type="submit" formaction="@Url.Action("Rechazar")" class="btn-pf-red" data-boton="@DecisionesSolicitud.Rechazar" hidden>
                     Rechazar solicitud
                 </button>
                 <a asp-action="@Model.AccionVolver" class="btn-pf-gray ms-auto">
@@ -185,10 +227,40 @@
         <script>
             (function () {
                 var form = document.getElementById('formAccionSolicitud');
-                var motivo = document.getElementById('txtMotivoRechazo');
-                // El motivo solo es obligatorio al rechazar: el navegador lo pide antes de enviar
-                form.querySelector('[data-rechazar]').addEventListener('click', function () { motivo.required = true; });
-                form.querySelector('[data-aprobar]').addEventListener('click', function () { motivo.required = false; });
+                var otro = form.querySelector('[data-otro]');
+                var texto = document.getElementById('txtObservacion');
+
+                // Solo la lista de la decisión elegida se envía: la otra queda oculta y deshabilitada
+                function listaActiva() {
+                    return form.querySelector('[data-decision]:not([hidden]) [data-lista-observacion]');
+                }
+
+                // "Otro" abre el cuadro de texto libre, que pasa a ser obligatorio
+                function revisarOtro() {
+                    var conOtro = listaActiva().value === '@ObservacionSolicitud.ValorOtro';
+                    otro.hidden = !conOtro;
+                    texto.disabled = !conOtro;
+                    texto.required = conOtro;
+                }
+
+                function elegirDecision(decision) {
+                    form.querySelectorAll('[data-decision]').forEach(function (bloque) {
+                        var activa = bloque.dataset.decision === decision;
+                        bloque.hidden = !activa;
+                        bloque.querySelector('[data-lista-observacion]').disabled = !activa;
+                    });
+                    form.querySelectorAll('[data-boton]').forEach(function (boton) {
+                        boton.hidden = boton.dataset.boton !== decision;
+                    });
+                    revisarOtro();
+                }
+
+                form.querySelectorAll('input[name="decision"]').forEach(function (radio) {
+                    radio.addEventListener('change', function () { elegirDecision(radio.value); });
+                });
+                form.querySelectorAll('[data-lista-observacion]').forEach(function (lista) {
+                    lista.addEventListener('change', revisarOtro);
+                });
             })();
         </script>
     }

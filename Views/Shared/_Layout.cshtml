@@ -23,7 +23,7 @@
         var enCargarExcel = currentController == "Pedidos" && currentAction == "CargarExcel";
         var enConfiguracion = currentController == "Auditoria" && currentAction == "Configuracion";
         var enRecursos = currentController is "Empleados" or "Bodegas" or "Productos";
-        var enSistema = currentController is "Usuarios" or "Auditoria";
+        var enSistema = currentController is "Usuarios" or "Auditoria" or "Observaciones";
         var (grupoActual, apartadoActual) = currentController switch
         {
             "Home" => ("Operación", "Inicio"),
@@ -36,6 +36,7 @@
             "Reportes" => ("Análisis", "Reportes"),
             "Usuarios" => ("Sistema", "Usuarios y roles"),
             "Auditoria" => ("Sistema", enConfiguracion ? "Configuración" : "Registro del sistema"),
+            "Observaciones" => ("Sistema", "Observaciones"),
             "Account" => ("Cuenta", "Cambiar contraseña"),
             _ => ("PickFlow", ViewData["Title"]?.ToString() ?? "")
         };
@@ -118,6 +119,10 @@
                                 <a class="pf-panel-opcion" asp-controller="Auditoria" asp-action="Index" aria-current="@Actual(currentController == "Auditoria" && !enConfiguracion)">
                                     <span class="pf-panel-ico"><partial name="_Icono" model='"registro"' /></span>
                                     <span class="pf-panel-texto"><b>Registro del sistema</b><span>Quién hizo qué y cuándo</span></span>
+                                </a>
+                                <a class="pf-panel-opcion" asp-controller="Observaciones" asp-action="Index" aria-current="@Actual(currentController == "Observaciones")">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"observaciones"' /></span>
+                                    <span class="pf-panel-texto"><b>Observaciones</b><span>Respuestas para aprobar o rechazar solicitudes</span></span>
                                 </a>
                                 <a class="pf-panel-opcion" asp-controller="Auditoria" asp-action="Configuracion" aria-current="@Actual(enConfiguracion)">
                                     <span class="pf-panel-ico"><partial name="_Icono" model='"config"' /></span>
@@ -242,6 +247,9 @@
                 </a>
                 <a class="pf-hoja-link" asp-controller="Auditoria" asp-action="Index" aria-current="@Actual(currentController == "Auditoria" && !enConfiguracion)">
                     <partial name="_Icono" model='"registro"' /><span class="pf-hoja-texto">Registro del sistema</span>
+                </a>
+                <a class="pf-hoja-link" asp-controller="Observaciones" asp-action="Index" aria-current="@Actual(currentController == "Observaciones")">
+                    <partial name="_Icono" model='"observaciones"' /><span class="pf-hoja-texto">Observaciones</span>
                 </a>
                 <a class="pf-hoja-link" asp-controller="Auditoria" asp-action="Configuracion" aria-current="@Actual(enConfiguracion)">
                     <partial name="_Icono" model='"config"' /><span class="pf-hoja-texto">Configuración</span>

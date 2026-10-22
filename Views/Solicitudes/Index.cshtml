@@ -180,9 +180,9 @@
                                         else
                                         {
                                             <div>@(s.UsuarioResponde?.NombreCompleto ?? "Sin registro") · @s.FechaRespuesta?.ToString("dd/MM/yyyy")</div>
-                                            @if (!string.IsNullOrWhiteSpace(s.MotivoRechazo))
+                                            @if (!string.IsNullOrWhiteSpace(s.TextoObservacion))
                                             {
-                                                <div class="pf-motivo-corto small text-secondary" title="@s.MotivoRechazo">Motivo: @s.MotivoRechazo</div>
+                                                <div class="pf-motivo-corto small text-secondary" title="@s.TextoObservacion">Observación: @s.TextoObservacion</div>
                                             }
                                         }
                                     </td>

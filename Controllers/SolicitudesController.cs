@@ -28,8 +28,39 @@ namespace PickingApp.Controllers
         private const int TipoGestionableSupervisor = FlujoSolicitudes.TipoGestionableSupervisor;
         private const string MensajeSinPermisoSupervisor = "Los Supervisores solo tienen permiso para gestionar solicitudes de registro de empleados.";
 
-        // Cabe en la notificación al solicitante (500 caracteres con el resto del mensaje) y en MotivoRechazo
-        private const int MaxMotivoRechazo = 400;
+        // Cabe en la notificación al solicitante (500 caracteres con el resto del mensaje) y en ObservacionRespuesta
+        private const int MaxObservacion = 400;
+
+        // Observación ya validada: del catálogo (Id) o texto libre de "Otro". Texto es lo que ve el solicitante.
+        private sealed record ObservacionElegida(int? Id, string? TextoLibre, string? Texto);
+
+        // Lee la opción elegida en la lista: el Id de una observación del catálogo, "otro" con texto libre, o nada.
+        // La observación del catálogo debe estar activa y corresponder al tipo de la solicitud y a la decisión.
+        private async Task<(ObservacionElegida? Elegida, string? Error)> LeerObservacionAsync(
+            Solicitud solicitud, string decision, string? observacion, string? observacionRespuesta)
+        {
+            if (observacion == ObservacionSolicitud.ValorOtro)
+            {
+                var texto = (observacionRespuesta ?? string.Empty).Trim();
+                if (texto.Length > MaxObservacion) return (null, $"La observación admite hasta {MaxObservacion} caracteres.");
+                if (!ObservacionSolicitud.TextoLibreValido(texto)) return (null, ObservacionSolicitud.MensajeTextoLibre);
+                return (new ObservacionElegida(null, texto, texto), null);
+            }
+
+            if (int.TryParse(observacion, out var observacionId))
+            {
+                var elegida = await _context.ObservacionesSolicitud.FirstOrDefaultAsync(o => o.Id == observacionId && o.Activa
+                    && o.TipoSolicitudId == solicitud.TipoSolicitudId && o.Decision == decision);
+                return elegida == null
+                    ? (null, "La observación elegida no corresponde a esta solicitud. Elija otra de la lista.")
+                    : (new ObservacionElegida(elegida.Id, null, elegida.Texto), null);
+            }
+
+            // Al aprobar la observación es opcional; al rechazar, el solicitante necesita saber por qué
+            return decision == DecisionesSolicitud.Rechazar
+                ? (null, "Para rechazar la solicitud elija una observación: el solicitante la verá.")
+                : (new ObservacionElegida(null, null, null), null);
+        }
 
         private bool PuedeGestionar(Solicitud solicitud) =>
             !User.IsInRole(Roles.Supervisor) || solicitud.TipoSolicitudId == TipoGestionableSupervisor;
@@ -145,6 +176,15 @@ namespace PickingApp.Controllers
 
             var modelo = await ConstruirDetalleAsync(solicitud);
             modelo.PuedeResponder = solicitud.Estado == EstadosSolicitud.Pendiente;
+            if (modelo.PuedeResponder)
+            {
+                var opciones = await _context.ObservacionesSolicitud
+                    .Where(o => o.TipoSolicitudId == solicitud.TipoSolicitudId && o.Activa)
+                    .OrderBy(o => o.Texto)
+                    .ToListAsync();
+                modelo.ObservacionesAprobar = opciones.Where(o => o.Decision == DecisionesSolicitud.Aprobar).ToList();
+                modelo.ObservacionesRechazar = opciones.Where(o => o.Decision == DecisionesSolicitud.Rechazar).ToList();
+            }
             return View(modelo);
         }
 
@@ -331,7 +371,7 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Aprobar(int id)
+        public async Task<IActionResult> Aprobar(int id, string? observacion, string? observacionRespuesta)
         {
             var solicitud = await _context.Solicitudes
                 .Include(s => s.UsuarioSolicitante)
@@ -349,19 +389,29 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            var (elegida, error) = await LeerObservacionAsync(solicitud, DecisionesSolicitud.Aprobar, observacion, observacionRespuesta);
+            if (elegida == null)
+            {
+                TempData["ErrorMessage"] = error;
+                return RedirectToAction(nameof(Revisar), new { id });
+            }
+            var conObservacion = elegida.Texto == null ? "" : $" Observación: {elegida.Texto}";
+
             try
             {
                 // Aplica el cambio pedido (crear, editar o inactivar empleado; editar o eliminar ubicación)
                 await FlujoSolicitudes.AplicarAsync(_context, solicitud);
 
                 solicitud.Estado = EstadosSolicitud.Aprobada;
+                solicitud.ObservacionId = elegida.Id;
+                solicitud.ObservacionRespuesta = elegida.TextoLibre;
                 solicitud.FechaRespuesta = DateTime.Now;
                 solicitud.UsuarioRespondeId = UsuarioActualId;
 
                 // Notificar al usuario solicitante (CU-43); el enlace abre esta solicitud
                 Avisos.AlUsuario(_context, solicitud.UsuarioSolicitanteId,
                     "Solicitud Aprobada",
-                    $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.",
+                    $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.{conObservacion}",
                     TiposNotificacion.Success,
                     $"/Solicitudes/Detalle/{solicitud.Id}");
 
@@ -370,7 +420,7 @@ namespace PickingApp.Controllers
                 await _context.SaveChangesAsync();
 
                 await _auditService.RegistrarAsync(AccionesLog.AprobarSolicitud, "Solicitudes",
-                    $"Solicitud #{solicitud.Id} ({solicitud.NombreTipo}) aprobada.");
+                    $"Solicitud #{solicitud.Id} ({solicitud.NombreTipo}) aprobada.{conObservacion}");
 
                 TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} aprobada correctamente.";
                 return RedirectToAction(nameof(Index));
@@ -395,17 +445,8 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Rechazar(int id, string? motivoRechazo)
+        public async Task<IActionResult> Rechazar(int id, string? observacion, string? observacionRespuesta)
         {
-            motivoRechazo = (motivoRechazo ?? string.Empty).Trim();
-            if (motivoRechazo.Length == 0 || motivoRechazo.Length > MaxMotivoRechazo)
-            {
-                TempData["ErrorMessage"] = motivoRechazo.Length == 0
-                    ? "Para rechazar la solicitud escriba el motivo del rechazo: el solicitante lo verá."
-                    : $"El motivo del rechazo admite hasta {MaxMotivoRechazo} caracteres.";
-                return RedirectToAction(nameof(Revisar), new { id });
-            }
-
             var solicitud = await _context.Solicitudes.FindAsync(id);
             if (solicitud == null || solicitud.Estado != EstadosSolicitud.Pendiente)
             {
@@ -419,22 +460,30 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            var (elegida, error) = await LeerObservacionAsync(solicitud, DecisionesSolicitud.Rechazar, observacion, observacionRespuesta);
+            if (elegida == null)
+            {
+                TempData["ErrorMessage"] = error;
+                return RedirectToAction(nameof(Revisar), new { id });
+            }
+
             solicitud.Estado = EstadosSolicitud.Rechazada;
-            solicitud.MotivoRechazo = motivoRechazo;
+            solicitud.ObservacionId = elegida.Id;
+            solicitud.ObservacionRespuesta = elegida.TextoLibre;
             solicitud.FechaRespuesta = DateTime.Now;
             solicitud.UsuarioRespondeId = UsuarioActualId;
 
-            // Notificar al usuario solicitante (CU-43); el enlace abre la solicitud con el motivo
+            // Notificar al usuario solicitante (CU-43); el enlace abre la solicitud con la observación
             Avisos.AlUsuario(_context, solicitud.UsuarioSolicitanteId,
                 "Solicitud Rechazada",
-                $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" fue rechazada. Motivo: {motivoRechazo}",
+                $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" fue rechazada. Observación: {elegida.Texto}",
                 TiposNotificacion.Danger,
                 $"/Solicitudes/Detalle/{solicitud.Id}");
 
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync(AccionesLog.RechazarSolicitud, "Solicitudes",
-                $"Solicitud #{solicitud.Id} rechazada. Motivo: {motivoRechazo}");
+                $"Solicitud #{solicitud.Id} rechazada. Observación: {elegida.Texto}");
 
             TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} rechazada.";
             return RedirectToAction(nameof(Index));

@@ -42,8 +42,19 @@ namespace PickingApp.Models
 
         public DateTime? FechaRespuesta { get; set; }
 
+        // Observación de quien responde: obligatoria al rechazar, opcional al aprobar. El solicitante la ve.
+        // Se elige del catálogo (ObservacionId) o, con "Otro", se escribe como texto libre (ObservacionRespuesta).
+        public int? ObservacionId { get; set; }
+
+        // Se carga siempre junto con la solicitud (AutoInclude en ApplicationDbContext)
+        [ForeignKey("ObservacionId")]
+        public virtual ObservacionSolicitud? Observacion { get; set; }
+
         [StringLength(500)]
-        public string? MotivoRechazo { get; set; }
+        public string? ObservacionRespuesta { get; set; }
+
+        [NotMapped]
+        public string? TextoObservacion => Observacion?.Texto ?? ObservacionRespuesta;
 
         // T es la clase de SolicitudDatos.cs que corresponde a TipoSolicitud
         public T LeerDatos<T>() where T : new() => JsonSerializer.Deserialize<T>(DatosJson) ?? new T();
