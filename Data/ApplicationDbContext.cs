@@ -26,6 +26,7 @@ namespace PickingApp.Data
         public DbSet<ConfiguracionSistema> ConfiguracionesSistema { get; set; } = null!;
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
         public DbSet<CategoriaProducto> CategoriasProducto { get; set; } = null!;
+        public DbSet<ObservacionSolicitud> ObservacionesSolicitud { get; set; } = null!;
 
         // Columna ENUM de MySQL con los valores permitidos: la base rechaza cualquier otro texto
         private static string EnumMySql(IEnumerable<string> valores) =>
@@ -46,11 +47,17 @@ namespace PickingApp.Data
             modelBuilder.Entity<TipoSolicitud>().HasIndex(t => t.Nombre).IsUnique();
             modelBuilder.Entity<TipoSolicitud>().HasData(TiposSolicitud.Catalogo);
 
+            // Observaciones para responder solicitudes: una misma frase no se repite en un tipo y decisión
+            modelBuilder.Entity<ObservacionSolicitud>().ToTable("ObservacionesSolicitud");
+            modelBuilder.Entity<ObservacionSolicitud>().HasIndex(o => new { o.TipoSolicitudId, o.Decision, o.Texto }).IsUnique();
+            modelBuilder.Entity<ObservacionSolicitud>().HasData(ObservacionesIniciales.Catalogo);
+
             // Columnas con pocos valores posibles: ENUM de MySQL (el código sigue usando texto)
             modelBuilder.Entity<Usuario>().Property(u => u.Estado).HasColumnType(EnumMySql(EstadosUsuario.Todos));
             modelBuilder.Entity<Pedido>().Property(p => p.Estado).HasColumnType(EnumMySql(PedidoEstados.Todos));
             modelBuilder.Entity<Pedido>().Property(p => p.Prioridad).HasColumnType(EnumMySql(Prioridades.Todas));
             modelBuilder.Entity<Solicitud>().Property(s => s.Estado).HasColumnType(EnumMySql(EstadosSolicitud.Todos));
+            modelBuilder.Entity<ObservacionSolicitud>().Property(o => o.Decision).HasColumnType(EnumMySql(DecisionesSolicitud.Todas));
             modelBuilder.Entity<NovedadPedido>().Property(n => n.TipoNovedad).HasColumnType(EnumMySql(TiposNovedad.Todos));
             modelBuilder.Entity<Notificacion>().Property(n => n.Tipo).HasColumnType(EnumMySql(TiposNotificacion.Todos));
 
@@ -112,6 +119,20 @@ namespace PickingApp.Data
                 .HasForeignKey(s => s.TipoSolicitudId)
                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<Solicitud>().Navigation(s => s.TipoSolicitud).AutoInclude();
+
+            modelBuilder.Entity<ObservacionSolicitud>()
+                .HasOne(o => o.TipoSolicitud)
+                .WithMany()
+                .HasForeignKey(o => o.TipoSolicitudId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<ObservacionSolicitud>().Navigation(o => o.TipoSolicitud).AutoInclude();
+
+            modelBuilder.Entity<Solicitud>()
+                .HasOne(s => s.Observacion)
+                .WithMany()
+                .HasForeignKey(s => s.ObservacionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Solicitud>().Navigation(s => s.Observacion).AutoInclude();
 
             // Relaciones y qué pasa al borrar el registro principal:
             // Restrict impide borrarlo si tiene hijos, Cascade borra también los hijos
