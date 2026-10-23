@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -6,6 +7,7 @@ using PickingApp.Controllers;
 using PickingApp.Models;
 using PickingApp.Models.ViewModels;
 using PickingApp.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace PickingApp.Tests
 {
@@ -22,7 +24,7 @@ namespace PickingApp.Tests
         {
             public string? UltimoCodigo { get; private set; }
 
-            public Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo, bool esCambioContrasena)
+            public Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo, PropositoCodigo proposito)
             {
                 UltimoCodigo = codigo;
                 return Task.CompletedTask;
@@ -135,6 +137,64 @@ namespace PickingApp.Tests
             Assert.Equal(new[] { "Credenciales de acceso inválidas." }, inexistente);
             Assert.Equal(inexistente, existente);
             Assert.Equal(inexistente, bloqueada);
+        }
+
+        [Fact]
+        public async Task ElPrimerInicioDeSesionPideElCodigoDelCorreo()
+        {
+            using var e = new Escenario();
+            var usuario = Usuario(e, Roles.IdAuxiliar);
+            usuario.CorreoVerificado = false;
+            e.Db.SaveChanges();
+            var correo = new SinCorreo();
+            AccountController Controlador()
+            {
+                var http = new DefaultHttpContext
+                {
+                    RequestServices = new ServiceCollection().AddLogging().AddMvcCore().Services
+                        .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie().Services.BuildServiceProvider()
+                };
+                return new AccountController(e.Db, new SinAuditoria(), correo, new Antifalsificacion())
+                {
+                    ControllerContext = new ControllerContext { HttpContext = http, RouteData = new Microsoft.AspNetCore.Routing.RouteData() },
+                    TempData = new TempDataDictionary(http, new SinTempData())
+                };
+            }
+            var navegador = Controlador();
+
+            var login = (RedirectToActionResult)await navegador.Login(new LoginViewModel { Correo = usuario.Correo, Password = "Correcta1" });
+            Assert.Equal(nameof(AccountController.VerificarCorreo), login.ActionName);
+            var codigo = correo.UltimoCodigo!;
+
+            // Sin haber escrito la contraseña en ese navegador, ni el código correcto sirve
+            var otro = (RedirectToActionResult)await Controlador().VerificarCorreo(new VerificarCorreoViewModel { Codigo = codigo });
+            Assert.Equal(nameof(AccountController.Login), otro.ActionName);
+
+            await navegador.VerificarCorreo(new VerificarCorreoViewModel { Codigo = codigo == "000000" ? "111111" : "000000" });
+            Assert.False(usuario.CorreoVerificado);
+            navegador.ModelState.Clear(); // en la app cada petición trae un controlador nuevo
+
+            var r =(RedirectToActionResult)await navegador.VerificarCorreo(new VerificarCorreoViewModel { Codigo = codigo });
+            Assert.Equal("Home", r.ControllerName);
+            Assert.True(usuario.CorreoVerificado);
+            Assert.Null(usuario.CodigoVerificacionHash);
+        }
+
+        [Fact]
+        public async Task UnCorreoSinVerificarNoRecibeCodigoDeRecuperacion()
+        {
+            using var e = new Escenario();
+            var usuario = Usuario(e, Roles.IdAuxiliar);
+            usuario.CorreoVerificado = false;
+            e.Db.SaveChanges();
+            var correo = new SinCorreo();
+            var controlador = new AccountController(e.Db, new SinAuditoria(), correo, new Antifalsificacion());
+
+            var r = (RedirectToActionResult)await controlador.SolicitarRecuperacion(new SolicitarCodigoViewModel { Correo = usuario.Correo });
+
+            Assert.Equal("VerificarCodigoRecuperacion", r.ActionName);
+            Assert.Null(correo.UltimoCodigo);
+            Assert.Null(usuario.CodigoVerificacionHash);
         }
 
         [Fact]

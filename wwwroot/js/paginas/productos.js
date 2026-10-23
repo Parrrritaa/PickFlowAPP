@@ -86,6 +86,7 @@
             if (mostrar) visibles++;
         });
         sinProductos.classList.toggle('d-none', visibles > 0);
+        tabla.dispatchEvent(new CustomEvent('pf:repaginar', { detail: { inicio: true } }));
     }
 
     tabla.addEventListener('change', function (e) {

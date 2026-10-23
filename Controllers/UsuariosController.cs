@@ -94,6 +94,8 @@ namespace PickingApp.Controllers
 
             // La contraseña se guarda como hash BCrypt, nunca en texto plano
             model.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+            // "No verificado" hasta que escriba el código que se le envía la primera vez que inicia sesión
+            model.CorreoVerificado = false;
             model.FechaRegistro = DateTime.Now;
             model.IntentosFallidos = 0;
 
@@ -104,7 +106,7 @@ namespace PickingApp.Controllers
                 $"Usuario creado: {model.NombreCompleto} con rol {Roles.Catalogo.First(r => r.Id == model.RolId).Nombre}");
 
             // TempData sobrevive a la redirección: _Layout lo muestra como alerta verde en la siguiente página
-            TempData["SuccessMessage"] = $"Usuario '{model.NombreCompleto}' ({model.Correo}) creado con éxito.";
+            TempData["SuccessMessage"] = $"Usuario '{model.NombreCompleto}' ({model.Correo}) creado. Verificará su correo con un código la primera vez que inicie sesión.";
             return RedirectToAction(nameof(Index));
         }
 

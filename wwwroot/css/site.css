@@ -3154,7 +3154,7 @@ label.pf-tipo { margin: 0; }
 .pf-pildora input[type="checkbox"]:not(:checked) + span .pf-kpi-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--dot); }
 
 
-/* Paginación de listas largas (Views/Shared/_Paginacion.cshtml): pedidos y LOG */
+/* Paginación de listas largas: Views/Shared/_Paginacion.cshtml (servidor) y [data-pf-paginar] en site.js (botones) */
 .pf-paginacion {
     display: flex;
     flex-wrap: wrap;
@@ -3180,6 +3180,7 @@ label.pf-tipo { margin: 0; }
 }
 
 .pf-paginacion a,
+.pf-paginacion button,
 .pf-paginacion span.actual,
 .pf-paginacion span.deshabilitado,
 .pf-paginacion span.salto {
@@ -3195,20 +3196,26 @@ label.pf-tipo { margin: 0; }
     text-decoration: none;
 }
 
-.pf-paginacion a {
+.pf-paginacion a,
+.pf-paginacion button {
+    font-family: inherit;
+    cursor: pointer;
     color: var(--pf-text-secondary);
     background-color: var(--pf-surface);
     border: 1px solid var(--pf-gray-border);
     transition: background-color var(--pf-duration-fast) var(--pf-ease), border-color var(--pf-duration-fast) var(--pf-ease);
 }
 
-.pf-paginacion a:hover {
+.pf-paginacion a:hover,
+.pf-paginacion button:hover {
     color: var(--pf-ink);
     border-color: var(--pf-ink3);
     background-color: var(--pf-surface2);
 }
 
-.pf-paginacion a:focus-visible {
+.pf-paginacion a:focus-visible,
+.pf-paginacion button:focus-visible,
+.pf-paginacion span.actual:focus-visible {
     outline: 2px solid var(--pf-accent);
     outline-offset: 2px;
 }

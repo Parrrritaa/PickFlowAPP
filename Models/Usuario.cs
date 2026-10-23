@@ -73,5 +73,9 @@ namespace PickingApp.Models
 
         // Hash de la nueva contraseña, pendiente de confirmar el código enviado al correo (CU-42).
         public string? PasswordPendienteHash { get; set; }
+
+        // Un usuario nuevo queda sin verificar hasta escribir el código que se le envía al correo la primera vez que
+        // inicia sesión (AccountController.VerificarCorreo). Por defecto true para las cuentas anteriores a esta regla y las del seed.
+        public bool CorreoVerificado { get; set; } = true;
     }
 }

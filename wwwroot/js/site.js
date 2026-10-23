@@ -2,27 +2,6 @@
 // Cada bloque escucha eventos en el documento y actúa solo sobre los elementos marcados con sus
 // atributos data-*, así funciona en cualquier vista sin repetir código.
 
-// "Ver más / Ver menos" para tablas largas: el botón [data-ver-mas="idTabla"] muestra u oculta
-// las filas .fila-extra de esa tabla. Guarda el estado en data-expandido.
-document.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-ver-mas]');
-    if (!btn) return;
-    var tabla = document.getElementById(btn.dataset.verMas);
-    if (!tabla) return;
-    var expandir = btn.dataset.expandido !== 'true';
-    tabla.querySelectorAll('.fila-extra').forEach(function (f) {
-        f.classList.toggle('d-none', !expandir);
-        // Reinicia la animación de aparición en cada despliegue
-        f.classList.remove('pf-reveal');
-        if (expandir) {
-            void f.offsetWidth;
-            f.classList.add('pf-reveal');
-        }
-    });
-    btn.dataset.expandido = expandir ? 'true' : 'false';
-    btn.textContent = expandir ? btn.dataset.textoMenos : btn.dataset.textoMas;
-});
-
 // Desplegar/ocultar las partes de un pedido dividido (Pedidos > Divididos): el botón
 // [data-target] alterna .is-expanded en la fila del pedido; el CSS anima la altura
 // de la fila de partes correspondiente vía el selector de hermanos.
@@ -47,6 +26,156 @@ document.addEventListener('click', function (e) {
     });
     if (enlace) enlace.click();
 });
+
+// Paginación según la pantalla: el usuario ve en cada página las filas que caben en la ventana (mínimo 4),
+// para desplazarse lo menos posible. Dos casos:
+//  - [data-pf-paginar] (tabla o lista): la página trae todas las filas y aquí se reparten en páginas, con la
+//    misma barra .pf-paginacion de _Paginacion.cshtml. Las filas que oculta un filtro de la vista (.d-none) no
+//    cuentan; tras filtrar, la vista lanza 'pf:repaginar' sobre la tabla ({ detail: { inicio: true } } vuelve a la 1).
+//  - [data-pf-filas-servidor="lista"] (pedidos, historial): pagina el servidor; aquí solo se calcula el tamaño y se
+//    guarda en la cookie pf_filas_<lista>, que lee Paginacion.FilasPorPantalla. Si no coincide, se recarga una vez.
+(function () {
+    var MIN = 4, MAX = 50, PREDETERMINADO = 8;
+    var RESERVA = 96; // barra de paginación + margen inferior de la tarjeta
+
+    function filas(contenedor) {
+        var cuerpo = contenedor.tBodies ? contenedor.tBodies[0] : contenedor;
+        return cuerpo ? Array.prototype.slice.call(cuerpo.children) : [];
+    }
+
+    // Cuántas filas del alto promedio de "items" caben entre el inicio del cuerpo y el borde inferior de la ventana.
+    // Una tabla que empieza más abajo del primer pantallazo se ajusta a la ventana completa, al desplazarse hasta ella.
+    function filasQueCaben(contenedor, items) {
+        var medibles = items.filter(function (f) { return f.offsetHeight > 4; });
+        if (!medibles.length) return PREDETERMINADO;
+        var alto = medibles.reduce(function (suma, f) { return suma + f.offsetHeight; }, 0) / medibles.length;
+        var cuerpo = contenedor.tBodies ? contenedor.tBodies[0] : contenedor;
+        var barra = document.querySelector('.pf-topbar');
+        var espacio = window.innerHeight - (cuerpo.getBoundingClientRect().top + window.scrollY) - RESERVA;
+        if (espacio < MIN * alto) {
+            var encabezado = contenedor.tHead ? contenedor.tHead.offsetHeight : 0;
+            espacio = window.innerHeight - (barra ? barra.offsetHeight : 0) - encabezado - RESERVA;
+        }
+        return Math.min(MAX, Math.max(MIN, Math.floor(espacio / alto)));
+    }
+
+    function paginar(contenedor) {
+        var estado = contenedor._pfPaginacion;
+        var items = filas(contenedor).filter(function (f) { return !f.classList.contains('d-none'); });
+        // Se mide con todas las filas a la vista; el navegador no pinta entre esto y el reparto de abajo
+        items.forEach(function (f) { f.hidden = false; });
+        var porPagina = filasQueCaben(contenedor, items);
+        var total = items.length;
+        var paginas = Math.max(1, Math.ceil(total / porPagina));
+        // Si cambió el tamaño de la ventana, se sigue viendo la primera fila que estaba a la vista
+        if (estado.porPagina) estado.pagina = Math.floor((estado.pagina - 1) * estado.porPagina / porPagina) + 1;
+        estado.pagina = Math.min(Math.max(1, estado.pagina), paginas);
+        estado.porPagina = porPagina;
+        var desde = (estado.pagina - 1) * porPagina;
+        items.forEach(function (f, i) { f.hidden = i < desde || i >= desde + porPagina; });
+        dibujarBarra(contenedor, estado, paginas, total, desde, porPagina);
+    }
+
+    function dibujarBarra(contenedor, estado, paginas, total, desde, porPagina) {
+        var nav = estado.nav;
+        if (!nav) {
+            nav = estado.nav = document.createElement('nav');
+            nav.className = 'pf-paginacion';
+            nav.setAttribute('aria-label', 'Páginas');
+            (contenedor.closest('.table-responsive') || contenedor).after(nav);
+            nav.addEventListener('click', function (e) {
+                var btn = e.target.closest('button[data-pagina]');
+                if (!btn) return;
+                var etiqueta = btn.getAttribute('aria-label');
+                estado.pagina = Number(btn.dataset.pagina);
+                paginar(contenedor);
+                // El botón pulsado se redibuja: el foco vuelve al mismo control (o a la página actual)
+                var foco = nav.querySelector('[aria-label="' + etiqueta + '"]') || nav.querySelector('[aria-current]');
+                if (foco) foco.focus({ preventScroll: true });
+            });
+        }
+        nav.hidden = paginas <= 1;
+        if (nav.hidden) return;
+
+        function boton(pagina, contenido, etiqueta, activo) {
+            return activo
+                ? '<li><button type="button" data-pagina="' + pagina + '" aria-label="' + etiqueta + '">' + contenido + '</button></li>'
+                : '<li><span class="deshabilitado" aria-hidden="true">' + contenido + '</span></li>';
+        }
+
+        var html = '<span class="pf-paginacion__resumen">' + (desde + 1) + ' a ' + Math.min(desde + porPagina, total) + ' de ' + total + '</span><ul>';
+        html += boton(estado.pagina - 1, '<i class="bi bi-chevron-left" aria-hidden="true"></i>', 'Página anterior', estado.pagina > 1);
+        // Primera, última y dos a cada lado de la actual, como _Paginacion.cshtml
+        var salto = false;
+        for (var p = 1; p <= paginas; p++) {
+            if (p === 1 || p === paginas || Math.abs(p - estado.pagina) <= 2) {
+                html += p === estado.pagina
+                    ? '<li><span class="actual" aria-current="page" aria-label="Página ' + p + '" tabindex="-1">' + p + '</span></li>'
+                    : boton(p, p, 'Página ' + p, true);
+                salto = false;
+            } else if (!salto) {
+                html += '<li><span class="salto" aria-hidden="true">…</span></li>';
+                salto = true;
+            }
+        }
+        html += boton(estado.pagina + 1, '<i class="bi bi-chevron-right" aria-hidden="true"></i>', 'Página siguiente', estado.pagina < paginas);
+        nav.innerHTML = html + '</ul>';
+    }
+
+    function ajustarServidor(contenedor) {
+        var lista = contenedor.dataset.pfFilasServidor;
+        var porPagina = filasQueCaben(contenedor, filas(contenedor));
+        var guardada = (document.cookie.match(new RegExp('(?:^|; )pf_filas_' + lista + '=(\\d+)')) || [])[1];
+        if (String(porPagina) === guardada) return false;
+        document.cookie = 'pf_filas_' + lista + '=' + porPagina + '; path=/; max-age=31536000; SameSite=Lax';
+        if (Number(contenedor.dataset.pfTamano) === porPagina) return false;
+        // Una sola recarga seguida por página: si la medida cambiara al recargar, no se entra en un ciclo
+        try {
+            if (sessionStorage.getItem('pfFilasRecarga') === location.href) return false;
+            sessionStorage.setItem('pfFilasRecarga', location.href);
+        } catch (e) { return false; }
+        location.reload();
+        return true;
+    }
+
+    var paginados = Array.prototype.slice.call(document.querySelectorAll('[data-pf-paginar]'));
+    paginados.forEach(function (contenedor) {
+        // Si la vista resalta una fila recién creada o editada, se abre en su página
+        var destacada = filas(contenedor).findIndex(function (f) { return f.classList.contains('pf-row-flash'); });
+        contenedor._pfPaginacion = { pagina: 1 };
+        contenedor.addEventListener('pf:repaginar', function (e) {
+            if (e.detail && e.detail.inicio) contenedor._pfPaginacion.pagina = 1;
+            paginar(contenedor);
+        });
+        paginar(contenedor);
+        if (destacada >= contenedor._pfPaginacion.porPagina) {
+            contenedor._pfPaginacion.pagina = Math.floor(destacada / contenedor._pfPaginacion.porPagina) + 1;
+            paginar(contenedor);
+        }
+    });
+
+    var delServidor = Array.prototype.slice.call(document.querySelectorAll('[data-pf-filas-servidor]'));
+    // Tras cargar fuentes e imágenes las filas ya tienen su alto definitivo
+    window.addEventListener('load', function () {
+        paginados.forEach(paginar);
+        if (!delServidor.some(ajustarServidor)) {
+            try { sessionStorage.removeItem('pfFilasRecarga'); } catch (e) { }
+        }
+    });
+
+    // Al cambiar el tamaño de la ventana se reparten de nuevo; las del servidor lo aplican en la próxima visita
+    var espera;
+    window.addEventListener('resize', function () {
+        clearTimeout(espera);
+        espera = setTimeout(function () {
+            paginados.forEach(paginar);
+            delServidor.forEach(function (c) {
+                var porPagina = filasQueCaben(c, filas(c));
+                document.cookie = 'pf_filas_' + c.dataset.pfFilasServidor + '=' + porPagina + '; path=/; max-age=31536000; SameSite=Lax';
+            });
+        }, 150);
+    });
+})();
 
 // Pestañas de vista (Pedidos / Divididos): al elegir otra pestaña, la píldora blanca se desliza
 // hasta ella y al terminar se navega. Sin JavaScript siguen siendo enlaces con su propio fondo.
@@ -472,6 +601,7 @@ window.addEventListener('pageshow', function (e) {
             var vecino = item.nextElementSibling || item.previousElementSibling;
             var teniaFoco = item.contains(document.activeElement);
             return descartar(item).then(function () {
+                lista.dispatchEvent(new Event('pf:repaginar'));
                 if (teniaFoco && vecino) {
                     var siguienteBtn = vecino.querySelector('.pf-notif-read');
                     if (siguienteBtn) siguienteBtn.focus({ preventScroll: true });

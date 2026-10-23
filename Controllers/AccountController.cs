@@ -177,6 +177,19 @@ namespace PickingApp.Controllers
                 return ErrorLogin(model);
             }
 
+            // Primer inicio de sesión de un usuario nuevo: antes de entrar confirma con un código que el correo es suyo.
+            // El correo queda en TempData (cookie protegida), no en la URL: solo quien escribió la contraseña puede verificar.
+            if (!usuario.CorreoVerificado)
+            {
+                usuario.IntentosFallidos = 0;
+                await EnviarCodigoCorreoAsync(usuario);
+                TempData[CorreoPorVerificar] = usuario.Correo;
+
+                return EsEnvioConFetch
+                    ? Json(new { ok = true, url = Url.Action(nameof(VerificarCorreo)) })
+                    : RedirectToAction(nameof(VerificarCorreo));
+            }
+
             // Inicio de sesión exitoso: se reinician los intentos y se guarda la fecha de acceso
             usuario.IntentosFallidos = 0;
             usuario.UltimoAcceso = DateTime.Now;
@@ -191,6 +204,103 @@ namespace PickingApp.Controllers
             TempData["JustLoggedIn"] = true;
 
             return IrADestino(returnUrl);
+        }
+
+        private const string CorreoPorVerificar = "CorreoPorVerificar";
+
+        // Usuario sin verificar que ya escribió su contraseña en este navegador (lo deja Login en TempData)
+        private async Task<Usuario?> UsuarioPorVerificarAsync()
+        {
+            if (TempData.Peek(CorreoPorVerificar) is not string correo) return null;
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Correo == correo);
+            return usuario is { CorreoVerificado: false, Estado: EstadosUsuario.Activo } ? usuario : null;
+        }
+
+        // Mismo código de 6 dígitos que la recuperación de contraseña (10 minutos, 5 intentos). False si el correo no salió.
+        private async Task<bool> EnviarCodigoCorreoAsync(Usuario usuario)
+        {
+            var codigo = AsignarCodigoVerificacion(usuario);
+            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo, PropositoCodigo.VerificarCorreo);
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Solicitud Código Verificación", "Seguridad",
+                    "Se envió un código para verificar el correo en el primer inicio de sesión.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Error Envío Código", "Seguridad",
+                    $"No se pudo enviar el código de verificación del correo: {ex.Message}");
+                TempData["ErrorMessage"] = "No pudimos enviar el código a tu correo. Inténtalo de nuevo con «Reenviar código».";
+                return false;
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> VerificarCorreo()
+        {
+            var usuario = await UsuarioPorVerificarAsync();
+            if (usuario == null) return RedirectToAction(nameof(Login));
+
+            return View(new VerificarCorreoViewModel { Correo = usuario.Correo });
+        }
+
+        // El correo sale de TempData y no del formulario: no se pueden probar códigos contra otra cuenta
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [EnableRateLimiting("CodigoVerificacion")]
+        public async Task<IActionResult> VerificarCorreo(VerificarCorreoViewModel model)
+        {
+            var usuario = await UsuarioPorVerificarAsync();
+            if (usuario == null) return RedirectToAction(nameof(Login));
+            model.Correo = usuario.Correo;
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            if (!CodigoCoincide(usuario, model.Codigo))
+            {
+                var anulado = await RegistrarFalloCodigoAsync(usuario);
+                ModelState.AddModelError("Codigo", anulado
+                    ? "Superaste el número de intentos permitidos. Pide un código nuevo."
+                    : "El código ingresado no es válido o ha expirado.");
+                return View(model);
+            }
+
+            usuario.CorreoVerificado = true;
+            usuario.CodigoVerificacionHash = null;
+            usuario.CodigoVerificacionExpira = null;
+            usuario.IntentosCodigo = 0;
+            usuario.UltimoAcceso = DateTime.Now;
+            await _context.SaveChangesAsync();
+            TempData.Remove(CorreoPorVerificar);
+
+            await IniciarSesionAsync(usuario);
+
+            await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Correo Verificado", "Seguridad",
+                "El usuario verificó su correo con el código enviado e inició sesión por primera vez.");
+
+            TempData["JustLoggedIn"] = true;
+            return RedirectToAction("Index", "Home");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [EnableRateLimiting("CodigoVerificacion")]
+        public async Task<IActionResult> ReenviarCodigoCorreo()
+        {
+            var usuario = await UsuarioPorVerificarAsync();
+            if (usuario == null) return RedirectToAction(nameof(Login));
+
+            if (await EnviarCodigoCorreoAsync(usuario))
+            {
+                TempData["SuccessMessage"] = "Te enviamos un código nuevo.";
+            }
+            return RedirectToAction(nameof(VerificarCorreo));
         }
 
         private IActionResult IrADestino(string? returnUrl)
@@ -332,14 +442,20 @@ namespace PickingApp.Controllers
 
             // El mensaje y el redireccionamiento son idénticos exista o no la cuenta, para no filtrar
             // qué correos están registrados (evita enumeración de usuarios).
-            if (usuario != null)
+            // Un correo sin verificar no recibe código: primero debe probarse que el correo es real.
+            if (usuario != null && !usuario.CorreoVerificado)
+            {
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Recuperación Sin Verificar", "Seguridad",
+                    "Se pidió recuperar la contraseña de una cuenta con el correo sin verificar; no se envió código.");
+            }
+            else if (usuario != null)
             {
                 var codigo = AsignarCodigoVerificacion(usuario);
                 await _context.SaveChangesAsync();
 
                 try
                 {
-                    await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo, esCambioContrasena: false);
+                    await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo, PropositoCodigo.RecuperarContrasena);
                     await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Solicitud Código Recuperación", "Seguridad",
                         "Se generó y envió un código de verificación para recuperar la contraseña.");
                 }
@@ -468,7 +584,7 @@ namespace PickingApp.Controllers
 
             try
             {
-                await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo, esCambioContrasena: true);
+                await _emailService.EnviarCodigoVerificacionAsync(usuario.Correo, usuario.NombreCompleto, codigo, PropositoCodigo.CambiarContrasena);
                 await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Solicitud Código Cambio Contraseña", "Seguridad",
                     "Se envió un código de verificación al correo para confirmar el cambio de contraseña.");
             }
