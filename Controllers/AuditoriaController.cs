@@ -27,7 +27,8 @@ namespace PickingApp.Controllers
             _datosDemostracion = datosDemostracion;
         }
 
-        private const int RegistrosPorPagina = 50;
+        // El LOG va fijo a 10 por página (pedido del profesor); el resto de listas se ajusta a la pantalla
+        private const int RegistrosPorPagina = 10;
 
         // CU-38: Consultar LOG del sistema
         public async Task<IActionResult> Index(string? modulo, string? usuario, DateTime? fechaDesde, DateTime? fechaHasta, int? pagina)

@@ -9,10 +9,11 @@
   <title>{{TITULO}} · PickFlow</title>
   <!--
     Plantilla de correo de PickFlow para el código de verificación de 6 dígitos.
-    Sirve para los dos flujos: recuperar contraseña y confirmar un cambio de contraseña.
+    Sirve para los tres flujos: recuperar contraseña, confirmar un cambio de contraseña y verificar el correo
+    en el primer inicio de sesión (EmailService, PropositoCodigo).
 
     Marcadores (todos se reemplazan con texto codificado en HTML):
-      {{TITULO}}   "Recupera tu contraseña"  |  "Confirma el cambio de contraseña"
+      {{TITULO}}   "Recupera tu contraseña"  |  "Confirma el cambio de contraseña"  |  "Verifica tu correo"
       {{INTRO}}    párrafo que explica por qué llega el correo
       {{NOMBRE}}   nombre completo del usuario
       {{CODIGO}}   código de 6 dígitos
@@ -153,7 +154,7 @@
                       <tr>
                         <td class="linea tinta2" style="border-top:1px solid #E3E8EF; padding-top:24px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:14px; line-height:21px; color:#556070;">
                           <strong class="tinta" style="color:#1A2433;">¿No fuiste tú?</strong>
-                          Ignora este correo: tu contraseña no cambia sin este código.
+                          Ignora este correo: nada cambia en tu cuenta sin este código.
                           Nadie de PickFlow te lo pedirá por teléfono, chat o correo, así que no lo compartas.
                           Si te siguen llegando sin haberlos pedido, avisa al administrador del sistema.
                         </td>

@@ -887,6 +887,9 @@ namespace PickingApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<bool>("CorreoVerificado")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasColumnType("enum('Activo','Inactivo','Bloqueado')");
