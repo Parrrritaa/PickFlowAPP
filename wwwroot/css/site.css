@@ -1028,17 +1028,17 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     color: var(--pf-on-accent) !important;
 }
 
-/* Apariencia oscura: el naranja fuerte solo aparece al pasar el cursor; en reposo el botón usa el naranja tenue
+/* Ambas apariencias: el naranja fuerte solo aparece al pasar el cursor; en reposo el botón usa el naranja tenue
    (el mismo de los botones de las tablas). */
-:root[data-theme="dark"] :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary) {
+:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary) {
     background-color: var(--pf-pill);
     border-color: transparent;
     color: var(--pf-accent-text) !important;
     box-shadow: none;
 }
 
-:root[data-theme="dark"] :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary):hover:not(:disabled, .disabled, [aria-disabled="true"]),
-:root[data-theme="dark"] :is(.btn-primary):is(:focus, :active):not(:disabled, .disabled) {
+:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary):hover:not(:disabled, .disabled, [aria-disabled="true"]),
+:root :is(.btn-primary):is(:focus, :active):not(:disabled, .disabled) {
     background-color: var(--pf-accent);
     border-color: var(--pf-accent);
     color: var(--pf-on-accent) !important;
