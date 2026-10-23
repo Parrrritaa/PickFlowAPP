@@ -27,6 +27,54 @@ document.addEventListener('click', function (e) {
     if (enlace) enlace.click();
 });
 
+// Validación en el navegador antes de enviar: un error que solo detectara el servidor recargaría la página, y el
+// navegador nunca vuelve a llenar los campos de contraseña. Lo simple va en atributos HTML que el navegador ya
+// respeta (required, pattern, minlength, type="email"); aquí solo lo que esos atributos no cubren:
+//  - [data-pf-igual="nombre"]: debe coincidir con el campo de ese name (confirmar contraseña).
+//  - [data-pf-correo-disponible="url"]: pregunta al servidor (POST, true/false) si el correo ya está en uso.
+(function () {
+    document.querySelectorAll('[data-pf-igual]').forEach(function (campo) {
+        var otro = campo.form.elements[campo.dataset.pfIgual];
+        function comparar() {
+            campo.setCustomValidity(campo.value && campo.value !== otro.value ? 'Las contraseñas no coinciden.' : '');
+        }
+        campo.addEventListener('input', comparar);
+        otro.addEventListener('input', comparar);
+    });
+
+    document.querySelectorAll('[data-pf-correo-disponible]').forEach(function (campo) {
+        var form = campo.form;
+        var revisado = null; // correo ya consultado (con su resultado aplicado)
+
+        function consultar() {
+            var correo = campo.value.trim().toLowerCase();
+            campo.setCustomValidity('');
+            if (!correo || !campo.checkValidity()) return Promise.resolve();
+            var datos = new URLSearchParams({ correo: correo, __RequestVerificationToken: form.elements['__RequestVerificationToken'].value });
+            return fetch(campo.dataset.pfCorreoDisponible, { method: 'POST', body: datos, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : true; })
+                .then(function (libre) {
+                    if (campo.value.trim().toLowerCase() !== correo) return; // lo cambiaron mientras respondía
+                    revisado = correo;
+                    campo.setCustomValidity(libre ? '' : 'Ese correo ya está en uso por otro usuario o por un empleado.');
+                    if (!libre) campo.reportValidity();
+                })
+                .catch(function () { revisado = correo; }); // sin respuesta: lo decide el servidor al enviar
+        }
+
+        campo.addEventListener('input', function () { campo.setCustomValidity(''); revisado = null; });
+        campo.addEventListener('change', consultar);
+        // Si se envía antes de que llegue la respuesta, se espera y luego se reenvía (o se muestra el aviso)
+        form.addEventListener('submit', function (e) {
+            if (revisado === campo.value.trim().toLowerCase()) return;
+            e.preventDefault();
+            consultar().then(function () {
+                if (campo.checkValidity()) form.requestSubmit(); else campo.reportValidity();
+            });
+        });
+    });
+})();
+
 // Paginación según la pantalla: el usuario ve en cada página las filas que caben en la ventana (mínimo 4),
 // para desplazarse lo menos posible. Dos casos:
 //  - [data-pf-paginar] (tabla o lista): la página trae todas las filas y aquí se reparten en páginas, con la

@@ -26,7 +26,8 @@
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
                 <label class="pf-label">Correo electronico <span class="text-danger">*</span></label>
-                <input asp-for="Correo" type="email" class="pf-input" placeholder="" required />
+                <input asp-for="Correo" type="email" class="pf-input" placeholder="" required
+                       data-pf-correo-disponible="@Url.Action("CorreoDisponible")" />
                 <span asp-validation-for="Correo" class="text-danger small"></span>
             </div>
             <div class="col-md-6 pf-form-group">
@@ -60,11 +61,11 @@
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
                 <label class="pf-label">Contraseña <span class="text-danger">*</span></label>
-                <input type="password" name="password" class="pf-input" required />
+                <input type="password" name="password" class="pf-input" autocomplete="new-password" required minlength="6" maxlength="100" pattern="(?=.*[A-Za-z])(?=.*\d).{6,}" title="Al menos 6 caracteres, con al menos una letra y un número" />
             </div>
             <div class="col-md-6 pf-form-group">
                 <label class="pf-label">Confirmar contraseña <span class="text-danger">*</span></label>
-                <input type="password" name="confirmPassword" class="pf-input" required />
+                <input type="password" name="confirmPassword" class="pf-input" autocomplete="new-password" required data-pf-igual="password" />
             </div>
         </div>
 
@@ -80,7 +81,7 @@
             </div>
             <div class="col-md-6">
                 <div class="pf-alert-warning mt-2 mb-0" style="font-size: 13px; font-weight: normal;">
-                    La contraseña asignada es temporal, el usuario podrá crear una solicitud para cambiarla cuando lo desee desde el apartado 'olvidaste tu contraseña'.
+                    La contraseña asignada es temporal; el usuario podrá cambiarla cuando lo desee desde la opción 'Cambiar contraseña', después de iniciar sesión.
                 </div>
             </div>
         </div>
