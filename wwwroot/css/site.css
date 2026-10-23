@@ -1029,15 +1029,15 @@ html.pf-hoja-abierta .pf-hoja-fondo {
 }
 
 /* Ambas apariencias: el naranja fuerte solo aparece al pasar el cursor; en reposo el botón usa el naranja tenue
-   (el mismo de los botones de las tablas). */
-:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary) {
+   (el mismo de los botones de las tablas). El de iniciar sesión (.btn-pf-login) se queda en naranja fuerte. */
+:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .pf-alert-btn--primary) {
     background-color: var(--pf-pill);
     border-color: transparent;
     color: var(--pf-accent-text) !important;
     box-shadow: none;
 }
 
-:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary):hover:not(:disabled, .disabled, [aria-disabled="true"]),
+:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .pf-alert-btn--primary):hover:not(:disabled, .disabled, [aria-disabled="true"]),
 :root :is(.btn-primary):is(:focus, :active):not(:disabled, .disabled) {
     background-color: var(--pf-accent);
     border-color: var(--pf-accent);
