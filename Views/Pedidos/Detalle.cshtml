@@ -17,8 +17,6 @@
     var puedeDeshacerDivision = pedido.PuedeDeshacerDivision;
     var esGestor = userRole == Roles.Administrador || userRole == Roles.Supervisor;
     if (totalUbicaciones == 0) totalUbicaciones = pedido.Detalles.Count;
-    const int productosVisibles = 5;
-    var productosOcultos = Math.Max(0, pedido.Detalles.Count - productosVisibles);
     var pasillosPedido = pedido.Detalles
         .Where(d => d.Ubicacion != null)
         .Select(d => d.Ubicacion!.Pasillo)
@@ -193,7 +191,7 @@
             }
         </div>
         <div class="table-responsive">
-            <table class="pf-table" id="tablaProductosPedido">
+            <table class="pf-table" id="tablaProductosPedido" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>Producto</th>
@@ -205,10 +203,9 @@
                 <tbody>
                     @if (pedido.Detalles.Any())
                     {
-                        var indice = 0;
                         @foreach (var d in pedido.Detalles)
                         {
-                            <tr class="fila-producto @(indice++ >= productosVisibles ? "fila-extra d-none" : "")"
+                            <tr class="fila-producto"
                                 data-buscar="@($"{d.NombreProducto} {d.CodigoProducto} {d.Ubicacion?.CodigoUbicacion}".ToLowerInvariant())"
                                 data-pasillo="@(d.Ubicacion?.Pasillo)">
                                 <td class="fw-semibold">@d.NombreProducto</td>
@@ -249,16 +246,6 @@
                 </tbody>
             </table>
         </div>
-        @if (productosOcultos > 0)
-        {
-            <div class="text-center mt-2" id="contenedorVerMasProductos">
-                <button type="button" id="btnVerMasProductos" class="btn btn-link fw-semibold text-decoration-none"
-                        data-ver-mas="tablaProductosPedido"
-                        data-texto-mas="Ver más (@productosOcultos productos)" data-texto-menos="Ver menos">
-                    Ver más (@productosOcultos productos)
-                </button>
-            </div>
-        }
     </div>
 
     <!-- Novedades registradas (CU-29 / CU-30) -->
@@ -530,34 +517,28 @@
 
 @section Scripts {
     <script>
-        // Con un filtro activo se muestran todas las coincidencias (sin el límite de 5);
-        // al limpiarlo se recupera el estado de "Ver más / Ver menos".
+        // Oculta los productos que no coinciden y vuelve a la primera página de la tabla (paginación de site.js)
         (function () {
             var texto = document.getElementById('filtroProductoTexto');
             var pasillo = document.getElementById('filtroProductoPasillo');
             if (!texto) return;
-            var filas = document.querySelectorAll('#tablaProductosPedido .fila-producto');
+            var tabla = document.getElementById('tablaProductosPedido');
+            var filas = tabla.querySelectorAll('.fila-producto');
             var sinCoincidencias = document.getElementById('filaSinCoincidencias');
-            var contenedorVerMas = document.getElementById('contenedorVerMasProductos');
-            var btnVerMas = document.getElementById('btnVerMasProductos');
 
             function aplicar() {
                 var t = texto.value.trim().toLowerCase();
                 var pas = pasillo ? pasillo.value : '';
-                var activo = t !== '' || pas !== '';
-                var expandido = btnVerMas && btnVerMas.dataset.expandido === 'true';
                 var visibles = 0;
 
                 filas.forEach(function (f) {
-                    var mostrar = activo
-                        ? f.dataset.buscar.indexOf(t) !== -1 && (pas === '' || f.dataset.pasillo === pas)
-                        : !f.classList.contains('fila-extra') || expandido;
+                    var mostrar = f.dataset.buscar.indexOf(t) !== -1 && (pas === '' || f.dataset.pasillo === pas);
                     f.classList.toggle('d-none', !mostrar);
                     if (mostrar) visibles++;
                 });
 
-                sinCoincidencias.classList.toggle('d-none', !(activo && visibles === 0));
-                if (contenedorVerMas) contenedorVerMas.classList.toggle('d-none', activo);
+                sinCoincidencias.classList.toggle('d-none', visibles > 0);
+                tabla.dispatchEvent(new CustomEvent('pf:repaginar', { detail: { inicio: true } }));
             }
 
             texto.addEventListener('input', aplicar);

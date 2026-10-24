@@ -44,7 +44,7 @@
     @* Los filtros viajan por GET en la URL y llegan a SolicitudesController como FiltrosSolicitudes *@
     <form method="get" asp-action="@accion" id="formFiltrosSolicitudes">
         <div class="table-responsive">
-            <table class="pf-table">
+            <table class="pf-table" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>

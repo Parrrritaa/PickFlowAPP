@@ -14,7 +14,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="pf-table">
+        <table class="pf-table" data-pf-paginar>
             <thead>
                 <tr>
                     <th>Correo</th>
@@ -33,7 +33,7 @@
                             <td class="fw-semibold">@u.Correo</td>
                             <td>@u.NombreCompleto</td>
                             <td>@u.NombreRol</td>
-                            <td>@u.Estado</td>
+                            <td>@(u.CorreoVerificado ? u.Estado : "No verificado")</td>
                             <td class="text-center">
                                 <div class="d-flex gap-2 justify-content-center">
                                     <a asp-action="Editar" asp-route-id="@u.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">

@@ -46,7 +46,6 @@ namespace PickingApp.Controllers
             });
         }
 
-        private const int HistorialPorPagina = 20;
         private const int PedidosEnGrafica = 30;
 
         // Ficha de historial: tiempo real contra estimado de cada pedido completado y la tendencia del empleado.
@@ -91,7 +90,7 @@ namespace PickingApp.Controllers
 
             var cuentan = filas.Where(f => f.CuentaParaRendimiento).ToList();
             var conEstimado = filas.Where(f => f.Estimado > 0).ToList();
-            var paginacion = new Paginacion(pagina, HistorialPorPagina, filas.Count);
+            var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, "historial"), filas.Count);
 
             return View(new EmpleadoHistorialViewModel
             {

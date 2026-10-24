@@ -32,7 +32,7 @@
     @if (hayBusquedaProducto)
     {
         <div class="table-responsive mt-4">
-            <table class="pf-table">
+            <table class="pf-table" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>Producto</th>
@@ -90,7 +90,7 @@
             <input type="hidden" name="busquedaProducto" value="@busquedaProducto" />
         }
         <div class="table-responsive">
-            <table class="pf-table">
+            <table class="pf-table" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>Bodega</th>

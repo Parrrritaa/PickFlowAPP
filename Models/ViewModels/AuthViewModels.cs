@@ -42,6 +42,16 @@ namespace PickingApp.Models.ViewModels
     }
 
     // CU-03: paso 2 de recuperación: código de verificación + nueva contraseña.
+    // Primer inicio de sesión: el código que confirma que el correo es real. Correo solo se muestra; el servidor usa el de TempData
+    public class VerificarCorreoViewModel
+    {
+        public string Correo { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El código de verificación es obligatorio.")]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "El código debe tener 6 dígitos.")]
+        public string Codigo { get; set; } = string.Empty;
+    }
+
     public class VerificarCodigoRecuperacionViewModel
     {
         [Required]

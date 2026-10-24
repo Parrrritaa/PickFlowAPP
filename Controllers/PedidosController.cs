@@ -31,8 +31,6 @@ namespace PickingApp.Controllers
             _auditService = auditService;
         }
 
-        private const int PedidosPorPagina = 25;
-
         // CU-24: Consultar pedidos con filtros
         // vista = "divididos" muestra aparte los pedidos divididos con sus partes, para no saturar la lista principal
         public async Task<IActionResult> Index(string? estado, string? prioridad, int? bodegaId, string? busqueda,
@@ -107,7 +105,7 @@ namespace PickingApp.Controllers
             }
 
             // Solo se trae la página pedida: primero se cuenta el total con los filtros y luego Skip/Take
-            var paginacion = new Paginacion(pagina, PedidosPorPagina, await query.CountAsync());
+            var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, "pedidos"), await query.CountAsync());
 
             // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes.
             // El Id al final deja el orden fijo, para que un pedido no salte de una página a otra.

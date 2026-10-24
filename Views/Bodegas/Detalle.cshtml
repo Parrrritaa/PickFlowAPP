@@ -6,8 +6,6 @@
     var ubicacionesPorBodega = Model.UbicacionesPorBodega;
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var puedeEliminarUbicacion = userRole == Roles.Administrador || userRole == Roles.Supervisor;
-    const int ubicacionesVisibles = 5;
-    var ubicacionesOcultas = Math.Max(0, (bodega.Ubicaciones?.Count ?? 0) - ubicacionesVisibles);
     var filtroUbicacion = Model.FiltroUbicacion;
     var filtroProducto = Model.FiltroProducto;
     var activoUbicacion = !string.IsNullOrWhiteSpace(filtroUbicacion);
@@ -59,7 +57,7 @@
             <form method="get" asp-action="Detalle" id="formFiltrosUbicaciones">
                 <input type="hidden" name="id" value="@bodega.Id" />
                 <div class="table-responsive">
-                    <table class="pf-table" id="tablaUbicaciones">
+                    <table class="pf-table" id="tablaUbicaciones" data-pf-paginar>
                         <thead>
                             <tr>
                                 <th>
@@ -109,10 +107,9 @@
                         <tbody>
                         @if (bodega.Ubicaciones != null && bodega.Ubicaciones.Any())
                         {
-                            var indice = 0;
                             @foreach (var u in bodega.Ubicaciones)
                             {
-                                <tr class="@(indice++ >= ubicacionesVisibles ? "fila-extra d-none" : "")">
+                                <tr>
                                     <td class="fw-semibold">@u.CodigoUbicacion</td>
                                     <td>
                                         @if (u.Producto != null)
@@ -153,16 +150,6 @@
                         </tbody>
                     </table>
                 </div>
-                @if (ubicacionesOcultas > 0)
-                {
-                    <div class="text-center mt-2">
-                        <button type="button" class="btn btn-link fw-semibold text-decoration-none"
-                                data-ver-mas="tablaUbicaciones"
-                                data-texto-mas="Ver más (@ubicacionesOcultas ubicaciones)" data-texto-menos="Ver menos">
-                            Ver más (@ubicacionesOcultas ubicaciones)
-                        </button>
-                    </div>
-                }
             </form>
         </div>
     </div>
