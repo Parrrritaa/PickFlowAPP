@@ -3,7 +3,13 @@
     ViewData["Title"] = "Editar empleado";
     var nombres = "";
     var apellidos = "";
-    if (!string.IsNullOrEmpty(Model.NombreCompleto))
+    // Si el servidor rechaza el formulario, nombres y apellidos vuelven tal como se escribieron
+    if (Context.Request.HasFormContentType)
+    {
+        nombres = Context.Request.Form["nombres"].ToString();
+        apellidos = Context.Request.Form["apellidos"].ToString();
+    }
+    else if (!string.IsNullOrEmpty(Model.NombreCompleto))
     {
         var parts = Model.NombreCompleto.Split(' ', 2);
         nombres = parts[0];
@@ -41,11 +47,11 @@
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
                 <label class="pf-label">Nombres <span class="text-danger">*</span></label>
-                <input type="text" id="inputNombres" class="pf-input" value="@nombres" required />
+                <input type="text" id="inputNombres" name="nombres" class="pf-input" value="@nombres" required />
             </div>
             <div class="col-md-6 pf-form-group">
                 <label class="pf-label">Apellidos <span class="text-danger">*</span></label>
-                <input type="text" id="inputApellidos" class="pf-input" value="@apellidos" required />
+                <input type="text" id="inputApellidos" name="apellidos" class="pf-input" value="@apellidos" required />
             </div>
         </div>
 
