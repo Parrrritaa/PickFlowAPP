@@ -28,7 +28,7 @@
             texto: v('--pf-ink2', '#4B5563'),
             rejilla: v('--pf-line', 'rgba(31,41,55,0.08)'),
             eje: v('--pf-line2', 'rgba(31,41,55,0.2)'),
-            tooltip: oscuro ? '#164079' : '#0F1B2D'
+            tooltip: oscuro ? '#26364F' : '#0F1B2D'
         };
     }
 

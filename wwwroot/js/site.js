@@ -81,7 +81,8 @@ document.addEventListener('click', function (e) {
 //    misma barra .pf-paginacion de _Paginacion.cshtml. Las filas que oculta un filtro de la vista (.d-none) no
 //    cuentan; tras filtrar, la vista lanza 'pf:repaginar' sobre la tabla ({ detail: { inicio: true } } vuelve a la 1).
 //  - [data-pf-filas-servidor="lista"] (pedidos, historial): pagina el servidor; aquí solo se calcula el tamaño y se
-//    guarda en la cookie pf_filas_<lista>, que lee Paginacion.FilasPorPantalla. Si no coincide, se recarga una vez.
+//    guarda en la cookie pf_filas_<lista>, que lee Paginacion.FilasPorPantalla. En la primera visita, si no coincide,
+//    se recarga una vez; después la medida nueva se usa en la próxima visita.
 (function () {
     var MIN = 4, MAX = 50, PREDETERMINADO = 8;
     var RESERVA = 96; // barra de paginación + margen inferior de la tarjeta
@@ -233,6 +234,9 @@ document.addEventListener('click', function (e) {
         if (String(porPagina) === guardada) return false;
         document.cookie = 'pf_filas_' + lista + '=' + porPagina + '; path=/; max-age=31536000; SameSite=Lax';
         if (Number(contenedor.dataset.pfTamano) === porPagina) return false;
+        // Solo se recarga la primera vez (sin medida guardada). Después la medida nueva se aplica en la próxima
+        // visita: el alto de las filas cambia con su contenido y recargar cada vez cargaba la página dos veces.
+        if (guardada) return false;
         // Una sola recarga seguida por página: si la medida cambiara al recargar, no se entra en un ciclo
         try {
             if (sessionStorage.getItem('pfFilasRecarga') === location.href) return false;

@@ -88,16 +88,18 @@
     --pf-banner-blue: var(--pf-blue-soft);
 }
 
-/* Apariencia oscura: navy de PickFlow. Se aplica con data-theme="dark" (elección guardada o tema del equipo). */
+/* Apariencia oscura: navy suavizado de PickFlow (saturación ~45 %; el navy puro se sentía pesado).
+   Cada nivel es un poco más claro que el de abajo: fondo, tarjeta, elementos elevados.
+   Se aplica con data-theme="dark" (elección guardada o tema del equipo). */
 :root[data-theme="dark"] {
     color-scheme: dark;
 
-    --pf-bg: #001736;
-    --pf-surface: #00204A;
-    --pf-surface2: #0A2C5C;
-    --pf-field: rgba(0, 23, 54, 0.6);
-    --pf-thumb: #164079;
-    --pf-avatar: #123A70;
+    --pf-bg: #0E1726;
+    --pf-surface: #152033;
+    --pf-surface2: #1D2A40;
+    --pf-field: rgba(14, 23, 38, 0.6);
+    --pf-thumb: #26364F;
+    --pf-avatar: #24334A;
     --pf-hover: rgba(255, 255, 255, 0.045);
     --pf-hover-strong: rgba(255, 255, 255, 0.09);
     --pf-line: rgba(255, 255, 255, 0.09);
@@ -107,10 +109,10 @@
     --pf-ink2: #A9B6C9;
     --pf-ink3: #8FA0B8;
 
-    --pf-glass: rgba(0, 23, 54, 0.72);
-    --pf-glass-strong: rgba(0, 32, 74, 0.88);
+    --pf-glass: rgba(14, 23, 38, 0.72);
+    --pf-glass-strong: rgba(21, 32, 51, 0.88);
     --pf-glass-line: rgba(255, 255, 255, 0.12);
-    --pf-scrim: rgba(0, 8, 20, 0.55);
+    --pf-scrim: rgba(5, 9, 15, 0.55);
     --pf-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
     --pf-shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
 
@@ -130,7 +132,7 @@
     --pf-bar: #24497F;
     --pf-track: rgba(255, 255, 255, 0.08);
     --pf-shadow-control: none;
-    --pf-navy-dark: #000814;
+    --pf-navy-dark: #05090F;
 }
 
 /* Si el usuario pidió reducir el movimiento en su sistema, las animaciones se vuelven instantáneas */
@@ -4522,14 +4524,20 @@ select.pf-input:not([multiple]):not([size]) {
     text-decoration: underline;
 }
 
+/* Prioridad: píldora con el texto del color sobre un fondo suave del mismo color; la palabra siempre dice la prioridad */
 .pf-prioridad {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--pf-ink2);
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
-.pf-prioridad.is-alta { color: var(--pf-accent-text); }
-.pf-prioridad.is-baja { color: var(--pf-ink3); }
+.pf-prioridad.is-alta { color: var(--pf-red); background: var(--pf-red-soft); }
+.pf-prioridad.is-media { color: var(--pf-amber); background: var(--pf-amber-soft); }
+.pf-prioridad.is-baja { color: var(--pf-green); background: var(--pf-green-soft); }
 
 /* Estado: el punto refuerza el color, el texto siempre dice el estado */
 .pf-estado-punto {
