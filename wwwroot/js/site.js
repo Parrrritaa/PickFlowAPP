@@ -107,6 +107,61 @@ document.addEventListener('click', function (e) {
         return Math.min(MAX, Math.max(MIN, Math.floor(espacio / alto)));
     }
 
+    // Entrada escalonada de las filas de la página nueva; animationend (abajo) quita la clase para poder repetirla
+    function animarFilas(items) {
+        items.forEach(function (f) { f.classList.remove('pf-pagina-in'); });
+        void document.body.offsetWidth;
+        items.forEach(function (f, i) {
+            f.style.setProperty('--pf-retraso', Math.min(i, 8) * 20 + 'ms');
+            f.classList.add('pf-pagina-in');
+        });
+    }
+
+    document.addEventListener('animationend', function (e) {
+        if (e.target.classList.contains('pf-pagina-in')) e.target.classList.remove('pf-pagina-in');
+    });
+
+    // Las listas que pagina el servidor (_Paginacion.cshtml) cambian de página sin recargar: se trae la página
+    // nueva y se reemplazan solo las filas y la barra, así no se repite la entrada de todo el apartado ni salta
+    // el scroll. Si algo falla (sesión vencida, error), se navega normalmente.
+    var urlMostrada = location.href.split('#')[0];
+    document.addEventListener('click', function (e) {
+        var enlace = e.target.closest('nav.pf-paginacion a[href]');
+        if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        var nav = enlace.closest('nav');
+        var tabla = nav.parentElement.querySelector('table.pf-table');
+        if (!tabla || !tabla.tBodies[0]) return;
+        e.preventDefault();
+        var indice = Array.prototype.indexOf.call(document.querySelectorAll('nav.pf-paginacion'), nav);
+        var etiqueta = enlace.getAttribute('aria-label');
+        tabla.classList.add('pf-paginando');
+        fetch(enlace.href, { credentials: 'same-origin' })
+            .then(function (r) {
+                if (!r.ok || r.redirected) throw new Error();
+                return r.text();
+            })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var navNueva = doc.querySelectorAll('nav.pf-paginacion')[indice];
+                var tablaNueva = navNueva && navNueva.parentElement.querySelector('table.pf-table');
+                if (!tablaNueva || !tablaNueva.tBodies[0]) throw new Error();
+                tabla.tBodies[0].replaceWith(tablaNueva.tBodies[0]);
+                nav.replaceWith(navNueva);
+                history.pushState(null, '', enlace.href);
+                urlMostrada = enlace.href.split('#')[0];
+                animarFilas(filas(tabla));
+                var foco = navNueva.querySelector('a[aria-label="' + etiqueta + '"]') || navNueva.querySelector('[aria-current]');
+                if (foco) foco.focus({ preventScroll: true });
+            })
+            .catch(function () { location.href = enlace.href; })
+            .finally(function () { tabla.classList.remove('pf-paginando'); });
+    });
+
+    // Atrás/adelante tras paginar así: la URL cambia pero las filas no, se recarga la página que corresponde
+    window.addEventListener('popstate', function () {
+        if (location.href.split('#')[0] !== urlMostrada) location.reload();
+    });
+
     function paginar(contenedor) {
         var estado = contenedor._pfPaginacion;
         var items = filas(contenedor).filter(function (f) { return !f.classList.contains('d-none'); });
@@ -137,6 +192,7 @@ document.addEventListener('click', function (e) {
                 var etiqueta = btn.getAttribute('aria-label');
                 estado.pagina = Number(btn.dataset.pagina);
                 paginar(contenedor);
+                animarFilas(filas(contenedor).filter(function (f) { return !f.hidden && !f.classList.contains('d-none'); }));
                 // El botón pulsado se redibuja: el foco vuelve al mismo control (o a la página actual)
                 var foco = nav.querySelector('[aria-label="' + etiqueta + '"]') || nav.querySelector('[aria-current]');
                 if (foco) foco.focus({ preventScroll: true });
