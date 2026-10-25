@@ -104,8 +104,9 @@ namespace PickingApp.Controllers
                 query = query.Where(p => p.FechaCarga < hastaExclusivo);
             }
 
-            // Solo se trae la página pedida: primero se cuenta el total con los filtros y luego Skip/Take
-            var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, "pedidos"), await query.CountAsync());
+            // Solo se trae la página pedida: primero se cuenta el total con los filtros y luego Skip/Take.
+            // Divididos tiene su propia medida: sus filas son más altas que las de Pedidos.
+            var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, verDivididos ? "divididos" : "pedidos"), await query.CountAsync());
 
             // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes.
             // El Id al final deja el orden fijo, para que un pedido no salte de una página a otra.
