@@ -83,7 +83,7 @@
             <input type="hidden" name="vista" value="divididos" />
         }
         <div class="table-responsive">
-            <table class="pf-table" data-pf-filas-servidor="pedidos" data-pf-tamano="@Model.Paginacion.TamanoPagina">
+            <table class="pf-table" data-pf-filas-servidor="@(verDivididos ? "divididos" : "pedidos")" data-pf-tamano="@Model.Paginacion.TamanoPagina">
                 <thead>
                     <tr>
                         <th>
