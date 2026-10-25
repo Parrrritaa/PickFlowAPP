@@ -32,6 +32,17 @@ namespace PickingApp.Controllers
             return View(usuarios);
         }
 
+        // Consulta del formulario de Crear (site.js, [data-pf-correo-disponible]) para avisar del correo repetido sin
+        // enviar el formulario: si el servidor lo rechazara, la página se recargaría y el navegador vaciaría las contraseñas.
+        // POST para que el correo no quede en la URL ni en los registros del servidor.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CorreoDisponible(string? correo)
+        {
+            var normalizado = ReglasEmpleado.NormalizarCorreo(correo);
+            return Json(normalizado == null || await ReglasEmpleado.CorreoDisponibleAsync(_context, normalizado, null));
+        }
+
         [HttpGet]
         public IActionResult Crear()
         {

@@ -27,13 +27,62 @@ document.addEventListener('click', function (e) {
     if (enlace) enlace.click();
 });
 
+// Validación en el navegador antes de enviar: un error que solo detectara el servidor recargaría la página, y el
+// navegador nunca vuelve a llenar los campos de contraseña. Lo simple va en atributos HTML que el navegador ya
+// respeta (required, pattern, minlength, type="email"); aquí solo lo que esos atributos no cubren:
+//  - [data-pf-igual="nombre"]: debe coincidir con el campo de ese name (confirmar contraseña).
+//  - [data-pf-correo-disponible="url"]: pregunta al servidor (POST, true/false) si el correo ya está en uso.
+(function () {
+    document.querySelectorAll('[data-pf-igual]').forEach(function (campo) {
+        var otro = campo.form.elements[campo.dataset.pfIgual];
+        function comparar() {
+            campo.setCustomValidity(campo.value && campo.value !== otro.value ? 'Las contraseñas no coinciden.' : '');
+        }
+        campo.addEventListener('input', comparar);
+        otro.addEventListener('input', comparar);
+    });
+
+    document.querySelectorAll('[data-pf-correo-disponible]').forEach(function (campo) {
+        var form = campo.form;
+        var revisado = null; // correo ya consultado (con su resultado aplicado)
+
+        function consultar() {
+            var correo = campo.value.trim().toLowerCase();
+            campo.setCustomValidity('');
+            if (!correo || !campo.checkValidity()) return Promise.resolve();
+            var datos = new URLSearchParams({ correo: correo, __RequestVerificationToken: form.elements['__RequestVerificationToken'].value });
+            return fetch(campo.dataset.pfCorreoDisponible, { method: 'POST', body: datos, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : true; })
+                .then(function (libre) {
+                    if (campo.value.trim().toLowerCase() !== correo) return; // lo cambiaron mientras respondía
+                    revisado = correo;
+                    campo.setCustomValidity(libre ? '' : 'Ese correo ya está en uso por otro usuario o por un empleado.');
+                    if (!libre) campo.reportValidity();
+                })
+                .catch(function () { revisado = correo; }); // sin respuesta: lo decide el servidor al enviar
+        }
+
+        campo.addEventListener('input', function () { campo.setCustomValidity(''); revisado = null; });
+        campo.addEventListener('change', consultar);
+        // Si se envía antes de que llegue la respuesta, se espera y luego se reenvía (o se muestra el aviso)
+        form.addEventListener('submit', function (e) {
+            if (revisado === campo.value.trim().toLowerCase()) return;
+            e.preventDefault();
+            consultar().then(function () {
+                if (campo.checkValidity()) form.requestSubmit(); else campo.reportValidity();
+            });
+        });
+    });
+})();
+
 // Paginación según la pantalla: el usuario ve en cada página las filas que caben en la ventana (mínimo 4),
 // para desplazarse lo menos posible. Dos casos:
 //  - [data-pf-paginar] (tabla o lista): la página trae todas las filas y aquí se reparten en páginas, con la
 //    misma barra .pf-paginacion de _Paginacion.cshtml. Las filas que oculta un filtro de la vista (.d-none) no
 //    cuentan; tras filtrar, la vista lanza 'pf:repaginar' sobre la tabla ({ detail: { inicio: true } } vuelve a la 1).
 //  - [data-pf-filas-servidor="lista"] (pedidos, historial): pagina el servidor; aquí solo se calcula el tamaño y se
-//    guarda en la cookie pf_filas_<lista>, que lee Paginacion.FilasPorPantalla. Si no coincide, se recarga una vez.
+//    guarda en la cookie pf_filas_<lista>, que lee Paginacion.FilasPorPantalla. En la primera visita, si no coincide,
+//    se recarga una vez; después la medida nueva se usa en la próxima visita.
 (function () {
     var MIN = 4, MAX = 50, PREDETERMINADO = 8;
     var RESERVA = 96; // barra de paginación + margen inferior de la tarjeta
@@ -58,6 +107,61 @@ document.addEventListener('click', function (e) {
         }
         return Math.min(MAX, Math.max(MIN, Math.floor(espacio / alto)));
     }
+
+    // Entrada escalonada de las filas de la página nueva; animationend (abajo) quita la clase para poder repetirla
+    function animarFilas(items) {
+        items.forEach(function (f) { f.classList.remove('pf-pagina-in'); });
+        void document.body.offsetWidth;
+        items.forEach(function (f, i) {
+            f.style.setProperty('--pf-retraso', Math.min(i, 8) * 20 + 'ms');
+            f.classList.add('pf-pagina-in');
+        });
+    }
+
+    document.addEventListener('animationend', function (e) {
+        if (e.target.classList.contains('pf-pagina-in')) e.target.classList.remove('pf-pagina-in');
+    });
+
+    // Las listas que pagina el servidor (_Paginacion.cshtml) cambian de página sin recargar: se trae la página
+    // nueva y se reemplazan solo las filas y la barra, así no se repite la entrada de todo el apartado ni salta
+    // el scroll. Si algo falla (sesión vencida, error), se navega normalmente.
+    var urlMostrada = location.href.split('#')[0];
+    document.addEventListener('click', function (e) {
+        var enlace = e.target.closest('nav.pf-paginacion a[href]');
+        if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        var nav = enlace.closest('nav');
+        var tabla = nav.parentElement.querySelector('table.pf-table');
+        if (!tabla || !tabla.tBodies[0]) return;
+        e.preventDefault();
+        var indice = Array.prototype.indexOf.call(document.querySelectorAll('nav.pf-paginacion'), nav);
+        var etiqueta = enlace.getAttribute('aria-label');
+        tabla.classList.add('pf-paginando');
+        fetch(enlace.href, { credentials: 'same-origin' })
+            .then(function (r) {
+                if (!r.ok || r.redirected) throw new Error();
+                return r.text();
+            })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var navNueva = doc.querySelectorAll('nav.pf-paginacion')[indice];
+                var tablaNueva = navNueva && navNueva.parentElement.querySelector('table.pf-table');
+                if (!tablaNueva || !tablaNueva.tBodies[0]) throw new Error();
+                tabla.tBodies[0].replaceWith(tablaNueva.tBodies[0]);
+                nav.replaceWith(navNueva);
+                history.pushState(null, '', enlace.href);
+                urlMostrada = enlace.href.split('#')[0];
+                animarFilas(filas(tabla));
+                var foco = navNueva.querySelector('a[aria-label="' + etiqueta + '"]') || navNueva.querySelector('[aria-current]');
+                if (foco) foco.focus({ preventScroll: true });
+            })
+            .catch(function () { location.href = enlace.href; })
+            .finally(function () { tabla.classList.remove('pf-paginando'); });
+    });
+
+    // Atrás/adelante tras paginar así: la URL cambia pero las filas no, se recarga la página que corresponde
+    window.addEventListener('popstate', function () {
+        if (location.href.split('#')[0] !== urlMostrada) location.reload();
+    });
 
     function paginar(contenedor) {
         var estado = contenedor._pfPaginacion;
@@ -89,6 +193,7 @@ document.addEventListener('click', function (e) {
                 var etiqueta = btn.getAttribute('aria-label');
                 estado.pagina = Number(btn.dataset.pagina);
                 paginar(contenedor);
+                animarFilas(filas(contenedor).filter(function (f) { return !f.hidden && !f.classList.contains('d-none'); }));
                 // El botón pulsado se redibuja: el foco vuelve al mismo control (o a la página actual)
                 var foco = nav.querySelector('[aria-label="' + etiqueta + '"]') || nav.querySelector('[aria-current]');
                 if (foco) foco.focus({ preventScroll: true });
@@ -129,6 +234,9 @@ document.addEventListener('click', function (e) {
         if (String(porPagina) === guardada) return false;
         document.cookie = 'pf_filas_' + lista + '=' + porPagina + '; path=/; max-age=31536000; SameSite=Lax';
         if (Number(contenedor.dataset.pfTamano) === porPagina) return false;
+        // Solo se recarga la primera vez (sin medida guardada). Después la medida nueva se aplica en la próxima
+        // visita: el alto de las filas cambia con su contenido y recargar cada vez cargaba la página dos veces.
+        if (guardada) return false;
         // Una sola recarga seguida por página: si la medida cambiara al recargar, no se entra en un ciclo
         try {
             if (sessionStorage.getItem('pfFilasRecarga') === location.href) return false;
