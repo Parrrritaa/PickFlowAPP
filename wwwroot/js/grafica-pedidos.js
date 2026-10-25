@@ -17,7 +17,7 @@ window.PfGrafica = (function () {
             texto: v('--pf-ink2', claro.texto),
             rejilla: v('--pf-line', claro.rejilla),
             eje: v('--pf-line2', claro.eje),
-            tooltip: document.documentElement.getAttribute('data-theme') === 'dark' ? '#164079' : claro.tooltip,
+            tooltip: document.documentElement.getAttribute('data-theme') === 'dark' ? '#26364F' : claro.tooltip,
             neutro: v('--pf-neutral-fill', claro.neutro)
         };
     }
