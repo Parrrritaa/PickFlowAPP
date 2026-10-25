@@ -3965,6 +3965,7 @@ select.pf-input:not([multiple]):not([size]) {
 
 .pf-acceso-contenido {
     position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -4128,6 +4129,78 @@ select.pf-input:not([multiple]):not([size]) {
     padding: 48px clamp(24px, 5vw, 72px);
     background: var(--pf-surface);
     border-left: 1px solid var(--pf-line);
+}
+
+/* Apariencia oscura: el formulario usa casi el mismo tono que el borde de la marca, así que el corte con línea se veía
+   como un error. Aquí el formulario lleva un degradado vertical muy suave sobre su mismo color (más claro arriba, como
+   la luz de la marca) y el navy se funde en él: la franja de unión pinta ese mismo fondo y lo desvanece hacia la
+   izquierda con una máscara, así los dos lados coinciden en el borde. En la clara el corte contra el blanco se deja. */
+:root[data-theme="dark"] .pf-acceso {
+    --pf-acceso-form-arriba: #1A2840;
+    --pf-acceso-form-fondo: linear-gradient(180deg, var(--pf-acceso-form-arriba) 0%, var(--pf-surface) 48%, #121C2E 100%);
+    --pf-acceso-union: clamp(120px, 14vw, 240px);
+    /* Cuadrícula de puntos (el piso de la bodega). Va fija a la ventana para que los puntos del formulario y los de
+       la franja de unión caigan en la misma posición y la textura cruce el centro sin saltos. */
+    --pf-acceso-puntos: radial-gradient(circle, rgba(143, 160, 184, 0.2) 1px, transparent 1.5px) center / 22px 22px fixed;
+}
+
+/* El plano se corre a la izquierda de la unión para que el despacho (final de la ruta) no quede bajo la franja */
+:root[data-theme="dark"] .pf-acceso-plano {
+    width: calc(100% - var(--pf-acceso-union) * 0.6);
+}
+
+:root[data-theme="dark"] .pf-acceso-form {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-left-color: transparent;
+    background: var(--pf-acceso-form-fondo);
+}
+
+/* Puntos y luces del formulario, detrás de su contenido */
+:root[data-theme="dark"] .pf-acceso-form::before,
+:root[data-theme="dark"] .pf-acceso-form::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Los puntos llegan completos al borde izquierdo (allí los continúa la franja de unión) y se suavizan hacia la derecha */
+:root[data-theme="dark"] .pf-acceso-form::before {
+    background: var(--pf-acceso-puntos);
+    -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 55%, rgba(0, 0, 0, 0.4) 100%);
+    mask-image: linear-gradient(90deg, #000 0%, #000 55%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+/* El formulario va en una tarjeta apenas más clara que el fondo, con borde fino y sombra: el centro deja de ser plano.
+   Es translúcida, así que la cuadrícula se alcanza a ver a través. */
+:root[data-theme="dark"] .pf-acceso .pf-login-card {
+    max-width: 476px;
+    padding: 40px 28px 32px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(134, 174, 240, 0.07) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0.015) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 28px 60px -12px rgba(0, 8, 20, 0.55);
+}
+
+/* Luces desde el borde derecho: azul de la marca arriba y un naranja muy tenue abajo, como el despacho */
+:root[data-theme="dark"] .pf-acceso-form::after {
+    background:
+        radial-gradient(55% 45% at 100% 0%, rgba(59, 113, 202, 0.18) 0%, rgba(59, 113, 202, 0) 100%),
+        radial-gradient(45% 40% at 100% 100%, rgba(235, 125, 38, 0.09) 0%, rgba(235, 125, 38, 0) 100%);
+}
+
+:root[data-theme="dark"] .pf-acceso-marca::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: var(--pf-acceso-union);
+    pointer-events: none;
+    background: var(--pf-acceso-puntos), var(--pf-acceso-form-fondo);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.55) 55%, #000 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.55) 55%, #000 100%);
 }
 
 .pf-login-card {
@@ -4410,6 +4483,35 @@ select.pf-input:not([multiple]):not([size]) {
         border-left: 0;
     }
 
+    /* La franja de la marca queda arriba: la unión con el formulario pasa a ser el borde de abajo */
+    :root[data-theme="dark"] .pf-acceso-plano {
+        width: 100%;
+    }
+
+    /* En el teléfono no hay espacio para la tarjeta: el formulario vuelve a ir directo sobre el fondo */
+    :root[data-theme="dark"] .pf-acceso .pf-login-card {
+        max-width: 420px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+    }
+
+    /* Arriba el formulario toca la franja de la marca: sin luz azul en ese borde, solo el naranja de abajo */
+    :root[data-theme="dark"] .pf-acceso-form::after {
+        background: radial-gradient(70% 35% at 100% 100%, rgba(235, 125, 38, 0.09) 0%, rgba(235, 125, 38, 0) 100%);
+    }
+
+    :root[data-theme="dark"] .pf-acceso-marca::after {
+        inset: auto 0 0 0;
+        width: auto;
+        height: 56px;
+        background: var(--pf-acceso-puntos), var(--pf-acceso-form-arriba);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 100%);
+        mask-image: linear-gradient(180deg, transparent 0%, #000 100%);
+    }
+
     .pf-login-titulo {
         font-size: 32px;
     }
@@ -4446,7 +4548,6 @@ select.pf-input:not([multiple]):not([size]) {
     .pf-topbar-inner,
     .pf-panel,
     .pf-hoja,
-    .pf-login-card,
     .pf-aviso,
     .pf-paleta-caja,
     .dropdown-menu,
