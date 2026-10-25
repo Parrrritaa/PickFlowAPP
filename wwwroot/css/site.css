@@ -1029,15 +1029,15 @@ html.pf-hoja-abierta .pf-hoja-fondo {
 }
 
 /* Ambas apariencias: el naranja fuerte solo aparece al pasar el cursor; en reposo el botón usa el naranja tenue
-   (el mismo de los botones de las tablas). */
-:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary) {
+   (el mismo de los botones de las tablas). El de iniciar sesión (.btn-pf-login) se queda en naranja fuerte. */
+:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .pf-alert-btn--primary) {
     background-color: var(--pf-pill);
     border-color: transparent;
     color: var(--pf-accent-text) !important;
     box-shadow: none;
 }
 
-:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .btn-pf-login, .pf-alert-btn--primary):hover:not(:disabled, .disabled, [aria-disabled="true"]),
+:root :is(.btn-pf-blue, .btn-pf-orange, .btn-primary, .pf-alert-btn--primary):hover:not(:disabled, .disabled, [aria-disabled="true"]),
 :root :is(.btn-primary):is(:focus, :active):not(:disabled, .disabled) {
     background-color: var(--pf-accent);
     border-color: var(--pf-accent);
@@ -1646,6 +1646,17 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 
 .pf-reveal {
     animation: pf-row-in 0.24s var(--pf-ease-out) backwards;
+}
+
+/* --- Cambio de página en las listas: las filas nuevas entran escalonadas (hacia arriba, para no
+   desbordar el scroll de .table-responsive); mientras llega la página del servidor se atenúan --- */
+.pf-pagina-in {
+    animation: pf-row-in 0.26s var(--pf-ease-out) var(--pf-retraso, 0ms) backwards;
+}
+
+.pf-table.pf-paginando > tbody > tr {
+    opacity: 0.5;
+    transition: opacity 0.2s var(--pf-ease) 0.12s;
 }
 
 /* --- Menús de filtro de los encabezados (solo opacidad y "translate": Popper usa "transform") --- */
@@ -3154,7 +3165,7 @@ label.pf-tipo { margin: 0; }
 .pf-pildora input[type="checkbox"]:not(:checked) + span .pf-kpi-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--dot); }
 
 
-/* Paginación de listas largas (Views/Shared/_Paginacion.cshtml): pedidos y LOG */
+/* Paginación de listas largas: Views/Shared/_Paginacion.cshtml (servidor) y [data-pf-paginar] en site.js (botones) */
 .pf-paginacion {
     display: flex;
     flex-wrap: wrap;
@@ -3180,6 +3191,7 @@ label.pf-tipo { margin: 0; }
 }
 
 .pf-paginacion a,
+.pf-paginacion button,
 .pf-paginacion span.actual,
 .pf-paginacion span.deshabilitado,
 .pf-paginacion span.salto {
@@ -3195,20 +3207,26 @@ label.pf-tipo { margin: 0; }
     text-decoration: none;
 }
 
-.pf-paginacion a {
+.pf-paginacion a,
+.pf-paginacion button {
+    font-family: inherit;
+    cursor: pointer;
     color: var(--pf-text-secondary);
     background-color: var(--pf-surface);
     border: 1px solid var(--pf-gray-border);
     transition: background-color var(--pf-duration-fast) var(--pf-ease), border-color var(--pf-duration-fast) var(--pf-ease);
 }
 
-.pf-paginacion a:hover {
+.pf-paginacion a:hover,
+.pf-paginacion button:hover {
     color: var(--pf-ink);
     border-color: var(--pf-ink3);
     background-color: var(--pf-surface2);
 }
 
-.pf-paginacion a:focus-visible {
+.pf-paginacion a:focus-visible,
+.pf-paginacion button:focus-visible,
+.pf-paginacion span.actual:focus-visible {
     outline: 2px solid var(--pf-accent);
     outline-offset: 2px;
 }

@@ -10,6 +10,7 @@
         Si <strong>@Model.Correo</strong> está registrado, te enviamos un código de 6 dígitos.
         Escríbelo junto con tu contraseña nueva.
     </p>
+    <p class="pf-login-sub">Las cuentas con el correo sin verificar no reciben código: primero verifica tu correo.</p>
 
     @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
     {
@@ -30,11 +31,11 @@
         <span asp-validation-for="Codigo" class="text-danger small d-block mb-2"></span>
 
         <label asp-for="NewPassword" class="pf-login-etiqueta">Nueva contraseña</label>
-        <input asp-for="NewPassword" type="password" class="pf-login-input mb-1" autocomplete="new-password" required />
+        <input asp-for="NewPassword" type="password" class="pf-login-input mb-1" autocomplete="new-password" required minlength="6" maxlength="100" pattern="(?=.*[A-Za-z])(?=.*\d).{6,}" title="Al menos 6 caracteres, con al menos una letra y un número" />
         <span asp-validation-for="NewPassword" class="text-danger small d-block mb-2"></span>
 
         <label asp-for="ConfirmPassword" class="pf-login-etiqueta">Confirmar nueva contraseña</label>
-        <input asp-for="ConfirmPassword" type="password" class="pf-login-input mb-1" autocomplete="new-password" required />
+        <input asp-for="ConfirmPassword" type="password" class="pf-login-input mb-1" autocomplete="new-password" required data-pf-igual="NewPassword" />
         <span asp-validation-for="ConfirmPassword" class="text-danger small d-block mb-2"></span>
 
         <button type="submit" class="btn-pf-login">

@@ -5,7 +5,7 @@ using System.Net.Mime;
 
 namespace PickingApp.Services
 {
-    // Envía por SMTP los códigos de verificación de 6 dígitos (recuperar y cambiar contraseña)
+    // Envía por SMTP los códigos de verificación de 6 dígitos (recuperar y cambiar contraseña, verificar el correo)
     public class EmailService : IEmailService
     {
         private const string LogoContentId = "logo-pickflow";
@@ -19,7 +19,7 @@ namespace PickingApp.Services
             _env = env;
         }
 
-        public async Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo, bool esCambioContrasena)
+        public async Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo, PropositoCodigo proposito)
         {
             // Servidor, puerto y cuenta remitente se leen de appsettings.json → EmailSettings
             var host = _configuration["EmailSettings:SmtpHost"];
@@ -35,10 +35,15 @@ namespace PickingApp.Services
 
             var port = int.Parse(portConfig ?? "587");
 
-            var titulo = esCambioContrasena ? "Confirma el cambio de contraseña" : "Recupera tu contraseña";
-            var intro = esCambioContrasena
-                ? "Pediste cambiar la contraseña de tu cuenta. Para aplicar la nueva, confirma con este código."
-                : "Recibimos una solicitud para restablecer la contraseña de tu cuenta. Usa este código para crear una nueva.";
+            var (titulo, intro) = proposito switch
+            {
+                PropositoCodigo.CambiarContrasena => ("Confirma el cambio de contraseña",
+                    "Pediste cambiar la contraseña de tu cuenta. Para aplicar la nueva, confirma con este código."),
+                PropositoCodigo.VerificarCorreo => ("Verifica tu correo",
+                    "Es la primera vez que inicias sesión en PickFlow con esta cuenta. Para activarla, confirma con este código que el correo es tuyo."),
+                _ => ("Recupera tu contraseña",
+                    "Recibimos una solicitud para restablecer la contraseña de tu cuenta. Usa este código para crear una nueva.")
+            };
 
             var plantilla = await File.ReadAllTextAsync(Path.Combine(_env.ContentRootPath, "Plantillas", "CorreoCodigoVerificacion.html"));
             var html = ConstruirHtml(plantilla, titulo, intro, nombreDestinatario, codigo, destinatarioEmail, DateTime.Now);

@@ -6,6 +6,11 @@ namespace PickingApp.Models.ViewModels
     {
         public int Pagina { get; }
         public int TamanoPagina { get; }
+
+        // Filas por página que calculó el navegador para la pantalla del usuario (site.js guarda la cookie
+        // pf_filas_<lista>); 8 mientras no la haya. Se acota para que una cookie manipulada no pida miles de filas.
+        public static int FilasPorPantalla(Microsoft.AspNetCore.Http.HttpRequest request, string lista) =>
+            int.TryParse(request.Cookies["pf_filas_" + lista], out var filas) ? Math.Clamp(filas, 4, 50) : 8;
         public int TotalRegistros { get; }
 
         public int TotalPaginas => Math.Max(1, (TotalRegistros + TamanoPagina - 1) / TamanoPagina);

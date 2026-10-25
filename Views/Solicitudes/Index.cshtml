@@ -44,7 +44,7 @@
     @* Los filtros viajan por GET en la URL y llegan a SolicitudesController como FiltrosSolicitudes *@
     <form method="get" asp-action="@accion" id="formFiltrosSolicitudes">
         <div class="table-responsive">
-            <table class="pf-table">
+            <table class="pf-table" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>
@@ -180,9 +180,9 @@
                                         else
                                         {
                                             <div>@(s.UsuarioResponde?.NombreCompleto ?? "Sin registro") · @s.FechaRespuesta?.ToString("dd/MM/yyyy")</div>
-                                            @if (!string.IsNullOrWhiteSpace(s.MotivoRechazo))
+                                            @if (!string.IsNullOrWhiteSpace(s.TextoObservacion))
                                             {
-                                                <div class="pf-motivo-corto small text-secondary" title="@s.MotivoRechazo">Motivo: @s.MotivoRechazo</div>
+                                                <div class="pf-motivo-corto small text-secondary" title="@s.TextoObservacion">Observación: @s.TextoObservacion</div>
                                             }
                                         }
                                     </td>

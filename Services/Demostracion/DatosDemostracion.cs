@@ -286,9 +286,9 @@ namespace PickingApp.Services
                 }
                 else
                 {
-                    sim.NotificarUsuario(fecha, Solicitante.Id, "Solicitud Rechazada", $"Tu solicitud SOL-{s.Id} \"{nombreTipo}\" fue rechazada. Motivo: {s.MotivoRechazo}",
+                    sim.NotificarUsuario(fecha, Solicitante.Id, "Solicitud Rechazada", $"Tu solicitud SOL-{s.Id} \"{nombreTipo}\" fue rechazada. Observación: {s.ObservacionRespuesta}",
                         TiposNotificacion.Danger, $"/Solicitudes/Detalle/{s.Id}");
-                    sim.Log(fecha, Responde, AccionesLog.RechazarSolicitud, $"Solicitud #{s.Id} rechazada. Motivo: {s.MotivoRechazo}", "Solicitudes");
+                    sim.Log(fecha, Responde, AccionesLog.RechazarSolicitud, $"Solicitud #{s.Id} rechazada. Observación: {s.ObservacionRespuesta}", "Solicitudes");
                 }
             }
         }
@@ -309,7 +309,7 @@ namespace PickingApp.Services
                 if (responde != null)
                 {
                     s.Estado = motivoRechazo == null ? EstadosSolicitud.Aprobada : EstadosSolicitud.Rechazada;
-                    s.MotivoRechazo = motivoRechazo;
+                    s.ObservacionRespuesta = motivoRechazo;
                     s.UsuarioRespondeId = responde.Id;
                     s.FechaRespuesta = Minimo(fecha.AddHours(_azar.Next(2, 20)), sim.Ahora);
                 }

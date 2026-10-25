@@ -1,0 +1,108 @@
+@model PickingApp.Models.ViewModels.ObservacionesIndexViewModel
+@{
+    ViewData["Title"] = "Observaciones de solicitudes";
+}
+
+<h1 class="pf-page-title">Observaciones de solicitudes</h1>
+
+<div class="pf-card mb-4">
+    <h4 class="fw-bold mb-1" style="color: var(--pf-ink);">Nueva observación</h4>
+    <p class="text-secondary small mb-3">
+        Aparecerá en la lista al responder solicitudes del tipo y la decisión que elija.
+    </p>
+    <form asp-action="Crear" method="post" class="row g-3 align-items-end">
+        @Html.AntiForgeryToken()
+        <div class="col-md-4">
+            <label class="pf-label" for="nuevaTipo">Tipo de solicitud</label>
+            <select name="tipoSolicitudId" id="nuevaTipo" class="pf-input" required>
+                @foreach (var t in TiposSolicitud.Catalogo)
+                {
+                    <option value="@t.Id" selected="@(t.Id == Model.TipoFiltro)">@t.Nombre</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="pf-label" for="nuevaDecision">Decisión</label>
+            <select name="decision" id="nuevaDecision" class="pf-input" required>
+                <option value="@DecisionesSolicitud.Rechazar">Rechazar</option>
+                <option value="@DecisionesSolicitud.Aprobar">Aprobar</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="pf-label" for="nuevaTexto">Observación</label>
+            <input type="text" name="texto" id="nuevaTexto" class="pf-input" minlength="3" maxlength="150" required autocomplete="off" />
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn-pf-blue w-100">Agregar</button>
+        </div>
+    </form>
+</div>
+
+<div class="pf-card">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Catálogo</h4>
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label class="small text-secondary text-nowrap" for="filtroTipo">Tipo de solicitud</label>
+            <select name="tipo" id="filtroTipo" class="pf-input">
+                <option value="">Todos</option>
+                @foreach (var t in TiposSolicitud.Catalogo)
+                {
+                    <option value="@t.Id" selected="@(t.Id == Model.TipoFiltro)">@t.Nombre</option>
+                }
+            </select>
+            <button type="submit" class="btn-pf-gray">Filtrar</button>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="pf-table" data-pf-paginar>
+            <thead>
+                <tr>
+                    <th>Tipo de solicitud</th>
+                    <th>Decisión</th>
+                    <th>Observación</th>
+                    <th class="text-end">Usada</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Observaciones.Any())
+                {
+                    @foreach (var o in Model.Observaciones)
+                    {
+                        var usos = Model.Usos.GetValueOrDefault(o.Id);
+                        <tr class="@(o.Activa ? "" : "text-secondary")">
+                            <td>@o.NombreTipo</td>
+                            <td>@o.Decision</td>
+                            <td class="fw-semibold">@o.Texto</td>
+                            <td class="text-end">@(usos == 1 ? "1 vez" : $"{usos} veces")</td>
+                            <td>@(o.Activa ? "Activa" : "Inactiva")</td>
+                            <td class="text-center">
+                                <form asp-action="CambiarEstado" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@o.Id" />
+                                    <input type="hidden" name="tipo" value="@Model.TipoFiltro" />
+                                    @if (o.Activa)
+                                    {
+                                        <button type="submit" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;">Desactivar</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="submit" class="btn-pf-outline-green">Activar</button>
+                                    }
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No hay observaciones para este tipo de solicitud.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

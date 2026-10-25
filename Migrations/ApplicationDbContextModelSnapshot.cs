@@ -370,6 +370,207 @@ namespace PickingApp.Migrations
                     b.ToTable("NovedadesPedido");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.ObservacionSolicitud", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasColumnType("enum('Aprobar','Rechazar')");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int>("TipoSolicitudId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TipoSolicitudId", "Decision", "Texto")
+                        .IsUnique();
+
+                    b.ToTable("ObservacionesSolicitud", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Identificación duplicada",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Datos incompletos o incorrectos",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "No se requiere personal adicional",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Datos verificados",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Incorporación autorizada",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Los cambios no están justificados",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Datos incorrectos",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Afecta pedidos en curso",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Cambios verificados",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Motivo insuficiente",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Tiene pedidos en curso",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Requiere revisión con Recursos Humanos",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Inactivación justificada",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Ubicación en uso por pedidos activos",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Datos de ubicación incorrectos",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 16,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "El producto no corresponde",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 17,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Cambios verificados",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 18,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Ubicación en uso",
+                            TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 19,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Tiene producto asignado",
+                            TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 20,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Se recomienda inactivar en vez de eliminar",
+                            TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 21,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Eliminación verificada",
+                            TipoSolicitudId = 5
+                        });
+                });
+
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>
                 {
                     b.Property<int>("Id")
@@ -543,7 +744,10 @@ namespace PickingApp.Migrations
                     b.Property<DateTime>("FechaSolicitud")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("MotivoRechazo")
+                    b.Property<int?>("ObservacionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ObservacionRespuesta")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
@@ -557,6 +761,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ObservacionId");
 
                     b.HasIndex("TipoSolicitudId");
 
@@ -681,6 +887,9 @@ namespace PickingApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<bool>("CorreoVerificado")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Estado")
                         .IsRequired()
                         .HasColumnType("enum('Activo','Inactivo','Bloqueado')");
@@ -785,6 +994,17 @@ namespace PickingApp.Migrations
                     b.Navigation("Pedido");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.ObservacionSolicitud", b =>
+                {
+                    b.HasOne("PickingApp.Models.TipoSolicitud", "TipoSolicitud")
+                        .WithMany()
+                        .HasForeignKey("TipoSolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TipoSolicitud");
+                });
+
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>
                 {
                     b.HasOne("PickingApp.Models.Bodega", "Bodega")
@@ -822,6 +1042,11 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
+                    b.HasOne("PickingApp.Models.ObservacionSolicitud", "Observacion")
+                        .WithMany()
+                        .HasForeignKey("ObservacionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PickingApp.Models.TipoSolicitud", "TipoSolicitud")
                         .WithMany()
                         .HasForeignKey("TipoSolicitudId")
@@ -838,6 +1063,8 @@ namespace PickingApp.Migrations
                         .HasForeignKey("UsuarioSolicitanteId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Observacion");
 
                     b.Navigation("TipoSolicitud");
 

@@ -27,13 +27,13 @@
 
         <div class="pf-form-group mb-3">
             <label asp-for="NewPassword" class="pf-label">Nueva contraseña <span class="text-danger">*</span></label>
-            <input asp-for="NewPassword" type="password" class="pf-input" autocomplete="new-password" required />
+            <input asp-for="NewPassword" type="password" class="pf-input" autocomplete="new-password" required minlength="6" maxlength="100" pattern="(?=.*[A-Za-z])(?=.*\d).{6,}" title="Al menos 6 caracteres, con al menos una letra y un número" />
             <span asp-validation-for="NewPassword" class="text-danger small"></span>
         </div>
 
         <div class="pf-form-group mb-4">
             <label asp-for="ConfirmPassword" class="pf-label">Confirmar nueva contraseña <span class="text-danger">*</span></label>
-            <input asp-for="ConfirmPassword" type="password" class="pf-input" autocomplete="new-password" required />
+            <input asp-for="ConfirmPassword" type="password" class="pf-input" autocomplete="new-password" required data-pf-igual="NewPassword" />
             <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
         </div>
 
