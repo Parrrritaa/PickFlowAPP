@@ -3963,6 +3963,31 @@ select.pf-input:not([multiple]):not([size]) {
     fill: #FFFFFF;
 }
 
+/* Rutas de otros pedidos: más tenues que la principal y con su propio destello, desfasado. Ocultas salvo a media
+   pantalla (ver "Ventana a media pantalla" más abajo). */
+.pf-rutas-extra {
+    display: none;
+}
+
+.pf-ruta-extra {
+    stroke: var(--pf-accent);
+    stroke-dasharray: 1;
+    opacity: 0.55;
+    animation: pf-draw 2.2s var(--pf-ease-seg) 0.6s backwards;
+}
+
+.pf-ruta-extra:nth-child(2) { animation-delay: 0.9s; }
+
+.pf-ruta-extra-flujo {
+    stroke: #FFE6CC;
+    stroke-dasharray: 0.08 2;
+    stroke-dashoffset: 0.08;
+    filter: drop-shadow(0 0 5px rgba(255, 168, 92, 0.8));
+    animation: pf-flujo 5s linear 3.4s infinite;
+}
+
+.pf-ruta-extra-flujo:nth-child(4) { animation-delay: 4.6s; animation-duration: 5.6s; }
+
 .pf-acceso-contenido {
     position: relative;
     z-index: 1;
@@ -4446,6 +4471,120 @@ select.pf-input:not([multiple]):not([size]) {
     text-decoration: underline;
 }
 
+/* --- Escritorio con poca altura (portátiles, con las barras del navegador quedan ~600-750 px): los espacios verticales
+   y el titular se escalan con el alto de la ventana para que el acceso quepa sin desplazarse. Los campos y botones
+   conservan su tamaño. --- */
+@media (min-width: 992px) and (max-height: 860px) {
+    .pf-acceso-marca {
+        padding-top: clamp(20px, 4.5vh, 44px);
+        padding-bottom: clamp(20px, 4.5vh, 48px);
+    }
+
+    /* El espacio libre se reparte igual arriba y abajo del titular (la tarjeta también va con margin-top: auto),
+       así el texto no queda pegado arriba con un hueco grande antes de la tarjeta */
+    .pf-acceso-logo {
+        margin-bottom: clamp(16px, 4vh, 48px);
+    }
+
+    .pf-acceso-titular {
+        margin-top: auto;
+        font-size: clamp(34px, min(4.5vw, 6.8vh), 68px);
+    }
+
+    .pf-acceso-bajada {
+        margin: 14px 0 clamp(16px, 3.5vh, 48px);
+        font-size: 16px;
+    }
+
+    .pf-acceso-tarjeta {
+        padding: 16px 20px 4px;
+    }
+
+    .pf-acceso-tarjeta-titulo {
+        margin-bottom: 10px;
+    }
+
+    .pf-acceso-tarjeta li {
+        margin-bottom: 10px;
+        line-height: 1.4;
+    }
+
+    .pf-acceso-form {
+        padding-top: clamp(12px, 2.5vh, 48px);
+        padding-bottom: clamp(12px, 2.5vh, 48px);
+    }
+
+    /* El formulario se aligera al mismo ritmo que la marca, para que ninguna columna se vea más grande que la otra */
+    .pf-acceso .pf-login-card {
+        max-width: 384px;
+    }
+
+    :root[data-theme="dark"] .pf-acceso .pf-login-card {
+        max-width: 440px;
+        padding-top: clamp(20px, 3.5vh, 40px);
+        padding-bottom: clamp(16px, 3vh, 32px);
+    }
+
+    .pf-login-titulo {
+        font-size: clamp(30px, 4.6vh, 40px);
+    }
+
+    .pf-login-sub {
+        margin-bottom: clamp(16px, 3vh, 32px);
+        font-size: 15px;
+    }
+
+    .pf-login-campo .pf-login-input,
+    .btn-pf-login {
+        height: 46px;
+    }
+
+    .btn-pf-login-sec {
+        height: 44px;
+    }
+
+    .pf-login-separador {
+        margin: clamp(14px, 3vh, 32px) 0 12px;
+    }
+
+    .pf-login-pie {
+        margin-top: clamp(12px, 2.5vh, 24px);
+    }
+}
+
+/* Ventanas muy bajas (~600 px): se aprietan un poco más los espacios entre bloques */
+@media (min-width: 992px) and (max-height: 680px) {
+    .pf-acceso-titular {
+        font-size: clamp(32px, min(4.5vw, 6.4vh), 68px);
+    }
+
+    .pf-acceso-tarjeta li {
+        margin-bottom: 8px;
+    }
+
+    .pf-acceso-form {
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+
+    :root[data-theme="dark"] .pf-acceso .pf-login-card {
+        padding-top: 16px;
+        padding-bottom: 14px;
+    }
+
+    .pf-login-sub {
+        margin-bottom: 12px;
+    }
+
+    .pf-login-separador {
+        margin: 10px 0 8px;
+    }
+
+    .pf-login-pie {
+        margin-top: 10px;
+    }
+}
+
 /* --- Pantallas angostas: la marca queda como una franja arriba, sin la tarjeta --- */
 @media (max-width: 991.98px) {
     .pf-acceso {
@@ -4457,20 +4596,35 @@ select.pf-input:not([multiple]):not([size]) {
         padding: 24px 20px 32px;
     }
 
+    /* El plano se ve solo a la derecha, para que sus líneas no crucen el titular */
     .pf-acceso-plano {
-        -webkit-mask-image: linear-gradient(100deg, transparent 10%, #000 80%);
-        mask-image: linear-gradient(100deg, transparent 10%, #000 80%);
+        -webkit-mask-image: linear-gradient(100deg, transparent 45%, #000 90%);
+        mask-image: linear-gradient(100deg, transparent 45%, #000 90%);
         opacity: 0.7;
     }
 
+    /* El titular y la bajada van centrados, alineados con el formulario de abajo; el logo se queda en la esquina */
+    .pf-acceso-contenido {
+        max-width: none;
+        align-items: center;
+        text-align: center;
+    }
+
+    .pf-acceso-logo {
+        align-self: flex-start;
+        text-align: left;
+    }
+
+    /* Lo más grande que cabe en dos líneas ("Del Excel al despacho," es la más larga) */
     .pf-acceso-titular {
         margin-top: 28px;
-        font-size: clamp(32px, 8.5vw, 44px);
+        font-size: clamp(30px, calc(8.4vw - 2px), 56px);
+        letter-spacing: -0.03em;
     }
 
     .pf-acceso-bajada {
-        margin: 12px 0 0;
-        font-size: 16px;
+        margin: 14px 0 0;
+        font-size: clamp(16px, 2.4vw, 18px);
     }
 
     .pf-acceso-tarjeta {
@@ -4488,7 +4642,51 @@ select.pf-input:not([multiple]):not([size]) {
         width: 100%;
     }
 
-    /* En el teléfono no hay espacio para la tarjeta: el formulario vuelve a ir directo sobre el fondo */
+    /* Arriba el formulario toca la franja de la marca: sin luz azul en ese borde, solo el naranja de abajo */
+    :root[data-theme="dark"] .pf-acceso-form::after {
+        background: radial-gradient(70% 35% at 100% 100%, rgba(235, 125, 38, 0.09) 0%, rgba(235, 125, 38, 0) 100%);
+    }
+
+    /* Transición de la franja de la marca al formulario: el propio fondo de la franja es un degradado que termina
+       exactamente en el color de arriba del formulario, así no hay capa encima que se note como una banda. La franja
+       crece hacia abajo para que el degradado tenga recorrido, y los puntos del piso aparecen poco a poco. */
+    :root[data-theme="dark"] .pf-acceso-marca {
+        padding-bottom: 120px;
+        background:
+            radial-gradient(110% 60% at 100% 0%, rgba(59, 113, 202, 0.3) 0%, rgba(59, 113, 202, 0) 60%),
+            linear-gradient(180deg, #0A2C5C 0%, #00204A 35%, #0B1F3E 65%, var(--pf-acceso-form-arriba) 100%);
+    }
+
+    :root[data-theme="dark"] .pf-acceso-marca::after {
+        inset: auto 0 0 0;
+        width: auto;
+        height: 70%;
+        background: var(--pf-acceso-puntos);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 100%);
+        mask-image: linear-gradient(180deg, transparent 0%, #000 100%);
+    }
+
+    /* Las líneas del plano se apagan antes de llegar al formulario en vez de cortarse en el borde */
+    :root[data-theme="dark"] .pf-acceso-plano {
+        -webkit-mask-image: linear-gradient(100deg, transparent 45%, #000 90%), linear-gradient(180deg, #000 45%, transparent 85%);
+        -webkit-mask-composite: source-in;
+        mask-image: linear-gradient(100deg, transparent 45%, #000 90%), linear-gradient(180deg, #000 45%, transparent 85%);
+        mask-composite: intersect;
+    }
+
+    .pf-login-titulo {
+        font-size: 32px;
+    }
+
+    /* El formulario conserva su tarjeta (borde, fondo y sombra), un poco más ajustada */
+    :root[data-theme="dark"] .pf-acceso .pf-login-card {
+        max-width: 460px;
+        padding: 32px 28px 28px;
+    }
+}
+
+/* En el teléfono no hay espacio para la tarjeta: el formulario va directo sobre el fondo */
+@media (max-width: 575.98px) {
     :root[data-theme="dark"] .pf-acceso .pf-login-card {
         max-width: 420px;
         padding: 0;
@@ -4497,27 +4695,66 @@ select.pf-input:not([multiple]):not([size]) {
         background: none;
         box-shadow: none;
     }
+}
 
-    /* Arriba el formulario toca la franja de la marca: sin luz azul en ese borde, solo el naranja de abajo */
-    :root[data-theme="dark"] .pf-acceso-form::after {
-        background: radial-gradient(70% 35% at 100% 100%, rgba(235, 125, 38, 0.09) 0%, rgba(235, 125, 38, 0) 100%);
+/* --- Ventana a media pantalla (Win + ← / →): más rutas naranjas en el plano. El plano solo se atenúa detrás del
+   titular, así las rutas se ven a los dos lados, y se apaga antes de llegar al formulario. --- */
+@media (min-width: 576px) and (max-width: 991.98px) {
+    .pf-rutas-extra {
+        display: inline;
     }
 
-    :root[data-theme="dark"] .pf-acceso-marca::after {
-        inset: auto 0 0 0;
-        width: auto;
-        height: 56px;
-        background: var(--pf-acceso-puntos), var(--pf-acceso-form-arriba);
-        -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 100%);
-        mask-image: linear-gradient(180deg, transparent 0%, #000 100%);
+    /* Aquí el plano se dibuja a la mitad de su tamaño: los trazos se engruesan para que las rutas se noten */
+    .pf-ruta-pedido,
+    .pf-ruta-flujo {
+        stroke-width: 7;
     }
 
-    .pf-login-titulo {
-        font-size: 32px;
+    .pf-ruta-extra,
+    .pf-ruta-extra-flujo {
+        stroke-width: 6;
+    }
+
+    .pf-ruta-extra {
+        opacity: 0.8;
+    }
+
+    /* Los rótulos de los pasillos quedarían encima del logo */
+    .pf-acceso-plano .pf-pasillos {
+        display: none;
+    }
+
+    /* La franja ocupa buena parte de la ventana y el titular con la bajada quedan centrados en su alto, debajo del
+       logo (el espacio libre se reparte igual arriba y abajo) */
+    .pf-acceso-marca,
+    :root[data-theme="dark"] .pf-acceso-marca {
+        min-height: clamp(400px, 66vh, 620px);
+        padding-bottom: 56px;
+    }
+
+    .pf-acceso-logo {
+        margin-bottom: 24px;
+    }
+
+    .pf-acceso-titular {
+        margin-top: auto;
+    }
+
+    .pf-acceso-bajada {
+        margin-bottom: auto;
+    }
+
+    :root .pf-acceso .pf-acceso-plano {
+        opacity: 1;
+        -webkit-mask-image: radial-gradient(ellipse 44% 48% at 50% 42%, rgba(0, 0, 0, 0.16) 55%, #000 100%), linear-gradient(180deg, #000 45%, transparent 88%);
+        -webkit-mask-composite: source-in;
+        mask-image: radial-gradient(ellipse 44% 48% at 50% 42%, rgba(0, 0, 0, 0.16) 55%, #000 100%), linear-gradient(180deg, #000 45%, transparent 88%);
+        mask-composite: intersect;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .pf-ruta-extra,
     .pf-ruta-pedido,
     .pf-parada,
     .pf-despacho,
@@ -4530,7 +4767,8 @@ select.pf-input:not([multiple]):not([size]) {
         animation: none !important;
     }
 
-    .pf-ruta-flujo {
+    .pf-ruta-flujo,
+    .pf-ruta-extra-flujo {
         display: none;
     }
 }
