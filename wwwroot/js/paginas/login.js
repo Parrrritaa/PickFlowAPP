@@ -9,6 +9,10 @@
     var textoBoton = boton.innerHTML;
     var campos = { Correo: form.elements['Correo'], Password: form.elements['Password'] };
 
+    // El cursor empieza en el correo sin desplazar la página (con autofocus, en pantallas angostas el navegador
+    // bajaba hasta el campo y la franja de la marca quedaba fuera de la vista)
+    campos.Correo.focus({ preventScroll: true });
+
     function temblar() {
         tarjeta.classList.remove('pf-temblor');
         void tarjeta.offsetWidth; // reinicia la animación si se equivoca varias veces seguidas

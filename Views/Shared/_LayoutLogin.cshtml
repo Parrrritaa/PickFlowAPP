@@ -34,6 +34,13 @@
                 @* Destello que recorre la ruta en bucle hasta el despacho, como un pedido en camino *@
                 <path class="pf-ruta-flujo" pathLength="1" d="M40 830 H213 V460 H513 V110 H813 V460 H1113 V830 H1400"
                       stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+                @* Otros pedidos en camino por los pasillos; solo se muestran con la ventana a media pantalla (ver site.css) *@
+                <g class="pf-rutas-extra" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <path class="pf-ruta-extra" pathLength="1" d="M1440 110 H1263 V460 H963 V830 H663 V460 H363 V110 H40"></path>
+                    <path class="pf-ruta-extra" pathLength="1" d="M40 460 H363 V830 H813 V110 H1113 V460 H1440"></path>
+                    <path class="pf-ruta-extra-flujo" pathLength="1" d="M1440 110 H1263 V460 H963 V830 H663 V460 H363 V110 H40"></path>
+                    <path class="pf-ruta-extra-flujo" pathLength="1" d="M40 460 H363 V830 H813 V110 H1113 V460 H1440"></path>
+                </g>
                 <g class="pf-paradas" stroke-width="4">
                     <circle class="pf-parada" style="animation-delay: 0.7s" cx="213" cy="610" r="9"></circle>
                     <circle class="pf-parada" style="animation-delay: 1.0s" cx="513" cy="250" r="9"></circle>
@@ -61,7 +68,7 @@
                     </span>
                 </div>
 
-                <p class="pf-acceso-titular">Del Excel al despacho, <span>sin perder un pedido.</span></p>
+                <p class="pf-acceso-titular">Del Excel al despacho,<br> <span>sin perder un pedido.</span></p>
                 <p class="pf-acceso-bajada">Carga los pedidos del día, repártelos entre los auxiliares disponibles y sigue cada alistamiento hasta completarlo.</p>
 
                 <section class="pf-acceso-tarjeta" aria-labelledby="pfAccesoTarjetaTitulo">
