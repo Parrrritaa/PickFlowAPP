@@ -12,8 +12,17 @@
 
 <h1 class="pf-page-title">Productos y categorías</h1>
 
+@* Dos pantallas en el mismo apartado: se cambia sin recargar y la elegida queda en la URL (#categorias / #productos),
+   así al guardar se vuelve a la misma (el controlador redirige con ese fragmento). *@
+<div class="pf-segmented mb-4" role="radiogroup" aria-label="Pantalla" style="max-width: 360px;">
+    <input type="radio" class="pf-seg-input" name="vistaProductos" id="vistaCategorias" value="categorias" checked />
+    <label for="vistaCategorias">Categorías (@categorias.Count)</label>
+    <input type="radio" class="pf-seg-input" name="vistaProductos" id="vistaProductosLista" value="productos" />
+    <label for="vistaProductosLista">Productos (@productos.Count)</label>
+</div>
+
 <!-- ===== Categorías de manipulación ===== -->
-<div class="pf-card">
+<div class="pf-card" data-vista="categorias">
     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
         <div>
             <h4 class="fw-bold mb-1 text-dark">Categorías de manipulación</h4>
@@ -91,7 +100,7 @@
 </div>
 
 <!-- ===== Clasificación de productos ===== -->
-<div class="pf-card">
+<div class="pf-card" data-vista="productos" hidden>
     <form asp-action="GuardarClasificacion" method="post" id="formClasificacion">
         @Html.AntiForgeryToken()
         <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
@@ -119,18 +128,6 @@
 
         @if (productos.Any())
         {
-            <div class="pf-aplicar-lote">
-                <label for="categoriaLote" class="small fw-semibold mb-0">Cambiar los productos visibles a:</label>
-                <select id="categoriaLote" class="form-select form-select-sm" style="width: auto;">
-                    <option value="">Sin clasificar (usa «@nombrePredeterminada»)</option>
-                    @foreach (var c in categorias)
-                    {
-                        <option value="@c.Id">@c.Nombre</option>
-                    }
-                </select>
-                <button type="button" class="btn-pf-gray" style="padding: 4px 14px; font-size: 14px;" id="btnAplicarLote">Aplicar</button>
-            </div>
-
             <div class="table-responsive">
                 <table class="pf-table" id="tablaProductos" data-pf-paginar>
                     <thead>
@@ -175,9 +172,24 @@
                 </table>
             </div>
 
-            <div class="pf-barra-guardar">
-                <span id="textoCambios" aria-live="polite">Sin cambios pendientes</span>
-                <button type="submit" class="btn-pf-blue" id="btnGuardarClasificacion" disabled>Guardar cambios</button>
+            @* El cambio en lote va en la barra de guardar y no en una fila propia sobre la tabla: deja espacio para
+               más productos por página y queda junto al botón que guarda lo que aplica *@
+            <div class="pf-barra-guardar flex-wrap">
+                <div class="pf-aplicar-lote mb-0">
+                    <label for="categoriaLote" class="small fw-semibold mb-0">Cambiar los productos visibles a:</label>
+                    <select id="categoriaLote" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">Sin clasificar (usa «@nombrePredeterminada»)</option>
+                        @foreach (var c in categorias)
+                        {
+                            <option value="@c.Id">@c.Nombre</option>
+                        }
+                    </select>
+                    <button type="button" class="btn-pf-gray" style="padding: 4px 14px; font-size: 14px;" id="btnAplicarLote">Aplicar</button>
+                </div>
+                <div class="d-flex align-items-center gap-3 ms-auto">
+                    <span id="textoCambios" aria-live="polite">Sin cambios pendientes</span>
+                    <button type="submit" class="btn-pf-blue" id="btnGuardarClasificacion" disabled>Guardar cambios</button>
+                </div>
             </div>
         }
         else
@@ -277,4 +289,26 @@
 
 @section Scripts {
     <script src="~/js/paginas/productos.js" asp-append-version="true" data-nombre-predeterminada="@nombrePredeterminada"></script>
+    <script>
+        (function () {
+            var radios = document.querySelectorAll('input[name="vistaProductos"]');
+
+            function mostrar(vista) {
+                document.querySelectorAll('[data-vista]').forEach(function (s) { s.hidden = s.dataset.vista !== vista; });
+                radios.forEach(function (r) { r.checked = r.value === vista; });
+                // Oculta, la tabla no se pudo medir: se vuelve a calcular cuántas filas caben (site.js)
+                document.querySelectorAll('[data-vista="' + vista + '"] [data-pf-paginar]').forEach(function (t) {
+                    t.dispatchEvent(new CustomEvent('pf:repaginar'));
+                });
+            }
+
+            mostrar(location.hash === '#productos' ? 'productos' : 'categorias');
+            radios.forEach(function (r) {
+                r.addEventListener('change', function () {
+                    mostrar(r.value);
+                    history.replaceState(null, '', '#' + r.value);
+                });
+            });
+        })();
+    </script>
 }

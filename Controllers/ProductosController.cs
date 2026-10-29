@@ -164,7 +164,7 @@ namespace PickingApp.Controllers
             }
 
             TempData["SuccessMessage"] = cambios == 1 ? "Se actualizó la categoría de 1 producto." : $"Se actualizó la categoría de {cambios} productos.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), null, null, "productos");
         }
 
         // Único lugar donde se cambia el nombre o la cantidad por caja de un producto: el cambio
@@ -192,7 +192,7 @@ namespace PickingApp.Controllers
             if (cambios.Count == 0)
             {
                 TempData["SuccessMessage"] = $"El producto '{producto.Codigo}' no tenía cambios.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Index), null, null, "productos");
             }
 
             producto.Nombre = nombre;
@@ -201,7 +201,7 @@ namespace PickingApp.Controllers
 
             await RegistrarAsync("Editar Producto", $"Producto {producto.Codigo} actualizado: {string.Join(", ", cambios)}.");
             TempData["SuccessMessage"] = $"Producto '{producto.Codigo}' actualizado.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), null, null, "productos");
         }
 
         private IActionResult Error(string mensaje)
