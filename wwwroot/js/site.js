@@ -100,10 +100,15 @@ document.addEventListener('click', function (e) {
         var alto = medibles.reduce(function (suma, f) { return suma + f.offsetHeight; }, 0) / medibles.length;
         var cuerpo = contenedor.tBodies ? contenedor.tBodies[0] : contenedor;
         var barra = document.querySelector('.pf-topbar');
-        var espacio = window.innerHeight - (cuerpo.getBoundingClientRect().top + window.scrollY) - RESERVA;
+        // Lo que va debajo de la tabla en la misma tarjeta (p. ej. la barra "Guardar cambios") también resta espacio
+        var debajo = 0;
+        for (var s = (contenedor.closest('.table-responsive') || contenedor).nextElementSibling; s; s = s.nextElementSibling) {
+            if (!s.hidden && !s.classList.contains('pf-paginacion')) debajo += s.offsetHeight + parseFloat(getComputedStyle(s).marginTop);
+        }
+        var espacio = window.innerHeight - (cuerpo.getBoundingClientRect().top + window.scrollY) - RESERVA - debajo;
         if (espacio < MIN * alto) {
             var encabezado = contenedor.tHead ? contenedor.tHead.offsetHeight : 0;
-            espacio = window.innerHeight - (barra ? barra.offsetHeight : 0) - encabezado - RESERVA;
+            espacio = window.innerHeight - (barra ? barra.offsetHeight : 0) - encabezado - RESERVA - debajo;
         }
         return Math.min(MAX, Math.max(MIN, Math.floor(espacio / alto)));
     }

@@ -13,21 +13,26 @@
 
 <h1 class="pf-page-title">Bodegas y ubicaciones</h1>
 
+@* Título y buscador en una sola fila, para que la lista de bodegas se vea sin desplazarse *@
 <div class="pf-card mb-4">
-    <h4 class="fw-bold mb-3" style="color: var(--pf-ink);">Buscar producto</h4>
-    <p class="pf-seccion-desc small mb-3">Busca un producto por código o nombre para saber en qué bodega está y qué ubicación tiene.</p>
-    <form method="get" asp-action="Index" class="d-flex gap-2 flex-wrap">
-        @if (activoEstado)
-        {
-            <input type="hidden" name="estado" value="@filtroEstado" />
-        }
-        <input type="text" name="busquedaProducto" value="@busquedaProducto" class="form-control" style="max-width: 320px;" placeholder="Código o nombre del producto..." />
-        <button type="submit" class="btn-pf-blue">Buscar</button>
-        @if (hayBusquedaProducto)
-        {
-            <a asp-action="Index" asp-route-estado="@filtroEstado" class="btn-pf-gray">Limpiar búsqueda</a>
-        }
-    </form>
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+            <h4 class="fw-bold mb-1" style="color: var(--pf-ink);">Buscar producto</h4>
+            <p class="pf-seccion-desc small mb-0">Busca un producto por código o nombre para saber en qué bodega está y qué ubicación tiene.</p>
+        </div>
+        <form method="get" asp-action="Index" class="d-flex gap-2 flex-wrap">
+            @if (activoEstado)
+            {
+                <input type="hidden" name="estado" value="@filtroEstado" />
+            }
+            <input type="text" name="busquedaProducto" value="@busquedaProducto" class="form-control" style="width: 320px; max-width: 100%;" placeholder="Código o nombre del producto..." />
+            <button type="submit" class="btn-pf-blue">Buscar</button>
+            @if (hayBusquedaProducto)
+            {
+                <a asp-action="Index" asp-route-estado="@filtroEstado" class="btn-pf-gray">Limpiar búsqueda</a>
+            }
+        </form>
+    </div>
 
     @if (hayBusquedaProducto)
     {
