@@ -30,15 +30,24 @@
 }
 
 <div class="pf-card">
-    <div class="mb-3">
-        <span class="text-muted fw-semibold">
-            @($"{Model.Solicitudes.Count} solicitud(es){(f.HayFiltros ? " con los filtros aplicados" : "")}")
-        </span>
-        <p class="pf-seccion-desc small mb-0 mt-1">
-            @(Model.EsBandeja
-                ? "Solicitudes de otros usuarios para aprobar o rechazar. Las pendientes aparecen primero."
-                : "Solicitudes que usted envió y la respuesta que recibieron. Abra una para ver el detalle o el motivo de un rechazo.")
-        </p>
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <span class="text-muted fw-semibold">
+                @($"{Model.Solicitudes.Count} solicitud(es){(f.HayFiltros ? " con los filtros aplicados" : "")}")
+            </span>
+            <p class="pf-seccion-desc small mb-0 mt-1">
+                @(Model.EsBandeja
+                    ? "Solicitudes de otros usuarios para aprobar o rechazar. Las pendientes aparecen primero."
+                    : "Solicitudes que usted envió y la respuesta que recibieron. Abra una para ver el detalle o el motivo de un rechazo.")
+            </p>
+        </div>
+        @if (Model.EsBandeja && Model.PendientesEnCadena > 0)
+        {
+            @* Abre la pendiente más antigua y, al decidir, pasa sola a la siguiente (respeta el filtro de tipo) *@
+            <a asp-action="RevisarPendientes" asp-route-tipo="@f.Tipo" class="btn-pf-blue">
+                Revisar pendientes (@Model.PendientesEnCadena)
+            </a>
+        }
     </div>
 
     @* Los filtros viajan por GET en la URL y llegan a SolicitudesController como FiltrosSolicitudes *@

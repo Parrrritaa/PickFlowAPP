@@ -129,7 +129,8 @@
         @if (productos.Any())
         {
             <div class="table-responsive">
-                <table class="pf-table" id="tablaProductos" data-pf-paginar>
+                @* 6 por página fijas: con la barra de guardar debajo, las que "caben" eran muy pocas *@
+                <table class="pf-table" id="tablaProductos" data-pf-paginar="6">
                     <thead>
                         <tr>
                             <th>Código</th>
