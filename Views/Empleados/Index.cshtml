@@ -42,7 +42,18 @@
                     {
                         var estadoText = PickingApp.Models.Empleado.DescribirEstado(emp.Activo, ocupados.Contains(emp.Id));
                         <tr class="@(emp.Id == destacadoId ? "pf-row-flash" : "")">
-                            <td class="fw-semibold">@emp.NombreCompleto</td>
+                            @* "Ver historial" va bajo el nombre y no en Rendimiento: así cada fila ocupa dos líneas y caben
+                               más por página, con la paginación a la vista *@
+                            <td>
+                                <div class="fw-semibold">@emp.NombreCompleto</div>
+                                @if (!esAuxiliar)
+                                {
+                                    <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
+                                        Ver historial<span class="visually-hidden"> de @emp.NombreCompleto</span>
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
+                                }
+                            </td>
                             <td>@estadoText</td>
                             @if (!esAuxiliar)
                             {
@@ -52,10 +63,6 @@
                                     {
                                         <partial name="_Rendimiento" model="rendimiento" />
                                     }
-                                    <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
-                                        Ver historial<span class="visually-hidden"> de @emp.NombreCompleto</span>
-                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                                    </a>
                                 </td>
                             }
                             <td>@emp.JornadaLaboral</td>
