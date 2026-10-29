@@ -67,6 +67,53 @@ namespace PickingApp.Controllers
 
         private int UsuarioActualId => User.IdUsuario();
 
+        // Revisión en cadena: el revisor decide una solicitud y pasa a la siguiente sin volver a la bandeja.
+        // Sigue siendo una a una (cada solicitud se ve y se confirma por separado); solo se quita la ida y vuelta.
+        // Orden de llegada, la más antigua primero, para que ninguna se quede esperando.
+        private IQueryable<Solicitud> PendientesPorRevisar(int? tipo)
+        {
+            var query = _context.Solicitudes.Where(s => s.Estado == EstadosSolicitud.Pendiente);
+            if (User.IsInRole(Roles.Supervisor)) query = query.Where(s => s.TipoSolicitudId == TipoGestionableSupervisor);
+            if (tipo.HasValue) query = query.Where(s => s.TipoSolicitudId == tipo.Value);
+            return query.OrderBy(s => s.FechaSolicitud).ThenBy(s => s.Id);
+        }
+
+        // La siguiente después de la actual; al llegar al final vuelve a las que se saltaron
+        private async Task<int?> SiguientePendienteAsync(Solicitud actual, int? tipo)
+        {
+            var otras = PendientesPorRevisar(tipo).Where(s => s.Id != actual.Id);
+            return await otras
+                       .Where(s => s.FechaSolicitud > actual.FechaSolicitud || (s.FechaSolicitud == actual.FechaSolicitud && s.Id > actual.Id))
+                       .Select(s => (int?)s.Id).FirstOrDefaultAsync()
+                   ?? await otras.Select(s => (int?)s.Id).FirstOrDefaultAsync();
+        }
+
+        private IActionResult IrARevisar(int id, bool cadena, int? tipo) =>
+            cadena ? RedirectToAction(nameof(Revisar), new { id, cadena, tipo }) : RedirectToAction(nameof(Revisar), new { id });
+
+        // Tras aprobar o rechazar: en cadena se abre la siguiente pendiente; si no, se vuelve a la bandeja
+        private async Task<IActionResult> DespuesDeDecidirAsync(Solicitud solicitud, bool cadena, int? tipo)
+        {
+            var siguiente = cadena ? await SiguientePendienteAsync(solicitud, tipo) : null;
+            if (siguiente.HasValue) return IrARevisar(siguiente.Value, cadena, tipo);
+            if (cadena) TempData["SuccessMessage"] = $"{TempData["SuccessMessage"]} No quedan solicitudes pendientes por revisar.".Trim();
+            return RedirectToAction(nameof(Index), new { tipo });
+        }
+
+        // Botón "Revisar pendientes" de la bandeja: abre la más antigua y empieza la cadena
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
+        [HttpGet]
+        public async Task<IActionResult> RevisarPendientes(int? tipo)
+        {
+            var primera = await PendientesPorRevisar(tipo).Select(s => (int?)s.Id).FirstOrDefaultAsync();
+            if (primera == null)
+            {
+                TempData["SuccessMessage"] = "No hay solicitudes pendientes por revisar.";
+                return RedirectToAction(nameof(Index), new { tipo });
+            }
+            return IrARevisar(primera.Value, cadena: true, tipo);
+        }
+
         // Bandeja de aprobación para Administrador y Supervisor
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         public Task<IActionResult> Index(FiltrosSolicitudes filtros) => ListarAsync(esBandeja: true, filtros);
@@ -148,6 +195,7 @@ namespace PickingApp.Controllers
                 PendientesPorRevisar = esSupervisor
                     ? await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor)
                     : 0,
+                PendientesEnCadena = esBandeja ? await PendientesPorRevisar(filtros.Tipo).CountAsync() : 0,
                 Tipos = await _context.CatalogoTiposSolicitud
                     .Where(t => idsTipos.Contains(t.Id))
                     .OrderBy(t => t.Nombre)
@@ -160,10 +208,13 @@ namespace PickingApp.Controllers
         // CU-08: Revisar Solicitud
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
-        public async Task<IActionResult> Revisar(int id)
+        public async Task<IActionResult> Revisar(int id, bool cadena = false, int? tipo = null)
         {
             var solicitud = await BuscarAsync(id);
             if (solicitud == null) return NotFound();
+
+            // En cadena, si otro revisor ya la respondió, se pasa a la siguiente en vez de mostrarla
+            if (cadena && solicitud.Estado != EstadosSolicitud.Pendiente) return await DespuesDeDecidirAsync(solicitud, cadena, tipo);
 
             if (!PuedeGestionar(solicitud))
             {
@@ -184,6 +235,14 @@ namespace PickingApp.Controllers
                     .ToListAsync();
                 modelo.ObservacionesAprobar = opciones.Where(o => o.Decision == DecisionesSolicitud.Aprobar).ToList();
                 modelo.ObservacionesRechazar = opciones.Where(o => o.Decision == DecisionesSolicitud.Rechazar).ToList();
+
+                if (cadena)
+                {
+                    modelo.EnCadena = true;
+                    modelo.TipoCadena = tipo;
+                    modelo.PendientesEnCadena = await PendientesPorRevisar(tipo).CountAsync();
+                    modelo.SiguienteId = await SiguientePendienteAsync(solicitud, tipo);
+                }
             }
             return View(modelo);
         }
@@ -371,7 +430,7 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Aprobar(int id, string? observacion, string? observacionRespuesta)
+        public async Task<IActionResult> Aprobar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
             var solicitud = await _context.Solicitudes
                 .Include(s => s.UsuarioSolicitante)
@@ -393,7 +452,7 @@ namespace PickingApp.Controllers
             if (elegida == null)
             {
                 TempData["ErrorMessage"] = error;
-                return RedirectToAction(nameof(Revisar), new { id });
+                return IrARevisar(id, cadena, tipo);
             }
             var conObservacion = elegida.Texto == null ? "" : $" Observación: {elegida.Texto}";
 
@@ -423,7 +482,7 @@ namespace PickingApp.Controllers
                     $"Solicitud #{solicitud.Id} ({solicitud.NombreTipo}) aprobada.{conObservacion}");
 
                 TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} aprobada correctamente.";
-                return RedirectToAction(nameof(Index));
+                return await DespuesDeDecidirAsync(solicitud, cadena, tipo);
             }
             catch (ReglaNegocioException ex)
             {
@@ -438,14 +497,14 @@ namespace PickingApp.Controllers
             }
 
             // Si no se pudo aprobar, se vuelve a la misma solicitud para rechazarla o revisarla
-            return RedirectToAction(nameof(Revisar), new { id });
+            return IrARevisar(id, cadena, tipo);
         }
 
         // Rechazar Solicitud (CU-08, CU-11, CU-14, CU-21, CU-41)
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Rechazar(int id, string? observacion, string? observacionRespuesta)
+        public async Task<IActionResult> Rechazar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
             var solicitud = await _context.Solicitudes.FindAsync(id);
             if (solicitud == null || solicitud.Estado != EstadosSolicitud.Pendiente)
@@ -464,7 +523,7 @@ namespace PickingApp.Controllers
             if (elegida == null)
             {
                 TempData["ErrorMessage"] = error;
-                return RedirectToAction(nameof(Revisar), new { id });
+                return IrARevisar(id, cadena, tipo);
             }
 
             solicitud.Estado = EstadosSolicitud.Rechazada;
@@ -486,7 +545,7 @@ namespace PickingApp.Controllers
                 $"Solicitud #{solicitud.Id} rechazada. Observación: {elegida.Texto}");
 
             TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} rechazada.";
-            return RedirectToAction(nameof(Index));
+            return await DespuesDeDecidirAsync(solicitud, cadena, tipo);
         }
     }
 }
