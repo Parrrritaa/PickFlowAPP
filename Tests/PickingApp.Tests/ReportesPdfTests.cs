@@ -44,20 +44,42 @@ namespace PickingApp.Tests
         public void TodosLosReportesGeneranUnPdf(bool conDatos)
         {
             var pedidos = conDatos ? Pedidos() : new List<Pedido>();
+            var estados = ResumenEstadosPedidos.De(pedidos);
 
             EsPdf(Servicio.GenerarReporteTiemposPorEmpleadoPdf(conDatos
                 ? new() { new ReporteTiemposEmpleadoItem { Identificacion = "1", Empleado = "Ana", TotalPedidos = 2, PromedioMinutos = 10 } }
-                : new(), Periodo));
+                : new(), Periodo, estados));
             EsPdf(Servicio.GenerarReporteGeneralTiemposPdf(conDatos
                 ? new() { new ReporteGeneralTiemposItem { Bodega = "Central", TotalCompletados = 2 } }
-                : new(), Periodo));
+                : new(), Periodo, estados));
             EsPdf(Servicio.GenerarReportePedidosPorPeriodoPdf(pedidos, Periodo, null));
             EsPdf(Servicio.GenerarReporteCompletadosCanceladosReasignadosPdf(pedidos, Periodo, null));
-            EsPdf(Servicio.GenerarReporteDetalleTiemposPdf("Detalle", "Empleado: Ana", pedidos, Periodo, porEmpleado: true));
+            EsPdf(Servicio.GenerarReporteDetalleTiemposPdf("Detalle", "Empleado: Ana", pedidos, Periodo, porEmpleado: true, estados));
             EsPdf(Servicio.GenerarReporteLogSistemaPdf(conDatos
                 ? new() { new LogSistema { FechaHora = DateTime.Now, Usuario = "a@b.com", Accion = "Prueba", Modulo = "Pedidos", Detalle = "detalle" } }
                 : new(), null, null, Periodo.Desde!.Value, Periodo.Hasta!.Value));
             EsPdf(Servicio.GenerarReporteDashboardPdf(new DashboardPdfDatos { Periodo = "Hoy", Filtros = "Sin filtros", Recientes = pedidos }));
+        }
+
+        [Fact]
+        public void ResumenCuentaCadaEstadoYLosReasignadosAparte()
+        {
+            var resumen = ResumenEstadosPedidos.De(new List<Pedido>
+            {
+                new() { Estado = PedidoEstados.Pendiente },
+                new() { Estado = PedidoEstados.Asignado },
+                new() { Estado = PedidoEstados.Reasignado, MotivoReasignacion = "Ausencia" },
+                new() { Estado = PedidoEstados.Completado, MotivoReasignacion = "Cambio de turno" },
+                new() { Estado = PedidoEstados.Completado },
+                new() { Estado = PedidoEstados.Cancelado }
+            });
+
+            Assert.Equal(6, resumen.Total);
+            Assert.Equal(1, resumen.Pendientes);
+            Assert.Equal(2, resumen.EnProceso); // Asignado + Reasignado
+            Assert.Equal(2, resumen.Completados);
+            Assert.Equal(1, resumen.Cancelados);
+            Assert.Equal(2, resumen.Reasignados); // también el que ya se completó
         }
     }
 }

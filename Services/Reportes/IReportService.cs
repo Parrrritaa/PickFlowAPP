@@ -58,6 +58,36 @@ namespace PickingApp.Services
         public List<Pedido> Recientes { get; set; } = new();
     }
 
+    // Cuántos pedidos hay en cada estado; los reportes lo muestran en tarjetas arriba de la tabla.
+    // Reasignados = pedidos que cambiaron de auxiliar al menos una vez: también cuentan en su estado actual.
+    public class ResumenEstadosPedidos
+    {
+        public ResumenEstadosPedidos(IReadOnlyDictionary<string, int> porEstado, int reasignados)
+        {
+            int De(string estado) => porEstado.TryGetValue(estado, out var n) ? n : 0;
+            Total = porEstado.Values.Sum();
+            Pendientes = De(PedidoEstados.Pendiente);
+            EnProceso = De(PedidoEstados.Asignado) + De(PedidoEstados.Reasignado);
+            Completados = De(PedidoEstados.Completado);
+            Cancelados = De(PedidoEstados.Cancelado);
+            Reasignados = reasignados;
+        }
+
+        public static ResumenEstadosPedidos De(IEnumerable<Pedido> pedidos)
+        {
+            var lista = pedidos.ToList();
+            return new(lista.GroupBy(p => p.Estado).ToDictionary(g => g.Key, g => g.Count()),
+                lista.Count(p => p.MotivoReasignacion != null));
+        }
+
+        public int Total { get; }
+        public int Pendientes { get; }
+        public int EnProceso { get; }
+        public int Completados { get; }
+        public int Cancelados { get; }
+        public int Reasignados { get; }
+    }
+
     // Periodo de un reporte. Sin fechas = todo el historial; con solo "Desde" o solo "Hasta" queda abierto por un lado.
     public class PeriodoReporte
     {
@@ -96,12 +126,14 @@ namespace PickingApp.Services
     // Contrato de generación de PDFs; la implementación está en ReportService.cs
     public interface IReportService
     {
-        byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo);
-        byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, PeriodoReporte periodo);
+        // estados: los pedidos cargados en el periodo, por estado (los reportes de tiempos solo listan completados)
+        byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo, ResumenEstadosPedidos estados);
+        byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, PeriodoReporte periodo, ResumenEstadosPedidos estados);
 
         // Reporte individual (un empleado o una bodega): resumen + detalle de cada pedido completado.
         // porEmpleado = true muestra la columna Bodega; false muestra la columna Empleado.
-        byte[] GenerarReporteDetalleTiemposPdf(string titulo, string sujeto, List<Pedido> pedidos, PeriodoReporte periodo, bool porEmpleado);
+        byte[] GenerarReporteDetalleTiemposPdf(string titulo, string sujeto, List<Pedido> pedidos, PeriodoReporte periodo, bool porEmpleado,
+            ResumenEstadosPedidos estados);
 
         byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
         byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
