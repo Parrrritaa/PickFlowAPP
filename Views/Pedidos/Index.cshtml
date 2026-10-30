@@ -20,7 +20,31 @@
     var activoBodega = (filtroBodegaId ?? 0) > 0;
     var activoEstado = !string.IsNullOrEmpty(filtroEstado);
     var activoEmpleado = (filtroEmpleadoId ?? 0) != 0;
-    var hayFiltros = activoPedido || activoFecha || activoPrioridad || activoBodega || activoEstado || activoEmpleado;
+    var filtroNovedad = Model.FiltroNovedad;
+    var activoNovedad = !string.IsNullOrEmpty(filtroNovedad);
+    var hayFiltros = activoPedido || activoFecha || activoPrioridad || activoBodega || activoEstado || activoEmpleado || activoNovedad;
+    var vistaRuta = verDivididos ? "divididos" : null;
+    var novedadesPorTipo = Model.NovedadesSinAtenderPorTipo;
+    var totalSinAtender = novedadesPorTipo.Values.Sum();
+
+    // Marca junto al código: ámbar con cuántas faltan por atender, o gris con ✓ si ya se atendieron todas
+    void MarcaNovedad(IEnumerable<PickingApp.Models.NovedadPedido> novedades)
+    {
+        var lista = novedades.ToList();
+        if (!lista.Any()) return;
+        var pendientes = lista.Where(n => !n.Atendida).ToList();
+        var texto = pendientes.Any()
+            ? $"{pendientes.Count} novedad(es) sin atender: {string.Join(", ", pendientes.Select(n => n.TipoNovedad).Distinct())}"
+            : $"{lista.Count} novedad(es), todas atendidas";
+        <span class="pf-marca-novedad @(pendientes.Any() ? "is-pendiente" : "is-atendida")" title="@texto">
+            <i class="bi @(pendientes.Any() ? "bi-exclamation-triangle-fill" : "bi-check2")" aria-hidden="true"></i>
+            @if (pendientes.Any())
+            {
+                @pendientes.Count
+            }
+            <span class="visually-hidden">@texto</span>
+        </span>
+    }
 
     // En la vista de divididos se filtra por el estado del pedido original
     var estados = verDivididos
@@ -68,6 +92,52 @@
     </a>
 </nav>
 
+@if (totalSinAtender > 0 || Model.HayNovedadesAtendidas || activoNovedad)
+{
+    @* Radar de novedades: cuántas faltan por atender y de qué tipo; cada chip filtra la lista con un clic *@
+    <section class="pf-radar @(totalSinAtender > 0 ? "pf-radar--alerta" : "")" aria-label="Novedades de los pedidos">
+        <div class="pf-radar__texto">
+            @if (totalSinAtender > 0)
+            {
+                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                <span><strong>@totalSinAtender @(totalSinAtender == 1 ? "novedad sin atender" : "novedades sin atender")</strong>
+                    en @Model.PedidosConNovedadSinAtender @(Model.PedidosConNovedadSinAtender == 1 ? "pedido" : "pedidos")</span>
+            }
+            else
+            {
+                <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                <span>Todas las novedades están atendidas</span>
+            }
+        </div>
+        <div class="pf-radar__chips">
+            @if (totalSinAtender > 0)
+            {
+                <a asp-action="Index" asp-route-vista="@vistaRuta" asp-route-novedad="@FiltrosNovedad.SinAtender"
+                   class="pf-radar-chip @(filtroNovedad == FiltrosNovedad.SinAtender ? "activo" : "")">
+                    Sin atender <span class="pf-radar-chip__n">@totalSinAtender</span>
+                </a>
+                @foreach (var tipo in TiposNovedad.Todos.Where(novedadesPorTipo.ContainsKey))
+                {
+                    <a asp-action="Index" asp-route-vista="@vistaRuta" asp-route-novedad="@tipo"
+                       class="pf-radar-chip @(filtroNovedad == tipo ? "activo" : "")">
+                        @tipo <span class="pf-radar-chip__n">@novedadesPorTipo[tipo]</span>
+                    </a>
+                }
+            }
+            <a asp-action="Index" asp-route-vista="@vistaRuta" asp-route-novedad="@FiltrosNovedad.Todas"
+               class="pf-radar-chip @(filtroNovedad == FiltrosNovedad.Todas ? "activo" : "")" title="Pedidos con alguna novedad, atendida o no">
+                Historial
+            </a>
+            @if (activoNovedad)
+            {
+                <a asp-action="Index" asp-route-vista="@vistaRuta" class="pf-radar-chip pf-radar-chip--quitar">
+                    <i class="bi bi-x" aria-hidden="true"></i> Ver todos los pedidos
+                </a>
+            }
+        </div>
+    </section>
+}
+
 <div class="pf-card pf-card-lista">
     @if (verDivididos)
     {
@@ -81,6 +151,11 @@
         @if (verDivididos)
         {
             <input type="hidden" name="vista" value="divididos" />
+        }
+        @if (activoNovedad)
+        {
+            @* El filtro de la franja de novedades se conserva al usar los filtros de las columnas *@
+            <input type="hidden" name="novedad" value="@filtroNovedad" />
         }
         <div class="table-responsive">
             <table class="pf-table" data-pf-filas-servidor="@(verDivididos ? "divididos" : "pedidos")" data-pf-tamano="@Model.Paginacion.TamanoPagina">
@@ -213,6 +288,7 @@
                                         </button>
                                     }
                                     <a asp-action="Detalle" asp-route-id="@p.Id" class="pf-codigo">@p.CodigoPedido</a>
+                                    @{ MarcaNovedad(p.Novedades.Concat(partesPedido.SelectMany(pa => pa.Novedades))); }
                                     @if (verDivididos)
                                     {
                                         <div class="text-secondary small fw-normal">@partesPedido.Count partes · @finalizadas finalizada(s)</div>
@@ -254,6 +330,7 @@
                                         <span class="pf-fila-parte__codigo">
                                             <i class="bi bi-arrow-return-right" aria-hidden="true"></i>
                                             <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-codigo">@pa.CodigoPedido</a>
+                                            @{ MarcaNovedad(pa.Novedades); }
                                         </span>
                                         <div class="text-secondary small">@pa.Detalles.Sum(d => d.Cantidad) uds</div>
                                     </td>
@@ -282,7 +359,12 @@
                     {
                         <tr>
                             <td colspan="7" class="text-center text-muted py-4">
-                                @if (hayFiltros)
+                                @* Se llega aquí desde un enlace guardado o tras atender la última novedad *@
+                                @if (activoNovedad && filtroNovedad != FiltrosNovedad.Todas && totalSinAtender == 0)
+                                {
+                                    @("No quedan novedades sin atender.")
+                                }
+                                else if (hayFiltros)
                                 {
                                     @("Ningún pedido coincide con los filtros aplicados.")
                                 }

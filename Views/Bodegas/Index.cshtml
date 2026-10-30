@@ -81,12 +81,20 @@
 <div class="pf-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Bodegas registradas</h4>
-        @if (userRole == Roles.Administrador)
-        {
-            <a asp-action="Crear" class="btn-pf-blue">
-                + Crear bodega
-            </a>
-        }
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @if (bodegas.Any())
+            {
+                @* Filtra la tabla al escribir (site.js, data-pf-buscar-en); el estado se sigue filtrando en la columna *@
+                <label class="visually-hidden" for="buscarBodega">Buscar bodega</label>
+                <input type="search" id="buscarBodega" class="pf-search-input" placeholder="Buscar nombre o código..." data-pf-buscar-en="tablaBodegas" autocomplete="off" />
+            }
+            @if (userRole == Roles.Administrador)
+            {
+                <a asp-action="Crear" class="btn-pf-blue">
+                    + Crear bodega
+                </a>
+            }
+        </div>
     </div>
 
     <form method="get" asp-action="Index" id="formFiltrosBodegas">
@@ -95,7 +103,7 @@
             <input type="hidden" name="busquedaProducto" value="@busquedaProducto" />
         }
         <div class="table-responsive">
-            <table class="pf-table" data-pf-paginar>
+            <table class="pf-table" id="tablaBodegas" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>Bodega</th>
@@ -169,6 +177,9 @@
                             </td>
                         </tr>
                     }
+                    <tr class="d-none" data-pf-sin-resultados>
+                        <td colspan="4" class="text-center text-muted py-4">Ninguna bodega coincide con la búsqueda.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>

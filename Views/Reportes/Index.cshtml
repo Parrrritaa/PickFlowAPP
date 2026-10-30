@@ -4,6 +4,76 @@
     var empleados = Model.Empleados;
     var bodegas = Model.Bodegas;
     var hoy = DateTime.Today.ToString("yyyy-MM-dd");
+    // Reportes de análisis: los de gestión solo para el Administrador; los de operación de bodega también para el Supervisor
+    var esAdmin = User.IsInRole(Roles.Administrador);
+    var esAdminOSupervisor = esAdmin || User.IsInRole(Roles.Supervisor);
+
+    // Tarjeta de un reporte de análisis que abre su diálogo
+    void TarjetaAnalisis(string titulo, string descripcion, string modal, string? etiqueta)
+    {
+        <div class="col-lg-4 col-md-6">
+            <div class="pf-report-card">
+                <div>
+                    <h3>@titulo</h3>
+                    <p>@descripcion</p>
+                    @if (etiqueta != null)
+                    {
+                        <span class="pf-report-etiqueta">@etiqueta</span>
+                    }
+                </div>
+                <div>
+                    <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#@modal">
+                        Generar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    // Diálogo de un reporte de análisis: periodo y, si aplica, todas las bodegas o una
+    // Los tag helpers no pueden ir en una función local síncrona: <!form> y <!option> los desactivan (aquí no hacen falta)
+    void DialogoAnalisis(string modal, string accion, string titulo, string descripcion, string prefijo, bool conBodega)
+    {
+        <div class="modal fade" id="@modal" tabindex="-1" aria-labelledby="titulo@(modal)" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <!form action="@Url.Action(accion)" method="get" data-reporte-form>
+                        <div class="modal-header border-0 pb-0">
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark" id="titulo@(modal)">@titulo</h5>
+                                <p class="pf-reporte-desc">@descripcion</p>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            @if (conBodega)
+                            {
+                                <fieldset class="pf-campo">
+                                    <legend class="pf-campo-titulo">Bodegas</legend>
+                                    @{ Segmentado("_alcance", prefijo, "Todas", "Una bodega"); }
+                                    <div class="pf-dependiente" data-si="_alcance=individual" hidden>
+                                        <label class="visually-hidden" for="@(prefijo)Select">Bodega</label>
+                                        <select class="form-select" id="@(prefijo)Select" name="bodegaId" required disabled>
+                                            <!option value="">Selecciona una bodega…</!option>
+                                            @foreach (var b in bodegas)
+                                            {
+                                                <!option value="@b.Id">@b.Codigo – @b.Nombre@(b.Activa ? "" : " (inactiva)")</!option>
+                                            }
+                                        </select>
+                                    </div>
+                                </fieldset>
+                            }
+                            @{ Periodo(prefijo); }
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn-pf-blue"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Generar PDF</button>
+                        </div>
+                    </!form>
+                </div>
+            </div>
+        </div>
+    }
 
     // Control segmentado de dos opciones: la segunda revela un campo adicional
     void Segmentado(string nombre, string prefijo, string textoGeneral, string textoIndividual)
@@ -63,7 +133,7 @@
         <div class="pf-report-card">
             <div>
                 <h3>Tiempos por empleado</h3>
-                <p>De todos los empleados o de uno solo, con el detalle de sus pedidos.</p>
+                <p>De todos o de uno solo, con cuánto cumplen el tiempo estándar de sus pedidos.</p>
             </div>
             <div>
                 <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalReporteEmpleados">
@@ -118,6 +188,23 @@
         </div>
     </div>
 </div>
+
+@if (esAdminOSupervisor)
+{
+    @* Reportes de análisis: ayudan a decidir (capacitar, acomodar la bodega, planear turnos), no solo a consultar *@
+    <h2 class="pf-reportes-seccion">Análisis</h2>
+    <div class="row g-4">
+        @if (esAdmin)
+        {
+            TarjetaAnalisis("Novedades", "Por tipo, bodega y empleado; cuáles siguen sin atender y cuánto tardan en atenderse.", "modalReporteNovedades", "Administrador");
+            TarjetaAnalisis("Solicitudes y aprobaciones", "Aprobadas, rechazadas y tiempo de respuesta, por tipo y por revisor.", "modalReporteSolicitudes", "Administrador");
+        }
+        @{
+            TarjetaAnalisis("Productos y ubicaciones más pedidos", "Lo que más sale y dónde está, para acomodar la bodega.", "modalReporteProductos", null);
+            TarjetaAnalisis("Carga por hora y día", "Pedidos que llegan y se completan por franja, frente a los empleados en turno.", "modalReporteCarga", null);
+        }
+    </div>
+}
 
 <!-- ===== Diálogos de configuración de cada reporte ===== -->
 
@@ -384,6 +471,21 @@
         </div>
     </div>
 </div>
+
+@if (esAdmin)
+{
+    DialogoAnalisis("modalReporteNovedades", "Novedades", "Novedades",
+        "Novedades registradas en el periodo, con las que siguen sin atender.", "nov", conBodega: false);
+    DialogoAnalisis("modalReporteSolicitudes", "Solicitudes", "Solicitudes y aprobaciones",
+        "Solicitudes enviadas en el periodo y cómo se respondieron.", "sol", conBodega: false);
+}
+@if (esAdminOSupervisor)
+{
+    DialogoAnalisis("modalReporteProductos", "ProductosUbicaciones", "Productos y ubicaciones más pedidos",
+        "Los productos con más unidades y las ubicaciones más visitadas.", "pro", conBodega: true);
+    DialogoAnalisis("modalReporteCarga", "CargaHoraria", "Carga por hora y día",
+        "Pedidos cargados y completados por hora y por día de la semana.", "car", conBodega: true);
+}
 
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>

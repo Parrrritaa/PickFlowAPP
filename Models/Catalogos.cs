@@ -23,6 +23,13 @@
         public static readonly string[] Todos = { Faltante, Averia, UbicacionIncorrecta, DiferenciaCantidad, Otro };
     }
 
+    // Valores del filtro ?novedad= de la lista de pedidos (además de un tipo de TiposNovedad)
+    public static class FiltrosNovedad
+    {
+        public const string SinAtender = "pendientes";
+        public const string Todas = "todas";
+    }
+
     public static class TiposNotificacion
     {
         public const string Info = "Info";
