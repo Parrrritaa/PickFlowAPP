@@ -19,12 +19,56 @@
     var tarjetas = {};
     var decisionesRevisadas = false;
 
-    // Un archivo nuevo invalida el resultado anterior
+    var caja = document.getElementById('cajaArchivo');
+    var tituloArchivo = document.getElementById('tituloArchivo');
+    var ayudaArchivo = document.getElementById('ayudaArchivo');
+    var textoTitulo = tituloArchivo.textContent;
+    var textoAyuda = ayudaArchivo.textContent;
+    var textoElegir = document.getElementById('btnElegirArchivo').innerHTML;
+
+    function tamano(bytes) {
+        return bytes < 1024 * 1024 ? Math.max(1, Math.round(bytes / 1024)) + ' KB' : (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    // La zona muestra el archivo elegido (nombre y tamaño) o la invitación a elegirlo
+    function mostrarArchivo() {
+        var archivo = input.files && input.files[0];
+        tituloArchivo.textContent = archivo ? archivo.name : textoTitulo;
+        ayudaArchivo.textContent = archivo ? tamano(archivo.size) + ' · listo para validar' : textoAyuda;
+        ayudaArchivo.classList.remove('is-error');
+        document.getElementById('btnElegirArchivo').innerHTML = archivo
+            ? '<i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Cambiar archivo'
+            : textoElegir;
+    }
+
+    // Un archivo nuevo invalida el resultado anterior y la zona vuelve a su tamaño completo
     input.addEventListener('change', function () {
         seccion.hidden = true;
         btnConfirmar.hidden = true;
         listaIncidencias.innerHTML = '';
         tarjetas = {};
+        caja.classList.remove('is-compacta');
+        mostrarArchivo();
+    });
+
+    // Arrastrar y soltar el archivo sobre la zona equivale a elegirlo
+    ['dragenter', 'dragover'].forEach(function (evento) {
+        caja.addEventListener(evento, function (e) {
+            e.preventDefault();
+            caja.classList.add('is-arrastrando');
+        });
+    });
+    ['dragleave', 'drop'].forEach(function (evento) {
+        caja.addEventListener(evento, function (e) {
+            e.preventDefault();
+            if (evento === 'dragleave' && caja.contains(e.relatedTarget)) return;
+            caja.classList.remove('is-arrastrando');
+        });
+    });
+    caja.addEventListener('drop', function (e) {
+        if (!e.dataTransfer.files.length) return;
+        input.files = e.dataTransfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     function plural(n, singular, varios) { return n + ' ' + (n === 1 ? singular : varios); }
@@ -207,6 +251,11 @@
         btnConfirmar.hidden = !(r.valido || decidir);
 
         seccion.hidden = false;
+        caja.classList.add('is-compacta');
+        if (input.files && input.files[0]) {
+            ayudaArchivo.textContent = tamano(input.files[0].size) + ' · ' + (r.valido ? 'listo para cargar'
+                : r.sinVerificar ? 'no se pudo validar' : 'revise el resultado');
+        }
         seccion.classList.remove('pf-reveal');
         void seccion.offsetWidth;
         seccion.classList.add('pf-reveal');
@@ -444,7 +493,10 @@
 
     btnValidar.addEventListener('click', function () {
         if (!input.files || input.files.length === 0) {
-            input.reportValidity();
+            // El selector nativo está oculto: el aviso va en la misma zona
+            ayudaArchivo.textContent = 'Primero elige el archivo Excel que quieres validar.';
+            ayudaArchivo.classList.add('is-error');
+            input.focus();
             return;
         }
 

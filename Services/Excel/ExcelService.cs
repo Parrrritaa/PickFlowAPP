@@ -77,6 +77,8 @@ namespace PickingApp.Services
                 var totalFilas = 0;
                 // Sin distinguir mayúsculas, igual que MySQL: "PED-1" y "ped-1" son el mismo pedido
                 var pedidosDict = new Dictionary<string, Pedido>(StringComparer.OrdinalIgnoreCase);
+                // Bodegas donde se recoge cada pedido: un pedido se alista en una sola bodega
+                var bodegasPorPedido = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var row in rows)
                 {
@@ -175,6 +177,15 @@ namespace PickingApp.Services
                         pedidosDict[codPedido] = pedido;
                     }
 
+                    // La bodega de la fila es la de donde se recoge: la de la ubicación elegida al resolver una
+                    // incidencia (puede ser otra) o, mientras no se resuelva, la que dice el archivo
+                    var bodegaFila = destino != null ? bodegas.First(b => b.Id == destino.BodegaId).Codigo : bodega.Codigo;
+                    if (!bodegasPorPedido.TryGetValue(codPedido, out var bodegasPedido))
+                    {
+                        bodegasPorPedido[codPedido] = bodegasPedido = new SortedSet<string>();
+                    }
+                    bodegasPedido.Add(bodegaFila);
+
                     if (destino == null || !nombreConfirmado) continue;
 
                     // Ubicacion (navegación) enlaza también las ubicaciones nuevas, que aún no tienen Id:
@@ -188,6 +199,14 @@ namespace PickingApp.Services
                         UbicacionId = destino.Id,
                         Ubicacion = destino
                     });
+                }
+
+                // Un mismo pedido con productos en varias bodegas no se puede alistar: cada bodega está en otro sitio
+                // y el pedido tiene una sola bodega, ruta y empleado. No se parte solo para no cambiar el código del cliente.
+                foreach (var (codigo, bodegasPedido) in bodegasPorPedido.Where(p => p.Value.Count > 1))
+                {
+                    result.Errors.Add($"El pedido '{codigo}' tiene productos en {bodegasPedido.Count} bodegas ({string.Join(", ", bodegasPedido)}). " +
+                                      "Un pedido se recoge en una sola bodega: sepárelo en un pedido por bodega.");
                 }
 
                 result.TotalFilas = totalFilas;

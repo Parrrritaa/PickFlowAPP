@@ -1257,6 +1257,110 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     border-color: var(--pf-accent);
 }
 
+/* Cargar Excel: zona centrada al entrar; .is-arrastrando mientras se arrastra un archivo encima;
+   .is-compacta (tras validar) la deja en una fila: ícono y archivo a la izquierda, botones a la derecha */
+.pf-upload-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 44px 24px 40px;
+}
+
+.pf-upload-box.is-arrastrando {
+    border-color: var(--pf-accent);
+    background-color: var(--pf-pill);
+}
+
+.pf-upload-box__icono {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background-color: var(--pf-green-soft);
+    color: var(--pf-green-fill);
+    font-size: 26px;
+}
+
+.pf-upload-box__titulo {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--pf-ink);
+}
+
+.pf-upload-box__ayuda {
+    margin: 0;
+    font-size: 14px;
+    color: var(--pf-ink2);
+    overflow-wrap: anywhere;
+}
+
+.pf-upload-box__ayuda.is-error {
+    color: var(--pf-red);
+    font-weight: 600;
+}
+
+.pf-upload-box__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+/* El selector nativo se oculta (los botones propios lo reemplazan) pero sigue en el formulario y es accesible */
+.pf-upload-box__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pf-upload-box__acciones label:focus-within,
+.pf-upload-box__input:focus-visible + label {
+    outline: 2px solid var(--pf-accent);
+    outline-offset: 2px;
+}
+
+.pf-upload-box.is-compacta {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 14px 18px;
+    padding: 18px 22px;
+    text-align: left;
+}
+
+.pf-upload-box.is-compacta .pf-upload-box__icono {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-size: 21px;
+}
+
+.pf-upload-box.is-compacta .pf-upload-box__titulo {
+    font-size: 16px;
+}
+
+.pf-upload-box.is-compacta .pf-upload-box__texto {
+    flex: 1;
+    min-width: 200px;
+}
+
+.pf-upload-box.is-compacta .pf-upload-box__acciones {
+    margin-top: 0;
+}
+
+.pf-verificaciones {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px 24px;
+}
+
 /* Tarjetas de reportes */
 .pf-report-card {
     background-color: var(--pf-surface);
@@ -1288,6 +1392,27 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     color: var(--pf-ink2);
     margin-bottom: 20px;
     min-height: 42px;
+}
+
+/* Título del grupo de reportes de análisis */
+.pf-reportes-seccion {
+    margin: 36px 0 16px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--pf-ink);
+}
+
+/* Quién puede generar el reporte (p. ej. "Administrador") */
+.pf-report-etiqueta {
+    display: inline-block;
+    margin: -8px 0 16px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background-color: var(--pf-blue-soft);
+    color: var(--pf-ink2);
+    font-size: 12px;
+    font-weight: 600;
 }
 
 /* Barra de búsqueda sobre las listas */
@@ -2172,7 +2297,16 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
     font-size: 12px;
     font-weight: 700;
     vertical-align: 1px;
+    white-space: nowrap;
     cursor: help;
+}
+
+/* Sola en su celda (estado de la novedad en el detalle del pedido): etiqueta de estado, no marca junto al código */
+td > .pf-marca-novedad:first-child {
+    gap: 5px;
+    margin-left: 0;
+    padding: 3px 10px;
+    cursor: default;
 }
 
 .pf-marca-novedad.is-pendiente {
@@ -2341,6 +2475,165 @@ body:not(.pf-just-logged-in) .pf-content > :not(.modal):not(script):nth-child(n+
 
 .pf-atajos dd {
     margin: 0;
+}
+
+/* --- Detalle del pedido: usa la rejilla y el panel fijo de .pf-sol (Revisar solicitud) --- */
+.pf-ped-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 20px;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-ped-cabecera > .pf-estado-punto {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.pf-ped-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+    color: var(--pf-ink);
+}
+
+.pf-ped-meta i {
+    margin-right: 6px;
+    color: var(--pf-ink2);
+}
+
+.pf-ped-tenue {
+    color: var(--pf-ink2);
+}
+
+.pf-ped-seccion-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    margin-bottom: 8px;
+}
+
+.pf-ped-seccion-cabecera .pf-sol-subtitulo {
+    margin-bottom: 0;
+}
+
+/* Barra de tiempo: el valor (real o estimado) frente a una marca en el estándar. Verde si cumple, ámbar si se pasa. */
+.pf-tiempo {
+    position: relative;
+    height: 8px;
+    margin: 4px 0 8px;
+    border-radius: 999px;
+    background-color: var(--pf-hover-strong);
+}
+
+.pf-tiempo__valor {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 999px;
+}
+
+.pf-tiempo__valor.is-dentro { background-color: var(--pf-green-fill); }
+.pf-tiempo__valor.is-fuera { background-color: var(--pf-accent); }
+
+.pf-tiempo__estandar {
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    height: 16px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background-color: var(--pf-ink);
+}
+
+.pf-tiempo__leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--pf-ink2);
+}
+
+.pf-tiempo__leyenda b {
+    font-weight: 600;
+    color: var(--pf-ink);
+}
+
+.pf-ped-nota {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--pf-ink2);
+}
+
+.pf-ped-prioridad {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pf-ped-siguiente {
+    margin: 16px 0 10px;
+    font-size: 14px;
+    color: var(--pf-ink2);
+}
+
+/* Volver y cancelar, del mismo tamaño, separados de las acciones principales por una línea: cancelar va en rojo
+   suave (borde y texto) y solo se llena al pasar el cursor, para que se note sin competir con el botón principal */
+.pf-ped-panel-pie {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--pf-line);
+}
+
+.pf-ped-pie-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding-left: 10px;
+    padding-right: 10px;
+    white-space: nowrap;
+}
+
+.pf-ped-pie-btn i {
+    font-size: 15px;
+}
+
+/* Igual que los botones naranjas: rojo tenue sin borde en reposo, rojo lleno al pasar el cursor */
+.pf-ped-cancelar {
+    border-color: transparent;
+    background-color: var(--pf-red-soft);
+    color: var(--pf-red) !important;
+}
+
+.pf-ped-cancelar:hover {
+    border-color: var(--pf-red-fill);
+    background-color: var(--pf-red-fill);
+    color: #FFFFFF !important;
+}
+
+.pf-ped-cancelar:focus-visible {
+    outline-color: var(--pf-red-fill);
+}
+
+.pf-btn-fila {
+    padding: 4px 14px;
+    font-size: 14px;
 }
 
 /* Portátiles de poca altura: se aprietan título y espacios para que la solicitud quepa sin desplazarse */

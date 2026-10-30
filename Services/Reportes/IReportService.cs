@@ -11,6 +11,42 @@ namespace PickingApp.Services
         public double PromedioMinutos { get; set; }
         public double TiempoMinimo { get; set; }
         public double TiempoMaximo { get; set; }
+
+        // Comparación con el tiempo estándar: solo los pedidos que lo tienen (los muy antiguos pueden no tenerlo).
+        // Se guardan sumas para poder sacar el total del reporte ponderado por pedidos.
+        public int ConEstandar { get; set; }
+        public int DentroDelEstandar { get; set; }
+        public double MinutosRealesConEstandar { get; set; }
+        public double MinutosEstandar { get; set; }
+
+        public double? PorcentajeCumplimiento => ConEstandar == 0 ? null : 100.0 * DentroDelEstandar / ConEstandar;
+
+        // Positivo: tarda más que el estándar; negativo: menos
+        public double? DesviacionPorcentaje => MinutosEstandar <= 0 ? null : 100.0 * (MinutosRealesConEstandar - MinutosEstandar) / MinutosEstandar;
+
+        // Requiere pedidos completados con tiempo real y el Empleado cargado. Dentro del estándar: real ≤ estándar.
+        public static List<ReporteTiemposEmpleadoItem> De(IEnumerable<Pedido> completados) => completados
+            .Where(p => p.Empleado != null && p.TiempoProcesamientoMinutos.HasValue)
+            .GroupBy(p => p.EmpleadoId)
+            .Select(g =>
+            {
+                var conEstandar = g.Where(p => p.TiempoEstandarMinutos > 0).ToList();
+                return new ReporteTiemposEmpleadoItem
+                {
+                    Identificacion = g.First().Empleado!.Identificacion,
+                    Empleado = g.First().Empleado!.NombreCompleto,
+                    TotalPedidos = g.Count(),
+                    PromedioMinutos = Math.Round(g.Average(p => p.TiempoProcesamientoMinutos!.Value), 1),
+                    TiempoMinimo = Math.Round(g.Min(p => p.TiempoProcesamientoMinutos!.Value), 1),
+                    TiempoMaximo = Math.Round(g.Max(p => p.TiempoProcesamientoMinutos!.Value), 1),
+                    ConEstandar = conEstandar.Count,
+                    DentroDelEstandar = conEstandar.Count(p => p.TiempoProcesamientoMinutos <= p.TiempoEstandarMinutos),
+                    MinutosRealesConEstandar = conEstandar.Sum(p => p.TiempoProcesamientoMinutos!.Value),
+                    MinutosEstandar = conEstandar.Sum(p => p.TiempoEstandarMinutos!.Value)
+                };
+            })
+            .OrderBy(i => i.Empleado)
+            .ToList();
     }
 
     public class ReporteGeneralTiemposItem
@@ -138,6 +174,12 @@ namespace PickingApp.Services
         byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
         byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro);
         byte[] GenerarReporteDashboardPdf(DashboardPdfDatos datos);
+
+        // Reportes de análisis: los datos se arman en ReportesAnalisis.cs
+        byte[] GenerarReporteNovedadesPdf(DatosNovedades datos, PeriodoReporte periodo);
+        byte[] GenerarReporteSolicitudesPdf(DatosSolicitudes datos, PeriodoReporte periodo);
+        byte[] GenerarReporteProductosUbicacionesPdf(DatosProductosUbicaciones datos, PeriodoReporte periodo, string? filtro);
+        byte[] GenerarReporteCargaHorariaPdf(DatosCargaHoraria datos, PeriodoReporte periodo, string? filtro);
         byte[] GenerarReporteLogSistemaPdf(List<LogSistema> logs, string? modulo, string? usuario, DateTime fechaDesde, DateTime fechaHasta);
     }
 }

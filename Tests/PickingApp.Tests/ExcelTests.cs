@@ -60,6 +60,32 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public async Task UnPedidoConProductosEnDosBodegasSeRechaza()
+        {
+            using var e = new Escenario();
+            var enBod01 = e.Ubicacion(Escenario.Pequeno);
+            var otra = new Bodega { Codigo = "BOD-02", Nombre = "Otra bodega" };
+            var enBod02 = new Ubicacion
+            {
+                Bodega = otra, Pasillo = "1", Estante = "1", Nivel = "1",
+                CodigoUbicacion = Ubicacion.GenerarCodigo("1", "1", "1"),
+                Producto = new Producto { Codigo = "PROD-900", Nombre = "Producto en otra bodega" }
+            };
+            e.Db.Ubicaciones.Add(enBod02);
+            e.Db.SaveChanges();
+            var filaBod02 = new object[] { "PED-902", "BOD-02", "1", "1", "1", "PROD-900", "Producto en otra bodega", 2, "Media" };
+
+            var dosBodegas = await ValidarAsync(e, Archivo(Fila(enBod01, "PED-902"), filaBod02));
+            // Cada bodega en su propio pedido sí es válido
+            var separados = await ValidarAsync(e, Archivo(Fila(enBod01, "PED-903"), filaBod02.Select((v, i) => i == 0 ? "PED-904" : v).ToArray()));
+
+            Assert.False(dosBodegas.IsValid);
+            Assert.Contains(dosBodegas.Errors, m => m.Contains("PED-902") && m.Contains("BOD-01") && m.Contains("BOD-02"));
+            Assert.True(separados.IsValid, string.Join(" / ", separados.Errors));
+            Assert.Equal(2, separados.TotalPedidos);
+        }
+
+        [Fact]
         public async Task UnArchivoIlegibleNoMuestraDetallesTecnicos()
         {
             using var e = new Escenario();
