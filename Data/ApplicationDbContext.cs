@@ -74,8 +74,9 @@ namespace PickingApp.Data
                 .HasIndex(b => b.Codigo)
                 .IsUnique();
 
+            // El código lo pone el cliente: dos bodegas pueden recibir el mismo código
             modelBuilder.Entity<Pedido>()
-                .HasIndex(p => p.CodigoPedido)
+                .HasIndex(p => new { p.BodegaId, p.CodigoPedido })
                 .IsUnique();
 
             modelBuilder.Entity<ConfiguracionSistema>()
@@ -153,6 +154,19 @@ namespace PickingApp.Data
                 .HasOne(p => p.Bodega)
                 .WithMany(b => b.Pedidos)
                 .HasForeignKey(p => p.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Una bodega con personal asignado no se puede borrar
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Bodega)
+                .WithMany()
+                .HasForeignKey(u => u.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Empleado>()
+                .HasOne(e => e.Bodega)
+                .WithMany()
+                .HasForeignKey(e => e.BodegaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Pedido>()
