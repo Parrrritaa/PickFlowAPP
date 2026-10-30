@@ -27,6 +27,9 @@ namespace PickingApp.Models.ViewModels
         public bool MostrarPestanas { get; set; }
         public int PendientesPorRevisar { get; set; }
 
+        // Pendientes que abre el botón "Revisar pendientes" (respeta el filtro de tipo)
+        public int PendientesEnCadena { get; set; }
+
         // Opciones de los filtros: solo los tipos y solicitantes que aparecen en la lista sin filtrar
         public List<TipoSolicitud> Tipos { get; set; } = new();
         public List<Usuario> Solicitantes { get; set; } = new();
@@ -68,6 +71,12 @@ namespace PickingApp.Models.ViewModels
 
         // Volver a la bandeja (Index) o a "Mis solicitudes"
         public string AccionVolver { get; set; } = "Index";
+
+        // Revisión en cadena ("Revisar pendientes"): al decidir se abre la siguiente pendiente
+        public bool EnCadena { get; set; }
+        public int? TipoCadena { get; set; }
+        public int PendientesEnCadena { get; set; }
+        public int? SiguienteId { get; set; }
     }
 
     // Views/Observaciones/Index.cshtml: catálogo de observaciones para responder solicitudes

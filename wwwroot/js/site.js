@@ -75,7 +75,7 @@ document.addEventListener('click', function (e) {
     });
 })();
 
-// Paginación según la pantalla: el usuario ve en cada página las filas que caben en la ventana (mínimo 4),
+// Paginación según la pantalla: el usuario ve en cada página las filas que caben en la ventana (ver filasQueCaben),
 // para desplazarse lo menos posible. Dos casos:
 //  - [data-pf-paginar] (tabla o lista): la página trae todas las filas y aquí se reparten en páginas, con la
 //    misma barra .pf-paginacion de _Paginacion.cshtml. Las filas que oculta un filtro de la vista (.d-none) no
@@ -84,7 +84,7 @@ document.addEventListener('click', function (e) {
 //    guarda en la cookie pf_filas_<lista>, que lee Paginacion.FilasPorPantalla. En la primera visita, si no coincide,
 //    se recarga una vez; después la medida nueva se usa en la próxima visita.
 (function () {
-    var MIN = 4, MAX = 50, PREDETERMINADO = 8;
+    var MIN = 4, MAX = 50, PREDETERMINADO = 8, MIN_PRIMER_PANTALLAZO = 2;
     var RESERVA = 96; // barra de paginación + margen inferior de la tarjeta
 
     function filas(contenedor) {
@@ -94,7 +94,17 @@ document.addEventListener('click', function (e) {
 
     // Cuántas filas del alto promedio de "items" caben entre el inicio del cuerpo y el borde inferior de la ventana.
     // Una tabla que empieza más abajo del primer pantallazo se ajusta a la ventana completa, al desplazarse hasta ella.
+    // Posición en el documento sin transformaciones: getBoundingClientRect incluye la animación de entrada de la
+    // página (la tarjeta empieza unos px más abajo) y al cargar daba una fila menos de las que caben
+    function topEnDocumento(el) {
+        for (var y = 0; el; el = el.offsetParent) y += el.offsetTop;
+        return y;
+    }
+
     function filasQueCaben(contenedor, items) {
+        // data-pf-paginar="6": la vista fija cuántas filas van por página
+        var fijas = parseInt(contenedor.dataset.pfPaginar, 10);
+        if (fijas > 0) return fijas;
         var medibles = items.filter(function (f) { return f.offsetHeight > 4; });
         if (!medibles.length) return PREDETERMINADO;
         var alto = medibles.reduce(function (suma, f) { return suma + f.offsetHeight; }, 0) / medibles.length;
@@ -105,11 +115,14 @@ document.addEventListener('click', function (e) {
         for (var s = (contenedor.closest('.table-responsive') || contenedor).nextElementSibling; s; s = s.nextElementSibling) {
             if (!s.hidden && !s.classList.contains('pf-paginacion')) debajo += s.offsetHeight + parseFloat(getComputedStyle(s).marginTop);
         }
-        var espacio = window.innerHeight - (cuerpo.getBoundingClientRect().top + window.scrollY) - RESERVA - debajo;
-        if (espacio < MIN * alto) {
-            var encabezado = contenedor.tHead ? contenedor.tHead.offsetHeight : 0;
-            espacio = window.innerHeight - (barra ? barra.offsetHeight : 0) - encabezado - RESERVA - debajo;
-        }
+        var espacio = window.innerHeight - topEnDocumento(cuerpo) - RESERVA - debajo;
+        // Si la tabla empieza en el primer pantallazo se muestran las filas que caben, aunque sean menos de MIN
+        // (p. ej. con un aviso arriba): así la paginación queda a la vista. Solo una tabla que empieza más abajo
+        // se ajusta a la ventana completa.
+        var caben = Math.floor(espacio / alto);
+        if (caben >= MIN_PRIMER_PANTALLAZO) return Math.min(MAX, caben);
+        var encabezado = contenedor.tHead ? contenedor.tHead.offsetHeight : 0;
+        espacio = window.innerHeight - (barra ? barra.offsetHeight : 0) - encabezado - RESERVA - debajo;
         return Math.min(MAX, Math.max(MIN, Math.floor(espacio / alto)));
     }
 
@@ -168,7 +181,8 @@ document.addEventListener('click', function (e) {
         if (location.href.split('#')[0] !== urlMostrada) location.reload();
     });
 
-    function paginar(contenedor) {
+    // paginaPedida: la que eligió el usuario (o la de una fila destacada); sin ella se conserva la que estaba a la vista
+    function paginar(contenedor, paginaPedida) {
         var estado = contenedor._pfPaginacion;
         var items = filas(contenedor).filter(function (f) { return !f.classList.contains('d-none'); });
         // Se mide con todas las filas a la vista; el navegador no pinta entre esto y el reparto de abajo
@@ -176,8 +190,10 @@ document.addEventListener('click', function (e) {
         var porPagina = filasQueCaben(contenedor, items);
         var total = items.length;
         var paginas = Math.max(1, Math.ceil(total / porPagina));
-        // Si cambió el tamaño de la ventana, se sigue viendo la primera fila que estaba a la vista
-        if (estado.porPagina) estado.pagina = Math.floor((estado.pagina - 1) * estado.porPagina / porPagina) + 1;
+        // Si cambió el tamaño de la ventana, se sigue viendo la primera fila que estaba a la vista.
+        // Una página elegida no se recalcula: con otro tamaño de página la cuenta la devolvía a la anterior.
+        if (paginaPedida) estado.pagina = paginaPedida;
+        else if (estado.porPagina) estado.pagina = Math.floor((estado.pagina - 1) * estado.porPagina / porPagina) + 1;
         estado.pagina = Math.min(Math.max(1, estado.pagina), paginas);
         estado.porPagina = porPagina;
         var desde = (estado.pagina - 1) * porPagina;
@@ -196,8 +212,7 @@ document.addEventListener('click', function (e) {
                 var btn = e.target.closest('button[data-pagina]');
                 if (!btn) return;
                 var etiqueta = btn.getAttribute('aria-label');
-                estado.pagina = Number(btn.dataset.pagina);
-                paginar(contenedor);
+                paginar(contenedor, Number(btn.dataset.pagina));
                 animarFilas(filas(contenedor).filter(function (f) { return !f.hidden && !f.classList.contains('d-none'); }));
                 // El botón pulsado se redibuja: el foco vuelve al mismo control (o a la página actual)
                 var foco = nav.querySelector('[aria-label="' + etiqueta + '"]') || nav.querySelector('[aria-current]');
@@ -257,31 +272,36 @@ document.addEventListener('click', function (e) {
         var destacada = filas(contenedor).findIndex(function (f) { return f.classList.contains('pf-row-flash'); });
         contenedor._pfPaginacion = { pagina: 1 };
         contenedor.addEventListener('pf:repaginar', function (e) {
-            if (e.detail && e.detail.inicio) contenedor._pfPaginacion.pagina = 1;
-            paginar(contenedor);
+            paginar(contenedor, e.detail && e.detail.inicio ? 1 : undefined);
         });
         paginar(contenedor);
         if (destacada >= contenedor._pfPaginacion.porPagina) {
-            contenedor._pfPaginacion.pagina = Math.floor(destacada / contenedor._pfPaginacion.porPagina) + 1;
-            paginar(contenedor);
+            paginar(contenedor, Math.floor(destacada / contenedor._pfPaginacion.porPagina) + 1);
         }
     });
 
     var delServidor = Array.prototype.slice.call(document.querySelectorAll('[data-pf-filas-servidor]'));
     // Tras cargar fuentes e imágenes las filas ya tienen su alto definitivo
+    // Las fuentes web pueden llegar después de 'load' y cambiar el alto de las filas
+    if (document.fonts) document.fonts.ready.then(function () { paginados.forEach(function (c) { paginar(c); }); });
     window.addEventListener('load', function () {
-        paginados.forEach(paginar);
+        paginados.forEach(function (c) { paginar(c); });
         if (!delServidor.some(ajustarServidor)) {
             try { sessionStorage.removeItem('pfFilasRecarga'); } catch (e) { }
         }
     });
 
-    // Al cambiar el tamaño de la ventana se reparten de nuevo; las del servidor lo aplican en la próxima visita
+    // Al cambiar el tamaño de la ventana (o cerrar un aviso, que deja más espacio) se reparten de nuevo;
+    // las del servidor lo aplican en la próxima visita
     var espera;
+    // 'closed.bs.alert' se lanza con el aviso ya fuera del documento y no llega aquí: se usa 'close' y se espera la animación
+    document.addEventListener('close.bs.alert', function () {
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 350);
+    });
     window.addEventListener('resize', function () {
         clearTimeout(espera);
         espera = setTimeout(function () {
-            paginados.forEach(paginar);
+            paginados.forEach(function (c) { paginar(c); });
             delServidor.forEach(function (c) {
                 var porPagina = filasQueCaben(c, filas(c));
                 document.cookie = 'pf_filas_' + c.dataset.pfFilasServidor + '=' + porPagina + '; path=/; max-age=31536000; SameSite=Lax';
