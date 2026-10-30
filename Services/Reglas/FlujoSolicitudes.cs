@@ -50,7 +50,8 @@ namespace PickingApp.Services
                 Correo = correo,
                 HorarioEntrada = datos.HorarioEntrada,
                 HorarioSalida = datos.HorarioSalida,
-                FechaIngreso = datos.FechaIngreso
+                FechaIngreso = datos.FechaIngreso,
+                BodegaId = datos.BodegaId
             });
         }
 

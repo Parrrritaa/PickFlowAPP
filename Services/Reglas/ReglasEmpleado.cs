@@ -32,9 +32,17 @@ namespace PickingApp.Services
                 return new("HorarioSalida", $"La jornada laboral no puede superar las {maxHoras:0.#} horas (duración indicada: {duracion:0.#} horas).");
             }
 
-            if (empleadoId == null && await context.Empleados.AnyAsync(e => e.Identificacion == identificacion))
+            if (empleadoId == null)
             {
-                return new("Identificacion", "Ya existe un empleado registrado con esta identificación.");
+                var registrado = await context.Empleados.Where(e => e.Identificacion == identificacion)
+                    .Select(e => new { Bodega = e.Bodega == null ? null : e.Bodega.Nombre }).FirstOrDefaultAsync();
+                if (registrado != null)
+                {
+                    // Quien llega de otra bodega no se registra de nuevo: el Administrador lo traslada
+                    return new("Identificacion", registrado.Bodega == null
+                        ? "Ya existe un empleado registrado con esta identificación."
+                        : $"Ya existe un empleado con esta identificación en la bodega {registrado.Bodega}. Si se trasladó, el Administrador puede cambiarle la bodega desde Editar.");
+                }
             }
 
             if (correo != null && !await CorreoDisponibleAsync(context, correo, empleadoId))

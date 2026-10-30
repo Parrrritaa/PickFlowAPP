@@ -123,8 +123,18 @@ namespace PickingApp.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear([Bind(nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto), nameof(Empleado.Correo),
-            nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso))] Empleado model)
+            nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso), nameof(Empleado.BodegaId))] Empleado model)
         {
+            // Solo el Administrador elige la bodega; lo que registra (o solicita) un Supervisor o Auxiliar queda en la suya
+            if (!User.IsInRole(Roles.Administrador))
+            {
+                model.BodegaId = User.IdBodega();
+            }
+            else if (!await BodegaActivaAsync(model.BodegaId))
+            {
+                ModelState.AddModelError(nameof(Empleado.BodegaId), "Elige una bodega activa.");
+            }
+
             if (!ModelState.IsValid)
             {
                 return View(model);
@@ -191,7 +201,8 @@ namespace PickingApp.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Editar([Bind(nameof(Empleado.Id), nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto),
-            nameof(Empleado.Correo), nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso))] Empleado model,
+            nameof(Empleado.Correo), nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso),
+            nameof(Empleado.BodegaId))] Empleado model,
             string? motivo)
         {
             motivo = (motivo ?? string.Empty).Trim();
@@ -214,9 +225,24 @@ namespace PickingApp.Controllers
             }
 
 
-            // Administrador: Edición directa (CU-09)
+            // Administrador: Edición directa (CU-09), incluido el traslado de bodega
             if (User.IsInRole(Roles.Administrador))
             {
+                var trasladado = model.BodegaId != empleadoExistente.BodegaId;
+                if (trasladado)
+                {
+                    var errorTraslado = !await BodegaActivaAsync(model.BodegaId) ? "Elige una bodega activa."
+                        : await ObtenerPedidoEnCursoAsync(empleadoExistente.Id) is string enCurso
+                            ? $"No se puede trasladar a '{empleadoExistente.NombreCompleto}' porque tiene el pedido {enCurso} en curso. Reasigne, complete o cancele el pedido primero."
+                        : null;
+                    if (errorTraslado != null)
+                    {
+                        ModelState.AddModelError(nameof(Empleado.BodegaId), errorTraslado);
+                        return View(model);
+                    }
+                }
+
+                empleadoExistente.BodegaId = model.BodegaId;
                 empleadoExistente.NombreCompleto = model.NombreCompleto;
                 empleadoExistente.Correo = model.Correo;
                 empleadoExistente.HorarioEntrada = model.HorarioEntrada;
@@ -227,7 +253,8 @@ namespace PickingApp.Controllers
                 TempData["EmpleadoDestacadoId"] = empleadoExistente.Id;
 
                 await _auditService.RegistrarAsync("Editar Empleado", "Empleados", 
-                    $"Datos actualizados de empleado: {empleadoExistente.Identificacion}");
+                    $"Datos actualizados de empleado: {empleadoExistente.Identificacion}" +
+                    (trasladado ? $". Trasladado a la bodega {(await _context.Bodegas.FindAsync(model.BodegaId))!.Nombre}" : ""));
 
                 TempData["SuccessMessage"] = $"Datos de '{empleadoExistente.NombreCompleto}' actualizados exitosamente.";
             }
@@ -369,6 +396,8 @@ namespace PickingApp.Controllers
                 .Select(p => p.CodigoPedido)
                 .FirstOrDefaultAsync();
         }
+
+        private Task<bool> BodegaActivaAsync(int? bodegaId) => _context.Bodegas.AnyAsync(b => b.Id == bodegaId && b.Activa);
 
         private static string FormatHora(TimeSpan t) => t.ToString(@"hh\:mm");
     }

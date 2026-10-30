@@ -12,7 +12,8 @@
 
 <div class="pf-card">
     <div class="pf-info-banner">
-        Complete la información del nuevo empleado. Los campos marcados con * son obligatorios
+        Complete la información del nuevo empleado. Los campos marcados con * son obligatorios.
+        @(userRole == Roles.Administrador ? "" : "Quedará en tu bodega.")
     </div>
 
     @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
@@ -59,6 +60,16 @@
                 <input asp-for="FechaIngreso" type="date" class="pf-input" required />
                 <span asp-validation-for="FechaIngreso" class="text-danger small"></span>
             </div>
+            @if (userRole == Roles.Administrador)
+            {
+                <div class="col-md-6 pf-form-group">
+                    <label class="pf-label" for="BodegaId">Bodega <span class="text-danger">*</span></label>
+                    <select asp-for="BodegaId" class="pf-input" required>
+                        @await Component.InvokeAsync("OpcionesBodega", new { seleccionada = Model?.BodegaId })
+                    </select>
+                    <span asp-validation-for="BodegaId" class="text-danger small"></span>
+                </div>
+            }
         </div>
 
         <div class="row mb-4">

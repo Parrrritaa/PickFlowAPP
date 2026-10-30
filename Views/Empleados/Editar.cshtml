@@ -73,6 +73,17 @@
                 <input asp-for="FechaIngreso" type="date" class="pf-input" required />
                 <span asp-validation-for="FechaIngreso" class="text-danger small"></span>
             </div>
+            @* Solo el Administrador traslada; no se permite con un pedido en curso (EmpleadosController.Editar) *@
+            @if (esAdministrador)
+            {
+                <div class="col-md-6 pf-form-group">
+                    <label class="pf-label" for="BodegaId">Bodega <span class="text-danger">*</span></label>
+                    <select asp-for="BodegaId" class="pf-input" required>
+                        @await Component.InvokeAsync("OpcionesBodega", new { seleccionada = Model.BodegaId })
+                    </select>
+                    <span asp-validation-for="BodegaId" class="text-danger small"></span>
+                </div>
+            }
         </div>
 
         <div class="row mb-4">
