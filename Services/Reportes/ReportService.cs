@@ -32,51 +32,101 @@ namespace PickingApp.Services
             }
         }
 
-        public byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo) =>
-            Pdf("Reporte de Tiempos de Picking por Empleado", periodo.Descripcion, "Todos los empleados", c => Tabla(c, datos,
-                "No hay pedidos completados por empleados en este periodo.",
-                new Columna<ReporteTiemposEmpleadoItem>("Doc ID", i => i.Identificacion, 80, Fija: true),
-                new("Empleado", i => i.Empleado, 3),
-                new("Pedidos", i => i.TotalPedidos.ToString(), 1.5f, Derecha: true),
-                new("Promedio (m)", i => i.PromedioMinutos.ToString("0.0"), 1.5f, Derecha: true),
-                new("Mínimo (m)", i => i.TiempoMinimo.ToString("0.0"), 1.5f, Derecha: true),
-                new("Máximo (m)", i => i.TiempoMaximo.ToString("0.0"), 1.5f, Derecha: true)));
+        public byte[] GenerarReporteTiemposPorEmpleadoPdf(List<ReporteTiemposEmpleadoItem> datos, PeriodoReporte periodo, ResumenEstadosPedidos estados)
+        {
+            var completados = datos.Sum(i => i.TotalPedidos);
+            return Pdf("Reporte de Tiempos de Picking por Empleado", periodo.Descripcion, "Todos los empleados", c => c.Column(col =>
+            {
+                col.Spacing(14);
+                col.Item().Element(t => FilaMetricas(t, "Tiempos del periodo", "Pedidos completados por un empleado, según su fecha de finalización.",
+                    new("Completados", completados.ToString(), ColorCompletado),
+                    new("Empleados", datos.Count.ToString(), ColorTotal),
+                    // Promedio ponderado: cada empleado pesa según cuántos pedidos completó
+                    new("Promedio", completados > 0 ? $"{datos.Sum(i => i.PromedioMinutos * i.TotalPedidos) / completados:0.0} min" : "-", AzulMarca),
+                    new("Más rápido", datos.Any() ? $"{datos.Min(i => i.TiempoMinimo):0.0} min" : "-", AzulMarca),
+                    new("Más lento", datos.Any() ? $"{datos.Max(i => i.TiempoMaximo):0.0} min" : "-", AzulMarca)));
+                col.Item().Element(t => ResumenEstados(t, estados));
+                col.Item().Element(t => Tabla(t, datos, "No hay pedidos completados por empleados en este periodo.",
+                    new Columna<ReporteTiemposEmpleadoItem>("Doc ID", i => i.Identificacion, 80, Fija: true),
+                    new("Empleado", i => i.Empleado, 3),
+                    new("Pedidos", i => i.TotalPedidos.ToString(), 1.5f, Derecha: true),
+                    new("Promedio (m)", i => i.PromedioMinutos.ToString("0.0"), 1.5f, Derecha: true),
+                    new("Mínimo (m)", i => i.TiempoMinimo.ToString("0.0"), 1.5f, Derecha: true),
+                    new("Máximo (m)", i => i.TiempoMaximo.ToString("0.0"), 1.5f, Derecha: true)));
+            }));
+        }
 
-        public byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, PeriodoReporte periodo) =>
-            Pdf("Reporte General de Tiempos de Entrega", periodo.Descripcion, "Todas las bodegas", c => Tabla(c, datos,
-                "No hay pedidos completados en este periodo.",
-                new Columna<ReporteGeneralTiemposItem>("Bodega", i => i.Bodega, 3),
-                new("Pedidos Completados", i => i.TotalCompletados.ToString(), 2, Derecha: true),
-                new("Promedio (min)", i => i.PromedioMinutos.ToString("0.0"), 2, Derecha: true),
-                new("Total Minutos", i => i.TiempoTotalMinutos.ToString("0.0"), 2, Derecha: true)));
+        public byte[] GenerarReporteGeneralTiemposPdf(List<ReporteGeneralTiemposItem> datos, PeriodoReporte periodo, ResumenEstadosPedidos estados)
+        {
+            var completados = datos.Sum(i => i.TotalCompletados);
+            var minutos = datos.Sum(i => i.TiempoTotalMinutos);
+            return Pdf("Reporte General de Tiempos de Entrega", periodo.Descripcion, "Todas las bodegas", c => c.Column(col =>
+            {
+                col.Spacing(14);
+                col.Item().Element(t => FilaMetricas(t, "Tiempos del periodo", "Pedidos completados, según su fecha de finalización.",
+                    new("Completados", completados.ToString(), ColorCompletado),
+                    new("Bodegas", datos.Count.ToString(), ColorTotal),
+                    new("Promedio", completados > 0 ? $"{minutos / completados:0.0} min" : "-", AzulMarca),
+                    new("Tiempo total", $"{minutos / 60:0.0} h", AzulMarca)));
+                col.Item().Element(t => ResumenEstados(t, estados));
+                col.Item().Element(t => Tabla(t, datos, "No hay pedidos completados en este periodo.",
+                    new Columna<ReporteGeneralTiemposItem>("Bodega", i => i.Bodega, 3),
+                    new("Pedidos Completados", i => i.TotalCompletados.ToString(), 2, Derecha: true),
+                    new("Promedio (min)", i => i.PromedioMinutos.ToString("0.0"), 2, Derecha: true),
+                    new("Total Minutos", i => i.TiempoTotalMinutos.ToString("0.0"), 2, Derecha: true)));
+            }));
+        }
 
         public byte[] GenerarReportePedidosPorPeriodoPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro) =>
-            Pdf("Reporte Consolidado de Pedidos por Periodo", periodo.Descripcion, filtro ?? "Todas las bodegas", c => Tabla(c, pedidos,
-                "No hay pedidos en este periodo.",
-                new Columna<Pedido>("Código", p => p.CodigoPedido, 90, Fija: true),
-                new("Bodega", p => p.Bodega?.Nombre ?? "N/A", 2),
-                new("Prioridad", p => p.Prioridad, 60, Fija: true),
-                new("Estado", p => p.Estado, 80, Fija: true),
-                new("Empleado", p => p.Empleado?.NombreCompleto ?? "Sin asignar", 2),
-                new("Fecha Carga", p => p.FechaCarga.ToString("dd/MM/yyyy HH:mm"), 100, Fija: true),
-                new("Tiempo (m)", p => p.TiempoProcesamientoMinutos?.ToString("0.0") ?? "-", 70, Fija: true, Derecha: true)),
-                horizontal: true);
-
-        public byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro) =>
-            Pdf("Reporte de Pedidos Completados, Cancelados y Reasignados", periodo.Descripcion, filtro ?? "Completados, cancelados y reasignados",
-                c => Tabla(c, pedidos, "No hay pedidos con estos estados en este periodo.",
+            Pdf("Reporte Consolidado de Pedidos por Periodo", periodo.Descripcion, filtro ?? "Todas las bodegas", c => c.Column(col =>
+            {
+                col.Spacing(14);
+                col.Item().Element(t => ResumenEstados(t, ResumenEstadosPedidos.De(pedidos)));
+                col.Item().Element(t => Tabla(t, pedidos, "No hay pedidos en este periodo.",
                     new Columna<Pedido>("Código", p => p.CodigoPedido, 90, Fija: true),
+                    new("Bodega", p => p.Bodega?.Nombre ?? "N/A", 2),
+                    new("Prioridad", p => p.Prioridad, 60, Fija: true),
                     new("Estado", p => p.Estado, 80, Fija: true),
-                    new("Empleado", p => p.Empleado?.NombreCompleto ?? "-", 2),
-                    new("Fecha Fin", p => p.FechaFinalizacion?.ToString("dd/MM/yyyy HH:mm") ?? "-", 100, Fija: true),
-                    new("Tiempo", p => Minutos(p.TiempoProcesamientoMinutos), 70, Fija: true, Derecha: true),
-                    new("Motivo / Observación", p =>
-                        !string.IsNullOrEmpty(p.MotivoCancelacion) ? $"Cancelación: {p.MotivoCancelacion}"
-                        : !string.IsNullOrEmpty(p.MotivoReasignacion) ? $"Reasignación: {p.MotivoReasignacion}"
-                        : p.ConfirmacionFisica ? "Entrega física confirmada" : "-", 3)),
-                horizontal: true);
+                    new("Empleado", p => p.Empleado?.NombreCompleto ?? "Sin asignar", 2),
+                    new("Fecha Carga", p => p.FechaCarga.ToString("dd/MM/yyyy HH:mm"), 100, Fija: true),
+                    new("Tiempo (m)", p => p.TiempoProcesamientoMinutos?.ToString("0.0") ?? "-", 70, Fija: true, Derecha: true)));
+            }), horizontal: true);
 
-        public byte[] GenerarReporteDetalleTiemposPdf(string titulo, string sujeto, List<Pedido> pedidos, PeriodoReporte periodo, bool porEmpleado)
+        public byte[] GenerarReporteCompletadosCanceladosReasignadosPdf(List<Pedido> pedidos, PeriodoReporte periodo, string? filtro)
+        {
+            var completados = pedidos.Where(p => p.Estado == PedidoEstados.Completado).ToList();
+            var cancelados = pedidos.Count(p => p.Estado == PedidoEstados.Cancelado);
+            var tiempos = completados.Where(p => p.TiempoProcesamientoMinutos.HasValue).Select(p => p.TiempoProcesamientoMinutos!.Value).ToList();
+            var cerrados = completados.Count + cancelados;
+
+            return Pdf("Reporte de Pedidos Completados, Cancelados y Reasignados", periodo.Descripcion, filtro ?? "Completados, cancelados y reasignados",
+                c => c.Column(col =>
+                {
+                    col.Spacing(14);
+                    col.Item().Element(t => FilaMetricas(t, "Resumen del periodo",
+                        "Pedidos cargados en el periodo. Un pedido reasignado también cuenta en su estado final.",
+                        new("Total", pedidos.Count.ToString(), ColorTotal),
+                        new("Completados", completados.Count.ToString(), ColorCompletado),
+                        new("Cancelados", cancelados.ToString(), ColorCancelado),
+                        new("Reasignados", pedidos.Count(p => p.MotivoReasignacion != null).ToString(), ColorReasignado),
+                        // De los que ya se cerraron, cuántos se entregaron (no se cancelaron)
+                        new("Cumplimiento", cerrados > 0 ? $"{100.0 * completados.Count / cerrados:0}%" : "-", ColorCompletado),
+                        new("Tiempo promedio", tiempos.Any() ? $"{tiempos.Average():0.0} min" : "-", AzulMarca)));
+                    col.Item().Element(t => Tabla(t, pedidos, "No hay pedidos con estos estados en este periodo.",
+                        new Columna<Pedido>("Código", p => p.CodigoPedido, 90, Fija: true),
+                        new("Estado", p => p.Estado, 80, Fija: true),
+                        new("Empleado", p => p.Empleado?.NombreCompleto ?? "-", 2),
+                        new("Fecha Fin", p => p.FechaFinalizacion?.ToString("dd/MM/yyyy HH:mm") ?? "-", 100, Fija: true),
+                        new("Tiempo", p => Minutos(p.TiempoProcesamientoMinutos), 70, Fija: true, Derecha: true),
+                        new("Motivo / Observación", p =>
+                            !string.IsNullOrEmpty(p.MotivoCancelacion) ? $"Cancelación: {p.MotivoCancelacion}"
+                            : !string.IsNullOrEmpty(p.MotivoReasignacion) ? $"Reasignación: {p.MotivoReasignacion}"
+                            : p.ConfirmacionFisica ? "Entrega física confirmada" : "-", 3)));
+                }), horizontal: true);
+        }
+
+        public byte[] GenerarReporteDetalleTiemposPdf(string titulo, string sujeto, List<Pedido> pedidos, PeriodoReporte periodo, bool porEmpleado,
+            ResumenEstadosPedidos estados)
         {
             var tiempos = pedidos.Where(p => p.TiempoProcesamientoMinutos.HasValue)
                                  .Select(p => p.TiempoProcesamientoMinutos!.Value)
@@ -85,24 +135,14 @@ namespace PickingApp.Services
 
             return Pdf(titulo, periodo.Descripcion, sujeto, c => c.Column(col =>
             {
-                // Resumen en tarjetas
-                col.Item().PaddingBottom(12).Row(row =>
-                {
-                    row.Spacing(8);
-
-                    void Dato(string etiqueta, string valor) =>
-                        row.RelativeItem().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(8).Column(d =>
-                        {
-                            d.Item().Text(etiqueta).FontSize(8).FontColor(Colors.Grey.Darken1);
-                            d.Item().Text(valor).FontSize(13).Bold().FontColor(AzulMarca);
-                        });
-
-                    Dato("Pedidos completados", pedidos.Count.ToString());
-                    Dato("Unidades", unidades.ToString());
-                    Dato("Promedio", tiempos.Any() ? $"{tiempos.Average():0.0} min" : "-");
-                    Dato("Mínimo", tiempos.Any() ? $"{tiempos.Min():0.0} min" : "-");
-                    Dato("Máximo", tiempos.Any() ? $"{tiempos.Max():0.0} min" : "-");
-                });
+                col.Spacing(14);
+                col.Item().Element(t => FilaMetricas(t, "Tiempos del periodo", "Pedidos completados, según su fecha de finalización.",
+                    new("Completados", pedidos.Count.ToString(), ColorCompletado),
+                    new("Unidades", unidades.ToString(), ColorTotal),
+                    new("Promedio", tiempos.Any() ? $"{tiempos.Average():0.0} min" : "-", AzulMarca),
+                    new("Mínimo", tiempos.Any() ? $"{tiempos.Min():0.0} min" : "-", AzulMarca),
+                    new("Máximo", tiempos.Any() ? $"{tiempos.Max():0.0} min" : "-", AzulMarca)));
+                col.Item().Element(t => ResumenEstados(t, estados));
 
                 col.Item().Element(t => Tabla(t, pedidos, "No hay pedidos completados en este periodo.",
                     new Columna<Pedido>("Pedido", p => p.CodigoPedido, 90, Fija: true),
@@ -122,9 +162,15 @@ namespace PickingApp.Services
             if (!string.IsNullOrWhiteSpace(modulo)) filtros.Add($"Módulo: {modulo}");
             if (!string.IsNullOrWhiteSpace(usuario)) filtros.Add($"Usuario: {usuario}");
             filtros.Add($"{logs.Count} registro(s)");
+            var masFrecuente = logs.GroupBy(l => l.Accion).OrderByDescending(g => g.Count()).FirstOrDefault();
 
             return Pdf("LOG del Sistema", new PeriodoReporte(fechaDesde, fechaHasta).Descripcion, null, c => c.Column(col =>
             {
+                col.Item().PaddingBottom(14).Element(t => FilaMetricas(t, "Resumen del periodo", "Actividad registrada con los filtros aplicados.",
+                    new("Registros", logs.Count.ToString(), ColorTotal),
+                    new("Usuarios", logs.Select(l => l.UsuarioParaMostrar).Distinct().Count().ToString(), AzulMarca),
+                    new("Módulos", logs.Select(l => l.Modulo).Distinct().Count().ToString(), AzulMarca),
+                    new("Acción más frecuente", masFrecuente != null ? $"{masFrecuente.Key} ({masFrecuente.Count()})" : "-", ColorEnProceso)));
                 col.Item().PaddingBottom(6).Text(string.Join(" • ", filtros)).FontSize(8).FontColor(Colors.Grey.Medium);
                 col.Item().Element(t => Tabla(t, logs, "No hay registros en el LOG con estos filtros.",
                     new Columna<LogSistema>("Fecha", l => l.FechaHora.ToString("dd/MM/yyyy HH:mm"), 90, Fija: true),
@@ -146,12 +192,12 @@ namespace PickingApp.Services
                     sec.Item().PaddingTop(6).Row(row =>
                     {
                         row.Spacing(6);
-                        TarjetaMetrica(row.RelativeItem(), "Total", datos.Total, "#4B5563");
-                        TarjetaMetrica(row.RelativeItem(), "Pendientes", datos.Pendientes, "#3B71CA");
-                        TarjetaMetrica(row.RelativeItem(), "En proceso", datos.EnProceso, "#EB7D26");
-                        TarjetaMetrica(row.RelativeItem(), "Completados", datos.Completados, "#52A447");
-                        TarjetaMetrica(row.RelativeItem(), "Cancelados", datos.Cancelados, "#DC2626");
-                        TarjetaMetrica(row.RelativeItem(), "Reasignados", datos.Reasignados, "#1F2937");
+                        TarjetaMetrica(row.RelativeItem(), "Total", datos.Total.ToString(), ColorTotal);
+                        TarjetaMetrica(row.RelativeItem(), "Pendientes", datos.Pendientes.ToString(), ColorPendiente);
+                        TarjetaMetrica(row.RelativeItem(), "En proceso", datos.EnProceso.ToString(), ColorEnProceso);
+                        TarjetaMetrica(row.RelativeItem(), "Completados", datos.Completados.ToString(), ColorCompletado);
+                        TarjetaMetrica(row.RelativeItem(), "Cancelados", datos.Cancelados.ToString(), ColorCancelado);
+                        TarjetaMetrica(row.RelativeItem(), "Reasignados", datos.Reasignados.ToString(), ColorReasignado);
                     });
                 });
 
@@ -214,6 +260,39 @@ namespace PickingApp.Services
 
         private const string AzulMarca = "#1C3A6B";
 
+        // Colores de cada estado: los mismos de las tarjetas del dashboard
+        private const string ColorTotal = "#4B5563";
+        private const string ColorPendiente = "#3B71CA";
+        private const string ColorEnProceso = "#EB7D26";
+        private const string ColorCompletado = "#52A447";
+        private const string ColorCancelado = "#DC2626";
+        private const string ColorReasignado = "#1F2937";
+
+        private sealed record Metrica(string Etiqueta, string Valor, string Color);
+
+        // Fila de tarjetas con título: el resumen en cifras que va arriba de la tabla de cada reporte
+        private static void FilaMetricas(IContainer container, string titulo, string nota, params Metrica[] metricas) =>
+            container.ShowEntire().Column(sec =>
+            {
+                sec.Item().Element(t => TituloSeccion(t, titulo, nota));
+                sec.Item().PaddingTop(6).Row(row =>
+                {
+                    row.Spacing(6);
+                    foreach (var m in metricas) TarjetaMetrica(row.RelativeItem(), m.Etiqueta, m.Valor, m.Color);
+                });
+            });
+
+        // Cuántos pedidos del periodo terminaron en cada estado
+        private static void ResumenEstados(IContainer container, ResumenEstadosPedidos r) =>
+            FilaMetricas(container, "Pedidos del periodo",
+                "Pedidos cargados en el periodo. Reasignados: los que cambiaron de auxiliar; también cuentan en su estado actual.",
+                new("Total", r.Total.ToString(), ColorTotal),
+                new("Pendientes", r.Pendientes.ToString(), ColorPendiente),
+                new("En proceso", r.EnProceso.ToString(), ColorEnProceso),
+                new("Completados", r.Completados.ToString(), ColorCompletado),
+                new("Cancelados", r.Cancelados.ToString(), ColorCancelado),
+                new("Reasignados", r.Reasignados.ToString(), ColorReasignado));
+
         // Todos los reportes comparten la página (tamaño, márgenes, fuente), el encabezado con logo y el pie con el
         // número de página. Los horizontales llevan letra más pequeña para que quepan más columnas.
         private byte[] Pdf(string titulo, string periodo, string? filtro, Action<IContainer> contenido, bool horizontal = false) =>
@@ -275,11 +354,12 @@ namespace PickingApp.Services
         }
 
         // Tarjeta del resumen: cifra grande del color del estado, igual que las tarjetas del dashboard
-        private static void TarjetaMetrica(IContainer container, string etiqueta, int valor, string color)
+        private static void TarjetaMetrica(IContainer container, string etiqueta, string valor, string color)
         {
+            // Un texto largo ("Inicio de Sesión (12)") va más pequeño para que no rompa la fila
             container.Background("#F4F6F8").BorderTop(3).BorderColor(color).PaddingVertical(8).PaddingHorizontal(6).Column(c =>
             {
-                c.Item().AlignCenter().Text(valor.ToString()).FontSize(20).Bold().FontColor(color);
+                c.Item().AlignCenter().Text(valor).FontSize(valor.Length > 10 ? 10 : 20).Bold().FontColor(color);
                 c.Item().AlignCenter().Text(etiqueta).FontSize(8).FontColor(Colors.Grey.Darken2);
             });
         }

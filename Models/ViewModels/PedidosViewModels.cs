@@ -19,6 +19,12 @@ namespace PickingApp.Models.ViewModels
         public string? FiltroFechaHasta { get; init; }
         public string? Busqueda { get; init; }
 
+        // Franja de novedades: "pendientes", "todas" o un tipo (FiltrosNovedad / TiposNovedad)
+        public string? FiltroNovedad { get; init; }
+        public Dictionary<string, int> NovedadesSinAtenderPorTipo { get; init; } = new();
+        public int PedidosConNovedadSinAtender { get; init; }
+        public bool HayNovedadesAtendidas { get; init; }
+
         // true: pestaña de pedidos divididos con sus partes
         public bool VerDivididos { get; init; }
         public int DivididosEnCurso { get; init; }

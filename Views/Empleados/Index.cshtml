@@ -15,13 +15,21 @@
 <div class="pf-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Empleados registrados</h4>
-        <a asp-action="Crear" class="btn-pf-blue">
-            @(esAuxiliar ? "+ Generar solicitud de registro" : "+ Registrar Empleado")
-        </a>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @if (Model.Empleados.Any())
+            {
+                @* Filtra la tabla al escribir (site.js, data-pf-buscar-en) *@
+                <label class="visually-hidden" for="buscarEmpleado">Buscar empleado</label>
+                <input type="search" id="buscarEmpleado" class="pf-search-input" placeholder="Buscar nombre, estado o turno..." data-pf-buscar-en="tablaEmpleados" autocomplete="off" />
+            }
+            <a asp-action="Crear" class="btn-pf-blue">
+                @(esAuxiliar ? "+ Generar solicitud de registro" : "+ Registrar Empleado")
+            </a>
+        </div>
     </div>
 
     <div class="table-responsive">
-        <table class="pf-table" data-pf-paginar>
+        <table class="pf-table" id="tablaEmpleados" data-pf-paginar>
             <thead>
                 <tr>
                     <th>Nombre</th>
@@ -106,6 +114,9 @@
                         <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">No hay empleados registrados.</td>
                     </tr>
                 }
+                <tr class="d-none" data-pf-sin-resultados>
+                    <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">Ningún empleado coincide con la búsqueda.</td>
+                </tr>
             </tbody>
         </table>
     </div>

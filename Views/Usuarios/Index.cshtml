@@ -8,13 +8,21 @@
 <div class="pf-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Usuarios registrados</h4>
-        <a asp-action="Crear" class="btn-pf-blue">
-            + Nuevo usuario
-        </a>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @if (Model != null && Model.Any())
+            {
+                @* Filtra la tabla al escribir (site.js, data-pf-buscar-en) *@
+                <label class="visually-hidden" for="buscarUsuario">Buscar usuario</label>
+                <input type="search" id="buscarUsuario" class="pf-search-input" placeholder="Buscar correo, nombre o rol..." data-pf-buscar-en="tablaUsuarios" autocomplete="off" />
+            }
+            <a asp-action="Crear" class="btn-pf-blue">
+                + Nuevo usuario
+            </a>
+        </div>
     </div>
 
     <div class="table-responsive">
-        <table class="pf-table" data-pf-paginar>
+        <table class="pf-table" id="tablaUsuarios" data-pf-paginar>
             <thead>
                 <tr>
                     <th>Correo</th>
@@ -58,6 +66,9 @@
                         <td colspan="5" class="text-center text-muted py-4">No hay usuarios registrados.</td>
                     </tr>
                 }
+                <tr class="d-none" data-pf-sin-resultados>
+                    <td colspan="5" class="text-center text-muted py-4">Ningún usuario coincide con la búsqueda.</td>
+                </tr>
             </tbody>
         </table>
     </div>

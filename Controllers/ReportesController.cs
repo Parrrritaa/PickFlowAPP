@@ -66,7 +66,7 @@ namespace PickingApp.Controllers
                 var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
                     "Reporte Individual de Tiempos de Picking",
                     $"Empleado: {empleado.NombreCompleto} · Doc. {empleado.Identificacion}",
-                    pedidosEmpleado, periodo, porEmpleado: true);
+                    pedidosEmpleado, periodo, porEmpleado: true, await ResumenEstadosAsync(periodo, empleadoId: empleado.Id));
                 return File(pdf, "application/pdf", $"Reporte_Tiempos_Empleado_{empleado.Identificacion}_{periodo.ParaArchivo}.pdf");
             }
 
@@ -90,7 +90,7 @@ namespace PickingApp.Controllers
             await _auditService.RegistrarAsync("Exportar PDF Reporte Tiempos Empleado", "Reportes",
                 $"Reporte general de todos los empleados, periodo: {periodo.Descripcion}.");
 
-            var pdfBytes = _reportService.GenerarReporteTiemposPorEmpleadoPdf(datos, periodo);
+            var pdfBytes = _reportService.GenerarReporteTiemposPorEmpleadoPdf(datos, periodo, await ResumenEstadosAsync(periodo));
             return File(pdfBytes, "application/pdf", $"Reporte_Tiempos_Empleados_{periodo.ParaArchivo}.pdf");
         }
 
@@ -120,7 +120,7 @@ namespace PickingApp.Controllers
                 var pdf = _reportService.GenerarReporteDetalleTiemposPdf(
                     "Reporte de Tiempos de Entrega por Bodega",
                     $"Bodega: {bodega.Nombre} ({bodega.Codigo})",
-                    pedidosBodega, periodo, porEmpleado: false);
+                    pedidosBodega, periodo, porEmpleado: false, await ResumenEstadosAsync(periodo, bodegaId: bodega.Id));
                 return File(pdf, "application/pdf", $"Reporte_Tiempos_Bodega_{bodega.Codigo}_{periodo.ParaArchivo}.pdf");
             }
 
@@ -141,7 +141,7 @@ namespace PickingApp.Controllers
             await _auditService.RegistrarAsync("Exportar PDF Reporte Tiempos General", "Reportes",
                 $"Reporte general de todas las bodegas, periodo: {periodo.Descripcion}.");
 
-            var pdfBytes = _reportService.GenerarReporteGeneralTiemposPdf(datos, periodo);
+            var pdfBytes = _reportService.GenerarReporteGeneralTiemposPdf(datos, periodo, await ResumenEstadosAsync(periodo));
             return File(pdfBytes, "application/pdf", $"Reporte_Tiempos_Entrega_{periodo.ParaArchivo}.pdf");
         }
 
@@ -215,6 +215,21 @@ namespace PickingApp.Controllers
             var pdfBytes = _reportService.GenerarReporteCompletadosCanceladosReasignadosPdf(pedidos, periodo, filtro);
             var nombre = string.IsNullOrEmpty(estado) ? "Completados_Cancelados_Reasignados" : NombreEstadoPlural(estado);
             return File(pdfBytes, "application/pdf", $"Reporte_{nombre}_{periodo.ParaArchivo}.pdf");
+        }
+
+        // Pedidos cargados en el periodo, por estado, para el resumen de los reportes de tiempos (que solo listan
+        // completados). Los divididos cuentan por sus partes, igual que en el reporte de pedidos por periodo.
+        private async Task<ResumenEstadosPedidos> ResumenEstadosAsync(PeriodoReporte periodo, int? empleadoId = null, int? bodegaId = null)
+        {
+            var query = _context.Pedidos.Where(p => !p.Partes.Any());
+            if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
+            if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaCarga < hasta);
+            if (empleadoId.HasValue) query = query.Where(p => p.EmpleadoId == empleadoId.Value);
+            if (bodegaId.HasValue) query = query.Where(p => p.BodegaId == bodegaId.Value);
+
+            var porEstado = await query.GroupBy(p => p.Estado).Select(g => new { Estado = g.Key, Cantidad = g.Count() }).ToListAsync();
+            var reasignados = await query.CountAsync(p => p.MotivoReasignacion != null);
+            return new ResumenEstadosPedidos(porEstado.ToDictionary(e => e.Estado, e => e.Cantidad), reasignados);
         }
 
         // Base de los reportes de tiempos: solo pedidos completados con tiempo real, filtrados por fecha de finalización

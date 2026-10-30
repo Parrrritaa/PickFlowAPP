@@ -34,7 +34,7 @@ namespace PickingApp.Controllers
         // CU-24: Consultar pedidos con filtros
         // vista = "divididos" muestra aparte los pedidos divididos con sus partes, para no saturar la lista principal
         public async Task<IActionResult> Index(string? estado, string? prioridad, int? bodegaId, string? busqueda,
-            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta, string? vista, int? pagina)
+            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta, string? vista, int? pagina, string? novedad)
         {
             var verDivididos = vista == "divididos";
 
@@ -47,6 +47,9 @@ namespace PickingApp.Controllers
                     .ThenInclude(pa => pa.Empleado)
                 .Include(p => p.Partes)
                     .ThenInclude(pa => pa.Detalles)
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Novedades)
+                .Include(p => p.Novedades)
                 .AsSplitQuery()
                 .AsQueryable();
 
@@ -104,6 +107,24 @@ namespace PickingApp.Controllers
                 query = query.Where(p => p.FechaCarga < hastaExclusivo);
             }
 
+            // novedad: "todas" (alguna, atendida o no), un tipo (sin atender de ese tipo) o cualquier otro valor
+            // ("pendientes"): alguna sin atender. En los divididos cuentan también las novedades de sus partes.
+            if (!string.IsNullOrEmpty(novedad))
+            {
+                var tipo = TiposNovedad.Todos.Contains(novedad) ? novedad : null;
+                var soloSinAtender = novedad != FiltrosNovedad.Todas;
+                query = query.Where(p =>
+                    p.Novedades.Any(n => (!soloSinAtender || !n.Atendida) && (tipo == null || n.TipoNovedad == tipo)) ||
+                    p.Partes.Any(pa => pa.Novedades.Any(n => (!soloSinAtender || !n.Atendida) && (tipo == null || n.TipoNovedad == tipo))));
+            }
+
+            // Resumen de novedades para la franja de arriba, solo de los pedidos de esta pestaña:
+            // en Pedidos, los que no se dividieron; en Divididos, las partes y los pedidos originales
+            var novedadesVista = verDivididos
+                ? _context.NovedadesPedido.Where(n => n.Pedido!.PedidoPadreId != null || n.Pedido.Partes.Any())
+                : _context.NovedadesPedido.Where(n => n.Pedido!.PedidoPadreId == null && !n.Pedido.Partes.Any());
+            var sinAtender = novedadesVista.Where(n => !n.Atendida);
+
             // Solo se trae la página pedida: primero se cuenta el total con los filtros y luego Skip/Take.
             // Divididos tiene su propia medida: sus filas son más altas que las de Pedidos.
             var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, verDivididos ? "divididos" : "pedidos"), await query.CountAsync());
@@ -133,6 +154,15 @@ namespace PickingApp.Controllers
                 FiltroFechaDesde = fechaDesde?.ToString("yyyy-MM-dd"),
                 FiltroFechaHasta = fechaHasta?.ToString("yyyy-MM-dd"),
                 Busqueda = busqueda,
+                FiltroNovedad = novedad,
+                NovedadesSinAtenderPorTipo = (await sinAtender
+                        .GroupBy(n => n.TipoNovedad)
+                        .Select(g => new { Tipo = g.Key, Cantidad = g.Count() })
+                        .ToListAsync())
+                    .ToDictionary(g => g.Tipo, g => g.Cantidad),
+                // Una parte cuenta como su pedido original: "en 2 pedidos" habla de lo que se ve en la lista
+                PedidosConNovedadSinAtender = await sinAtender.Select(n => n.Pedido!.PedidoPadreId ?? n.PedidoId).Distinct().CountAsync(),
+                HayNovedadesAtendidas = await novedadesVista.AnyAsync(n => n.Atendida),
                 VerDivididos = verDivididos,
                 DivididosEnCurso = await _context.Pedidos.CountAsync(p => p.Estado == PedidoEstados.Dividido)
             });

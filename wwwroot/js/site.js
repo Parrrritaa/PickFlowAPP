@@ -310,6 +310,38 @@ document.addEventListener('click', function (e) {
     });
 })();
 
+// Cuadro de búsqueda de una tabla: <input data-pf-buscar-en="idTabla">. Filtra las filas por todo su texto, sin
+// distinguir tildes ni mayúsculas ("andres" encuentra "Andrés"), muestra la fila [data-pf-sin-resultados] si ninguna
+// coincide y vuelve a paginar desde la primera página.
+(function () {
+    function normalizar(texto) {
+        return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    document.querySelectorAll('[data-pf-buscar-en]').forEach(function (campo) {
+        var tabla = document.getElementById(campo.dataset.pfBuscarEn);
+        if (!tabla || !tabla.tBodies[0]) return;
+        var sinResultados = tabla.querySelector('[data-pf-sin-resultados]');
+        // Las filas de "no hay registros" (una sola celda con colspan) no se filtran
+        var filas = Array.prototype.filter.call(tabla.tBodies[0].rows, function (f) {
+            return f !== sinResultados && !f.querySelector('td[colspan]');
+        });
+        filas.forEach(function (f) { f.dataset.pfTexto = normalizar(f.textContent); });
+
+        campo.addEventListener('input', function () {
+            var buscado = normalizar(campo.value.trim());
+            var visibles = 0;
+            filas.forEach(function (f) {
+                var coincide = f.dataset.pfTexto.indexOf(buscado) !== -1;
+                f.classList.toggle('d-none', !coincide);
+                if (coincide) visibles++;
+            });
+            if (sinResultados) sinResultados.classList.toggle('d-none', visibles > 0);
+            tabla.dispatchEvent(new CustomEvent('pf:repaginar', { detail: { inicio: true } }));
+        });
+    });
+})();
+
 // Pestañas de vista (Pedidos / Divididos): al elegir otra pestaña, la píldora blanca se desliza
 // hasta ella y al terminar se navega. Sin JavaScript siguen siendo enlaces con su propio fondo.
 (function () {
