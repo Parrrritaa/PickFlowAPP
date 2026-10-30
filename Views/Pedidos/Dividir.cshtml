@@ -107,7 +107,8 @@
         </p>
 
         <div class="table-responsive pf-tabla-reparto-contenedor">
-            <table class="pf-table pf-tabla-reparto" id="tablaReparto">
+            @* Paginada (site.js): las filas de otras páginas solo se ocultan, sus campos siguen en el formulario y se envían *@
+            <table class="pf-table pf-tabla-reparto" id="tablaReparto" data-pf-paginar>
                 <thead>
                     <tr id="filaEncabezado">
                         <th class="pf-col-fija">Producto</th>

@@ -118,6 +118,7 @@
 
     function actualizar() {
         var errores = [];
+        var porRevisar = []; // productos con unidades sin cuadrar: con la tabla paginada pueden estar en otra página
 
         lineas.forEach(function (l, i) {
             var repartidas = reparto[i].reduce(function (s, u) { return s + u; }, 0);
@@ -126,8 +127,14 @@
             celda.textContent = diferencia === 0 ? '✓' : (diferencia > 0 ? 'Faltan ' + diferencia : 'Sobran ' + (-diferencia));
             celda.classList.toggle('is-ok', diferencia === 0);
             celda.classList.toggle('is-error', diferencia !== 0);
-            if (diferencia !== 0) errores.push(diferencia > 0 ? 'faltan unidades por repartir' : 'hay unidades de más');
+            if (diferencia !== 0) {
+                errores.push(diferencia > 0 ? 'faltan unidades por repartir' : 'hay unidades de más');
+                porRevisar.push(filas[l.id].querySelector('.fw-semibold').textContent.trim());
+            }
         });
+        if (porRevisar.length) {
+            errores.push('revise ' + porRevisar.slice(0, 2).join(' y ') + (porRevisar.length > 2 ? ' y ' + (porRevisar.length - 2) + ' más' : ''));
+        }
 
         resumen.innerHTML = '';
         var algunaExcede = false;
