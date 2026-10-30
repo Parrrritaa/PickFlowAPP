@@ -17,7 +17,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> Asignar(int id)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Detalles)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -56,7 +56,7 @@ namespace PickingApp.Controllers
                 EmpleadoRecomendadoId = empleados.FirstOrDefault(Asignable)?.Id,
                 EmpleadoActualId = empleadoActualId,
                 EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
-                    ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null)
+                    ?? (empleadoActualId.HasValue ? (await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == empleadoActualId.Value))?.NombreCompleto : null)
             });
         }
 
@@ -68,7 +68,7 @@ namespace PickingApp.Controllers
         {
             await using var transaccion = await BloquearAsignacionAsync(pedidoId, empleadoId);
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             // Un pedido en curso solo cambia de empleado por CU-27 (motivo obligatorio y liberación del anterior)
@@ -88,7 +88,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var empleado = await _context.Empleados.FindAsync(empleadoId);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == empleadoId);
             if (empleado == null) return NotFound();
 
             // Si genera advertencia de experiencia (umbrales de Configuración)
@@ -140,7 +140,7 @@ namespace PickingApp.Controllers
 
             await using var transaccion = await BloquearAsignacionAsync(pedidoId, nuevoEmpleadoId);
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             if (!pedido.EstaEnCurso || !pedido.EmpleadoId.HasValue)
@@ -162,7 +162,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Asignar), new { id = pedidoId });
             }
 
-            var nuevoEmpleado = await _context.Empleados.FindAsync(nuevoEmpleadoId);
+            var nuevoEmpleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == nuevoEmpleadoId);
             if (nuevoEmpleado == null) return NotFound();
 
             var nombreEmpleadoAnterior = await _context.Empleados

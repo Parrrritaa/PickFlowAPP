@@ -28,7 +28,8 @@ namespace PickingApp.Controllers
         // CU-16: Consultar empleados
         public async Task<IActionResult> Index()
         {
-            var empleados = await _context.Empleados
+            var empleados = await _context.Empleados.DelAlcance(User)
+                .Include(e => e.Bodega)
                 .OrderBy(e => e.NombreCompleto)
                 .ToListAsync();
 
@@ -53,7 +54,7 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         public async Task<IActionResult> Historial(int id, int? pagina)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
             var completados = await _context.Pedidos
@@ -192,7 +193,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> Editar(int id)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
             return View(empleado);
@@ -212,7 +213,7 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var empleadoExistente = await _context.Empleados.FindAsync(model.Id);
+            var empleadoExistente = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == model.Id);
             if (empleadoExistente == null) return NotFound();
 
             model.Correo = ReglasEmpleado.NormalizarCorreo(model.Correo);
@@ -307,7 +308,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Inactivar(int id, string? motivo)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
             // No se puede inactivar (ni solicitar inactivar) a un empleado con un pedido en curso
@@ -375,7 +376,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReiniciarPromedio(int id)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
             empleado.FechaReinicioPromedio = DateTime.Now;

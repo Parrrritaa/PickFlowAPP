@@ -28,7 +28,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             var userName = User.Identity?.Name ?? "Usuario";
@@ -68,7 +68,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> AtenderNovedad(int novedadId,
             [StringLength(500, ErrorMessage = "Las observaciones admiten hasta {1} caracteres.")] string? observacionesAtencion)
         {
-            var novedad = await _context.NovedadesPedido
+            var novedad = await _context.NovedadesPedido.DelAlcance(User)
                 .Include(n => n.Pedido)
                 .FirstOrDefaultAsync(n => n.Id == novedadId);
 

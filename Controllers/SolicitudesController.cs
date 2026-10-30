@@ -72,7 +72,7 @@ namespace PickingApp.Controllers
         // Orden de llegada, la más antigua primero, para que ninguna se quede esperando.
         private IQueryable<Solicitud> PendientesPorRevisar(int? tipo)
         {
-            var query = _context.Solicitudes.Where(s => s.Estado == EstadosSolicitud.Pendiente);
+            var query = _context.Solicitudes.DelAlcance(User).Where(s => s.Estado == EstadosSolicitud.Pendiente);
             if (User.IsInRole(Roles.Supervisor)) query = query.Where(s => s.TipoSolicitudId == TipoGestionableSupervisor);
             if (tipo.HasValue) query = query.Where(s => s.TipoSolicitudId == tipo.Value);
             return query.OrderBy(s => s.FechaSolicitud).ThenBy(s => s.Id);
@@ -127,7 +127,8 @@ namespace PickingApp.Controllers
             var esSupervisor = User.IsInRole(Roles.Supervisor);
             var userId = UsuarioActualId;
 
-            var baseQuery = _context.Solicitudes.AsQueryable();
+            // Cada solicitud queda en la bodega de quien la creó: también las propias se ven solo desde esa bodega
+            var baseQuery = _context.Solicitudes.DelAlcance(User);
             if (!esBandeja)
             {
                 baseQuery = baseQuery.Where(s => s.UsuarioSolicitanteId == userId);
@@ -193,7 +194,7 @@ namespace PickingApp.Controllers
                 EsBandeja = esBandeja,
                 MostrarPestanas = esSupervisor,
                 PendientesPorRevisar = esSupervisor
-                    ? await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor)
+                    ? await _context.Solicitudes.DelAlcance(User).CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor)
                     : 0,
                 PendientesEnCadena = esBandeja ? await PendientesPorRevisar(filtros.Tipo).CountAsync() : 0,
                 Tipos = await _context.CatalogoTiposSolicitud
@@ -269,7 +270,8 @@ namespace PickingApp.Controllers
             return View("Revisar", modelo);
         }
 
-        private Task<Solicitud?> BuscarAsync(int id) => _context.Solicitudes
+        private Task<Solicitud?> BuscarAsync(int id) => _context.Solicitudes.DelAlcance(User)
+            .Include(s => s.Bodega)
             .Include(s => s.UsuarioSolicitante)
             .Include(s => s.UsuarioResponde)
             .FirstOrDefaultAsync(s => s.Id == id);
@@ -432,7 +434,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Aprobar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
-            var solicitud = await _context.Solicitudes
+            var solicitud = await _context.Solicitudes.DelAlcance(User)
                 .Include(s => s.UsuarioSolicitante)
                 .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -506,7 +508,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Rechazar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
-            var solicitud = await _context.Solicitudes.FindAsync(id);
+            var solicitud = await _context.Solicitudes.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (solicitud == null || solicitud.Estado != EstadosSolicitud.Pendiente)
             {
                 TempData["ErrorMessage"] = "La solicitud no se encuentra disponible para rechazo.";

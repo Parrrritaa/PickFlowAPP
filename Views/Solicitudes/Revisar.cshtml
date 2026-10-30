@@ -45,6 +45,11 @@
         </header>
         <p class="pf-sol-meta">
             <span><i class="bi bi-person" aria-hidden="true"></i> @(s.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</span>
+            @* El Administrador ve solicitudes de todas las bodegas *@
+            @if (s.Bodega != null && User.IsInRole(Roles.Administrador))
+            {
+                <span><i class="bi bi-building" aria-hidden="true"></i> @s.Bodega.Nombre</span>
+            }
             <span><i class="bi bi-clock" aria-hidden="true"></i> <time datetime="@s.FechaSolicitud.ToString("s")">@s.FechaSolicitud.ToString("dd/MM/yyyy · HH:mm")</time></span>
         </p>
 

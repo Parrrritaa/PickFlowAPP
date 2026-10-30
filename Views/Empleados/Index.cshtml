@@ -20,7 +20,7 @@
             {
                 @* Filtra la tabla al escribir (site.js, data-pf-buscar-en) *@
                 <label class="visually-hidden" for="buscarEmpleado">Buscar empleado</label>
-                <input type="search" id="buscarEmpleado" class="pf-search-input" placeholder="Buscar nombre, estado o turno..." data-pf-buscar-en="tablaEmpleados" autocomplete="off" />
+                <input type="search" id="buscarEmpleado" class="pf-search-input" placeholder="@(esAdmin ? "Buscar nombre, bodega, estado o turno..." : "Buscar nombre, estado o turno...")" data-pf-buscar-en="tablaEmpleados" autocomplete="off" />
             }
             <a asp-action="Crear" class="btn-pf-blue">
                 @(esAuxiliar ? "+ Generar solicitud de registro" : "+ Registrar Empleado")
@@ -54,6 +54,11 @@
                                más por página, con la paginación a la vista *@
                             <td>
                                 <div class="fw-semibold">@emp.NombreCompleto</div>
+                                @if (esAdmin)
+                                {
+                                    @* El Administrador ve a todas las bodegas; los demás solo la suya *@
+                                    <div class="text-secondary small">@(emp.Bodega?.Nombre ?? "Sin bodega asignada")</div>
+                                }
                                 @if (!esAuxiliar)
                                 {
                                     <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
