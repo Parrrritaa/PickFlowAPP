@@ -17,7 +17,7 @@
             <span class="pf-upload-box__icono" aria-hidden="true"><i class="bi bi-file-earmark-spreadsheet"></i></span>
             <div class="pf-upload-box__texto">
                 <h3 class="pf-upload-box__titulo" id="tituloArchivo">Arrastra aquí el archivo Excel</h3>
-                <p class="pf-upload-box__ayuda" id="ayudaArchivo" aria-live="polite">o elígelo desde tu equipo. Formato .xlsx, con las columnas de la plantilla de pedidos.</p>
+                <p class="pf-upload-box__ayuda" id="ayudaArchivo" aria-live="polite">o elígelo desde tu equipo. Formato .xlsx con las columnas @PickingApp.Services.ExcelService.ColumnasEsperadas.</p>
             </div>
             <div class="pf-upload-box__acciones">
                 <input type="file" name="archivoExcel" id="archivoExcel" class="pf-upload-box__input" accept=".xlsx" required aria-describedby="ayudaArchivo" />
@@ -52,10 +52,20 @@
                 <ul class="mb-0 mt-2" id="listaErroresValidacion"></ul>
             </div>
 
-            <!-- Productos no registrados o fuera de su ubicación: el usuario decide de dónde se recogen -->
+            <!-- Productos que la bodega del pedido no tiene: no bloquean la carga, quedan como novedad del pedido -->
+            <div class="pf-info-banner mb-4" id="avisosNoDisponibles" hidden>
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <div>
+                    <strong>Estos productos no se cargarán: su bodega no los tiene.</strong>
+                    <div class="small">Cada pedido queda con una novedad «No disponible» que indica dónde sí está el producto.</div>
+                    <ul class="mb-0 mt-2" id="listaNoDisponibles"></ul>
+                </div>
+            </div>
+
+            <!-- Nombres del archivo distintos al registrado para el código: el usuario confirma con qué nombre se cargan -->
             <div id="seccionIncidencias" class="mb-4" hidden>
-                <h5 class="fw-bold text-dark mb-1">Decida qué hacer con estas filas</h5>
-                <p class="text-secondary small mb-3">Los productos y ubicaciones nuevos se registran al confirmar la carga.</p>
+                <h5 class="fw-bold text-dark mb-1">Confirme el nombre de estos productos</h5>
+                <p class="text-secondary small mb-3">Se cargan con el nombre registrado en el sistema para su código.</p>
                 <div class="d-flex flex-column gap-3" id="listaIncidencias"></div>
             </div>
 
@@ -72,5 +82,5 @@
 </div>
 
 @section Scripts {
-    <script src="~/js/paginas/cargar-excel.js" asp-append-version="true" data-url-validar="@Url.Action("ValidarExcel")" data-max-unidades="@Producto.MaxUnidadesPorCaja"></script>
+    <script src="~/js/paginas/cargar-excel.js" asp-append-version="true" data-url-validar="@Url.Action("ValidarExcel")"></script>
 }

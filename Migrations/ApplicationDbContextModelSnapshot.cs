@@ -366,7 +366,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("TipoNovedad")
                         .IsRequired()
-                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Diferencia Cantidad','Otro')");
+                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Diferencia Cantidad','Otro','No disponible')");
 
                     b.HasKey("Id");
 
