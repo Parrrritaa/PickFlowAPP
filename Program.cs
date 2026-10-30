@@ -136,6 +136,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Una respuesta de error sin contenido (p. ej. el NotFound de un registro de otra bodega) se muestra con la
+// pantalla Home/Estado y el mismo código; la dirección que pidió la persona no cambia.
+app.UseStatusCodePagesWithReExecute("/Home/Estado/{0}");
+
 app.UseHttpsRedirection();
 
 // Cabeceras de seguridad en todas las respuestas: ninguna otra página puede mostrar PickFlow dentro de un marco

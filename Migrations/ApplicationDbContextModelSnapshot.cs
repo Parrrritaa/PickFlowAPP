@@ -733,6 +733,9 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BodegaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("DatosJson")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -764,6 +767,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BodegaId");
 
                     b.HasIndex("ObservacionId");
 
@@ -1060,6 +1065,11 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
+                    b.HasOne("PickingApp.Models.Bodega", "Bodega")
+                        .WithMany()
+                        .HasForeignKey("BodegaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PickingApp.Models.ObservacionSolicitud", "Observacion")
                         .WithMany()
                         .HasForeignKey("ObservacionId")
@@ -1081,6 +1091,8 @@ namespace PickingApp.Migrations
                         .HasForeignKey("UsuarioSolicitanteId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Bodega");
 
                     b.Navigation("Observacion");
 

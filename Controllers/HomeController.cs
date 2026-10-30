@@ -256,6 +256,12 @@ namespace PickingApp.Controllers
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
 
+        // Destino de UseStatusCodePagesWithReExecute (Program.cs): 404 de un registro inexistente o de otra bodega,
+        // y cualquier otro error sin contenido. Anónima para atender también direcciones que no existen sin sesión.
+        [AllowAnonymous]
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Estado(int id) => View(id);
+
         // Destino de ErrorBaseDatosMiddleware. Anónima porque la sesión puede no existir aún (p. ej. en el login)
         // y sin verbo HTTP para atender también los POST que fallaron.
         [AllowAnonymous]

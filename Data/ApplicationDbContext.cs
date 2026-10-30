@@ -169,6 +169,12 @@ namespace PickingApp.Data
                 .HasForeignKey(e => e.BodegaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Solicitud>()
+                .HasOne(s => s.Bodega)
+                .WithMany()
+                .HasForeignKey(s => s.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<Pedido>()
                 .HasOne(p => p.Empleado)
                 .WithMany(e => e.PedidosAsignados)

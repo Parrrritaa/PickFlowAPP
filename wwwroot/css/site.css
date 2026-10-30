@@ -5613,6 +5613,12 @@ select.pf-input:not([multiple]):not([size]) {
     background-color: var(--pf-red-soft);
 }
 
+/* No encontrado: no es un permiso negado ni un éxito, el ícono va en tono neutro */
+.pf-pantalla-estado .pf-notif-empty-icon {
+    color: var(--pf-ink2);
+    background-color: var(--pf-surface2);
+}
+
 /* Botón del campo de archivo (Cargar Excel) */
 .form-control::file-selector-button {
     background-color: var(--pf-surface2);
