@@ -8,9 +8,9 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
-    // Gestión de usuarios del sistema. [Authorize(Roles = ...)] en la clase aplica a todas sus acciones:
-    // solo el Administrador entra; los demás roles reciben la página de acceso denegado.
-    [Authorize(Roles = Roles.Administrador)]
+    // Gestión de usuarios del sistema. [Authorize(Roles = ...)] en la clase aplica a todas sus acciones.
+    // El Administrador gestiona a todos; el Supervisor solo a los auxiliares de su bodega (DelAlcance).
+    [Authorize(Roles = Roles.AdministradorOSupervisor)]
     public class UsuariosController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -22,9 +22,30 @@ namespace PickingApp.Controllers
             _auditService = auditService;
         }
 
+        private bool EsAdministrador => User.IsInRole(Roles.Administrador);
+
+        // Al Supervisor, un usuario que no es auxiliar de su bodega le responde 404, como si no existiera
+        private IQueryable<Usuario> DelAlcance()
+        {
+            if (EsAdministrador) return _context.Usuarios;
+            var bodegaId = User.IdBodega();
+            return _context.Usuarios.Where(u => u.RolId == Roles.IdAuxiliar && u.BodegaId == bodegaId);
+        }
+
+        // El Administrador no tiene bodega; Supervisor y Auxiliar necesitan una activa
+        // (o conservar la que ya tenían, aunque se haya inactivado después).
+        private async Task<string?> ErrorBodegaAsync(int rolId, int? bodegaId, int? bodegaActual)
+        {
+            if (rolId == Roles.IdAdministrador) return null;
+            if (bodegaId == null) return "Elige la bodega donde trabajará.";
+            return await _context.Bodegas.AnyAsync(b => b.Id == bodegaId && (b.Activa || b.Id == bodegaActual))
+                ? null : "Elige una bodega activa.";
+        }
+
         public async Task<IActionResult> Index()
         {
-            var usuarios = await _context.Usuarios
+            var usuarios = await DelAlcance()
+                .Include(u => u.Bodega)
                 .OrderBy(u => u.Rol!.Nombre)
                 .ThenBy(u => u.NombreCompleto)
                 .ToListAsync();
@@ -54,8 +75,19 @@ namespace PickingApp.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear([Bind(nameof(Usuario.NombreCompleto), nameof(Usuario.Identificacion), nameof(Usuario.Correo),
-            nameof(Usuario.RolId), nameof(Usuario.Estado))] Usuario model, string password, string confirmPassword)
+            nameof(Usuario.RolId), nameof(Usuario.Estado), nameof(Usuario.BodegaId))] Usuario model, string password, string confirmPassword)
         {
+            if (!EsAdministrador)
+            {
+                // El Supervisor solo crea auxiliares de su bodega: rol y bodega se fijan aquí, no vienen del formulario
+                model.RolId = Roles.IdAuxiliar;
+                model.BodegaId = User.IdBodega();
+            }
+            else if (model.RolId == Roles.IdAdministrador)
+            {
+                model.BodegaId = null;
+            }
+
             // El formulario envía la contraseña en "password", no en "PasswordHash": el binding automático
             // la deja vacía y dispara el [Required] del modelo antes de llegar aquí. Se valida a mano abajo.
             ModelState.Remove("PasswordHash");
@@ -74,9 +106,12 @@ namespace PickingApp.Controllers
             }
 
             model.Correo = model.Correo.Trim().ToLower();
-            if (await _context.Usuarios.AnyAsync(u => u.Correo == model.Correo))
+            var registrado = await _context.Usuarios.Where(u => u.Correo == model.Correo).Select(u => new { u.BodegaId }).FirstOrDefaultAsync();
+            if (registrado != null)
             {
-                ModelState.AddModelError("Correo", "Ya existe un usuario con este correo electrónico.");
+                ModelState.AddModelError("Correo", !EsAdministrador && registrado.BodegaId != null && registrado.BodegaId != model.BodegaId
+                    ? "Ese correo pertenece a un usuario de otra bodega. Si se trasladó a la tuya, pide al Administrador que le cambie la bodega."
+                    : "Ya existe un usuario con este correo electrónico.");
             }
             else if (await _context.Empleados.AnyAsync(e => e.Correo == model.Correo))
             {
@@ -90,6 +125,11 @@ namespace PickingApp.Controllers
             if (!EstadosUsuario.Todos.Contains(model.Estado))
             {
                 ModelState.AddModelError("Estado", "Seleccione un estado válido.");
+            }
+            var errorBodega = await ErrorBodegaAsync(model.RolId, model.BodegaId, null);
+            if (errorBodega != null)
+            {
+                ModelState.AddModelError("BodegaId", errorBodega);
             }
 
             model.Identificacion = (model.Identificacion ?? string.Empty).Trim();
@@ -125,7 +165,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> Editar(int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await DelAlcance().FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return NotFound();
 
             return View(usuario);
@@ -138,14 +178,30 @@ namespace PickingApp.Controllers
             [StringLength(100, ErrorMessage = "El nombre completo admite hasta {1} caracteres.")] string nombreCompleto,
             [StringLength(30, ErrorMessage = "La identificación admite hasta {1} dígitos.")]
             [RegularExpression(@"^\d*$", ErrorMessage = "La identificación solo debe contener números.")] string? identificacion,
-            int rolId, string estado)
+            int rolId, string estado, int? bodegaId)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await DelAlcance().FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return NotFound();
+
+            if (!EsAdministrador)
+            {
+                // El Supervisor no cambia rol ni bodega: solo el Administrador asciende o traslada
+                rolId = usuario.RolId;
+                bodegaId = usuario.BodegaId;
+            }
+            else if (rolId == Roles.IdAdministrador)
+            {
+                bodegaId = null;
+            }
 
             if (!Roles.Catalogo.Any(r => r.Id == rolId) || !EstadosUsuario.Todos.Contains(estado))
             {
                 ModelState.AddModelError(string.Empty, "El rol o el estado seleccionado no es válido.");
+            }
+            var errorBodega = await ErrorBodegaAsync(rolId, bodegaId, usuario.BodegaId);
+            if (errorBodega != null)
+            {
+                ModelState.AddModelError(string.Empty, errorBodega);
             }
             if (!ModelState.IsValid)
             {
@@ -168,6 +224,7 @@ namespace PickingApp.Controllers
             usuario.Identificacion = (identificacion ?? string.Empty).Trim();
             usuario.RolId = rolId;
             usuario.Estado = estado;
+            usuario.BodegaId = bodegaId;
 
             if (estado == EstadosUsuario.Activo)
             {
@@ -179,7 +236,8 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Editar Usuario/Rol", "Usuarios", 
-                $"Usuario {usuario.NombreCompleto} actualizado: Rol={Roles.Catalogo.First(r => r.Id == rolId).Nombre}, Estado={estado}");
+                $"Usuario {usuario.NombreCompleto} actualizado: Rol={Roles.Catalogo.First(r => r.Id == rolId).Nombre}, Estado={estado}, " +
+                $"Bodega={(bodegaId == null ? "ninguna" : (await _context.Bodegas.FindAsync(bodegaId))!.Nombre)}");
 
             TempData["SuccessMessage"] = $"Usuario '{usuario.Correo}' actualizado exitosamente.";
             return RedirectToAction(nameof(Index));
@@ -189,7 +247,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Desbloquear(int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await DelAlcance().FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return NotFound();
 
             usuario.Estado = EstadosUsuario.Activo;

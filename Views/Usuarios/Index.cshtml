@@ -1,22 +1,25 @@
 @model IEnumerable<PickingApp.Models.Usuario>
 @{
-    ViewData["Title"] = "Usuarios y roles";
+    // El Supervisor solo ve a los auxiliares de su bodega (UsuariosController.DelAlcance)
+    var esAdmin = User.IsInRole(Roles.Administrador);
+    ViewData["Title"] = esAdmin ? "Usuarios y roles" : "Auxiliares de tu bodega";
+    var columnas = esAdmin ? 6 : 4;
 }
 
-<h1 class="pf-page-title">Usuarios y roles</h1>
+<h1 class="pf-page-title">@ViewData["Title"]</h1>
 
 <div class="pf-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Usuarios registrados</h4>
+        <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">@(esAdmin ? "Usuarios registrados" : "Auxiliares registrados")</h4>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             @if (Model != null && Model.Any())
             {
                 @* Filtra la tabla al escribir (site.js, data-pf-buscar-en) *@
                 <label class="visually-hidden" for="buscarUsuario">Buscar usuario</label>
-                <input type="search" id="buscarUsuario" class="pf-search-input" placeholder="Buscar correo, nombre o rol..." data-pf-buscar-en="tablaUsuarios" autocomplete="off" />
+                <input type="search" id="buscarUsuario" class="pf-search-input" placeholder="@(esAdmin ? "Buscar correo, nombre, rol o bodega..." : "Buscar correo o nombre...")" data-pf-buscar-en="tablaUsuarios" autocomplete="off" />
             }
             <a asp-action="Crear" class="btn-pf-blue">
-                + Nuevo usuario
+                @(esAdmin ? "+ Nuevo usuario" : "+ Nuevo auxiliar")
             </a>
         </div>
     </div>
@@ -27,7 +30,11 @@
                 <tr>
                     <th>Correo</th>
                     <th>Nombre</th>
-                    <th>Rol</th>
+                    @if (esAdmin)
+                    {
+                        <th>Rol</th>
+                        <th>Bodega</th>
+                    }
                     <th>Estado</th>
                     <th class="text-center">Acción</th>
                 </tr>
@@ -40,7 +47,11 @@
                         <tr>
                             <td class="fw-semibold">@u.Correo</td>
                             <td>@u.NombreCompleto</td>
-                            <td>@u.NombreRol</td>
+                            @if (esAdmin)
+                            {
+                                <td>@u.NombreRol</td>
+                                <td>@(u.Bodega?.Nombre ?? (u.RolId == Roles.IdAdministrador ? "Todas" : "Sin asignar"))</td>
+                            }
                             <td>@(u.CorreoVerificado ? u.Estado : "No verificado")</td>
                             <td class="text-center">
                                 <div class="d-flex gap-2 justify-content-center">
@@ -63,11 +74,11 @@
                 else
                 {
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">No hay usuarios registrados.</td>
+                        <td colspan="@columnas" class="text-center text-muted py-4">@(esAdmin ? "No hay usuarios registrados." : "Aún no hay auxiliares en tu bodega.")</td>
                     </tr>
                 }
                 <tr class="d-none" data-pf-sin-resultados>
-                    <td colspan="5" class="text-center text-muted py-4">Ningún usuario coincide con la búsqueda.</td>
+                    <td colspan="@columnas" class="text-center text-muted py-4">Ningún usuario coincide con la búsqueda.</td>
                 </tr>
             </tbody>
         </table>

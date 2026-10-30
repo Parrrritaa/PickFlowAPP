@@ -17,13 +17,15 @@
         var displayName = userName.Contains("@") ? userName.Split('@')[0] : userName;
         displayName = char.ToUpper(displayName[0]) + displayName.Substring(1);
         var esAdmin = userRole == Roles.Administrador;
-        var puedeCargar = esAdmin || userRole == Roles.Supervisor;
+        var esSupervisor = userRole == Roles.Supervisor;
+        var puedeCargar = esAdmin || esSupervisor;
 
         // Apartado actual para la ruta sobre el título: grupo de la navegación y nombre de la opción
         var enCargarExcel = currentController == "Pedidos" && currentAction == "CargarExcel";
         var enConfiguracion = currentController == "Auditoria" && currentAction == "Configuracion";
-        var enRecursos = currentController is "Empleados" or "Bodegas" or "Productos";
-        var enSistema = currentController is "Usuarios" or "Auditoria" or "Observaciones";
+        // El Supervisor entra a Usuarios solo para los auxiliares de su bodega: para él es un recurso, no el sistema
+        var enRecursos = currentController is "Empleados" or "Bodegas" or "Productos" || (esSupervisor && currentController == "Usuarios");
+        var enSistema = currentController is "Auditoria" or "Observaciones" || (esAdmin && currentController == "Usuarios");
         var (grupoActual, apartadoActual) = currentController switch
         {
             "Home" => ("Operación", "Inicio"),
@@ -34,7 +36,7 @@
             "Bodegas" => ("Recursos", "Bodegas"),
             "Productos" => ("Recursos", "Productos"),
             "Reportes" => ("Análisis", "Reportes"),
-            "Usuarios" => ("Sistema", "Usuarios y roles"),
+            "Usuarios" => esSupervisor ? ("Recursos", "Auxiliares") : ("Sistema", "Usuarios y roles"),
             "Auditoria" => ("Sistema", enConfiguracion ? "Configuración" : "Registro del sistema"),
             "Observaciones" => ("Sistema", "Observaciones"),
             "Account" => ("Cuenta", "Cambiar contraseña"),
@@ -94,6 +96,13 @@
                                 <a class="pf-panel-opcion" asp-controller="Productos" asp-action="Index" aria-current="@Actual(currentController == "Productos")">
                                     <span class="pf-panel-ico"><partial name="_Icono" model='"productos"' /></span>
                                     <span class="pf-panel-texto"><b>Productos</b><span>Categorías y tiempos de manipulación</span></span>
+                                </a>
+                            }
+                            @if (esSupervisor)
+                            {
+                                <a class="pf-panel-opcion" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"usuarios"' /></span>
+                                    <span class="pf-panel-texto"><b>Auxiliares</b><span>Cuentas de los auxiliares de tu bodega</span></span>
                                 </a>
                             }
                         </div>
@@ -231,6 +240,12 @@
             {
                 <a class="pf-hoja-link" asp-controller="Productos" asp-action="Index" aria-current="@Actual(currentController == "Productos")">
                     <partial name="_Icono" model='"productos"' /><span class="pf-hoja-texto">Productos</span>
+                </a>
+            }
+            @if (esSupervisor)
+            {
+                <a class="pf-hoja-link" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                    <partial name="_Icono" model='"usuarios"' /><span class="pf-hoja-texto">Auxiliares</span>
                 </a>
             }
 

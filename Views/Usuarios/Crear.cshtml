@@ -1,13 +1,15 @@
 @model PickingApp.Models.Usuario
 @{
-    ViewData["Title"] = "Nuevo usuario";
+    // El Supervisor solo crea auxiliares de su bodega (UsuariosController fija rol y bodega)
+    var esAdmin = User.IsInRole(Roles.Administrador);
+    ViewData["Title"] = esAdmin ? "Nuevo usuario" : "Nuevo auxiliar";
 }
 
-<h1 class="pf-page-title">Nuevo usuario</h1>
+<h1 class="pf-page-title">@ViewData["Title"]</h1>
 
 <div class="pf-card">
     <div class="pf-info-banner">
-        Los usuarios tendrán acceso al sistema según el rol asignado.
+        @(esAdmin ? "Los usuarios tendrán acceso al sistema según el rol asignado." : "El auxiliar quedará en tu bodega, con acceso a lo que permite el rol Auxiliar.")
     </div>
 
     @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
@@ -45,18 +47,28 @@
             </div>
         </div>
 
-        <div class="row mb-3">
-            <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Rol <span class="text-danger">*</span></label>
-                <select asp-for="RolId" class="pf-input" required>
-                    @foreach (var rol in Roles.Catalogo)
-                    {
-                        <option value="@rol.Id">@rol.Nombre</option>
-                    }
-                </select>
-                <span asp-validation-for="RolId" class="text-danger small"></span>
+        @if (esAdmin)
+        {
+            <div class="row mb-3">
+                <div class="col-md-6 pf-form-group">
+                    <label class="pf-label" for="RolId">Rol <span class="text-danger">*</span></label>
+                    <select asp-for="RolId" class="pf-input" required>
+                        @foreach (var rol in Roles.Catalogo)
+                        {
+                            <option value="@rol.Id">@rol.Nombre</option>
+                        }
+                    </select>
+                    <span asp-validation-for="RolId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6 pf-form-group" data-pf-oculto-si="RolId=@Roles.IdAdministrador">
+                    <label class="pf-label" for="BodegaId">Bodega <span class="text-danger">*</span></label>
+                    <select asp-for="BodegaId" class="pf-input" required>
+                        @await Component.InvokeAsync("OpcionesBodega", new { seleccionada = Model?.BodegaId })
+                    </select>
+                    <span asp-validation-for="BodegaId" class="text-danger small"></span>
+                </div>
             </div>
-        </div>
+        }
 
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
@@ -91,7 +103,7 @@
                 Cancelar
             </a>
             <button type="submit" class="btn-pf-blue">
-                Crear usuario
+                @(esAdmin ? "Crear usuario" : "Crear auxiliar")
             </button>
         </div>
     </form>

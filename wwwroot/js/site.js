@@ -32,7 +32,22 @@ document.addEventListener('click', function (e) {
 // respeta (required, pattern, minlength, type="email"); aquí solo lo que esos atributos no cubren:
 //  - [data-pf-igual="nombre"]: debe coincidir con el campo de ese name (confirmar contraseña).
 //  - [data-pf-correo-disponible="url"]: pregunta al servidor (POST, true/false) si el correo ya está en uso.
+//  - [data-pf-oculto-si="idSelect=valor"]: oculta el bloque y desactiva sus campos (no se validan ni se envían)
+//    mientras ese select tenga ese valor; p. ej. la bodega, que no aplica al rol Administrador.
 (function () {
+    document.querySelectorAll('[data-pf-oculto-si]').forEach(function (bloque) {
+        var partes = bloque.dataset.pfOcultoSi.split('=');
+        var select = document.getElementById(partes[0]);
+        if (!select) return;
+        function aplicar() {
+            var oculto = select.value === partes[1];
+            bloque.hidden = oculto;
+            bloque.querySelectorAll('input, select').forEach(function (c) { c.disabled = oculto; });
+        }
+        select.addEventListener('change', aplicar);
+        aplicar();
+    });
+
     document.querySelectorAll('[data-pf-igual]').forEach(function (campo) {
         var otro = campo.form.elements[campo.dataset.pfIgual];
         function comparar() {
