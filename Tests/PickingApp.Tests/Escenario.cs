@@ -98,7 +98,8 @@ namespace PickingApp.Tests
                 HorarioEntrada = entrada ?? new TimeSpan(8, 0, 0),
                 HorarioSalida = salida ?? new TimeSpan(17, 0, 0),
                 FechaIngreso = DateTime.Today.AddMonths(-mesesExperiencia),
-                Activo = activo
+                Activo = activo,
+                Bodega = _bodega
             };
             Db.Empleados.Add(empleado);
             Db.SaveChanges();

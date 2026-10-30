@@ -34,7 +34,8 @@ namespace PickingApp.Controllers
 
             // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante),
             // evaluadas para todos los empleados en un número fijo de consultas
-            var empleados = await _context.Empleados.Where(e => e.Activo).ToListAsync();
+            // Solo el personal activo de la bodega del pedido (PickingEngine rechaza también a los de otra bodega)
+            var empleados = await _context.Empleados.Where(e => e.Activo && e.BodegaId == pedido.BodegaId).ToListAsync();
             var validaciones = await _pickingEngine.ValidarAsignacionesAsync(id, empleados.Select(e => e.Id).ToList());
 
             bool Asignable(Empleado e) => e.Id != empleadoActualId && validaciones[e.Id].PuedeAsignar;

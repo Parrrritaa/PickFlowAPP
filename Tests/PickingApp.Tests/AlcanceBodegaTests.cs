@@ -87,7 +87,10 @@ namespace PickingApp.Tests
             Assert.Equal(-1, sinBodega.BodegaVisible());
             Assert.Equal(0, await e.Db.Pedidos.DelAlcance(sinBodega).CountAsync());
             // Los empleados aún sin bodega tampoco: el -1 no coincide con un BodegaId nulo
-            e.Empleado();
+            var sinAsignar = e.Empleado();
+            sinAsignar.Bodega = null;
+            sinAsignar.BodegaId = null;
+            e.Db.SaveChanges();
             Assert.Equal(0, await e.Db.Empleados.DelAlcance(sinBodega).CountAsync());
         }
 
