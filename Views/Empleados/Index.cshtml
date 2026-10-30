@@ -116,7 +116,7 @@
                 else
                 {
                     <tr>
-                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">No hay empleados registrados.</td>
+                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">@(esAdmin ? "No hay empleados registrados." : "Aún no hay empleados en tu bodega.")</td>
                     </tr>
                 }
                 <tr class="d-none" data-pf-sin-resultados>

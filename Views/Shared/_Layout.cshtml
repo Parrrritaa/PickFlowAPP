@@ -23,12 +23,14 @@
         // Apartado actual para la ruta sobre el título: grupo de la navegación y nombre de la opción
         var enCargarExcel = currentController == "Pedidos" && currentAction == "CargarExcel";
         var enConfiguracion = currentController == "Auditoria" && currentAction == "Configuracion";
+        // Pantalla de error (Home/Estado): no es Inicio, así que no marca esa opción ni la pone en la ruta
+        var enInicio = currentController == "Home" && currentAction != "Estado";
         // El Supervisor entra a Usuarios solo para los auxiliares de su bodega: para él es un recurso, no el sistema
         var enRecursos = currentController is "Empleados" or "Bodegas" or "Productos" || (esSupervisor && currentController == "Usuarios");
         var enSistema = currentController is "Auditoria" or "Observaciones" || (esAdmin && currentController == "Usuarios");
         var (grupoActual, apartadoActual) = currentController switch
         {
-            "Home" => ("Operación", "Inicio"),
+            "Home" when enInicio => ("Operación", "Inicio"),
             "Pedidos" => ("Operación", enCargarExcel ? "Cargar Excel" : "Pedidos"),
             "Solicitudes" => ("Operación", "Solicitudes"),
             "Notificaciones" => ("Operación", "Notificaciones"),
@@ -62,7 +64,7 @@
 
                 <nav class="pf-topnav" id="pfTopnav" aria-label="Principal">
                     @* Cada opción solo se muestra a los roles que pueden usarla; el controlador también lo valida con [Authorize] *@
-                    <a class="pf-topnav-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(currentController == "Home")">
+                    <a class="pf-topnav-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(enInicio)">
                         <span class="pf-ico"><partial name="_Icono" model='"inicio"' /></span>Inicio
                     </a>
                     <a class="pf-topnav-link" asp-controller="Pedidos" asp-action="Index" aria-current="@Actual(currentController == "Pedidos")">
@@ -206,7 +208,7 @@
         <div class="pf-hoja-fondo" id="pfHojaFondo" aria-hidden="true"></div>
         <nav class="pf-hoja" id="pfHoja" aria-label="Principal">
             <div class="pf-hoja-grupo">Operación</div>
-            <a class="pf-hoja-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(currentController == "Home")">
+            <a class="pf-hoja-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(enInicio)">
                 <partial name="_Icono" model='"inicio"' /><span class="pf-hoja-texto">Inicio</span>
             </a>
             <a class="pf-hoja-link" asp-controller="Pedidos" asp-action="Index" aria-current="@Actual(currentController == "Pedidos" && !enCargarExcel)">
