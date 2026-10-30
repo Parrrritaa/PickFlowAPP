@@ -1290,6 +1290,27 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     min-height: 42px;
 }
 
+/* Título del grupo de reportes de análisis */
+.pf-reportes-seccion {
+    margin: 36px 0 16px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--pf-ink);
+}
+
+/* Quién puede generar el reporte (p. ej. "Administrador") */
+.pf-report-etiqueta {
+    display: inline-block;
+    margin: -8px 0 16px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background-color: var(--pf-blue-soft);
+    color: var(--pf-ink2);
+    font-size: 12px;
+    font-weight: 600;
+}
+
 /* Barra de búsqueda sobre las listas */
 .pf-search-input {
     background-color: var(--pf-surface);
