@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PickingApp.Controllers;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Tests
@@ -127,6 +128,31 @@ namespace PickingApp.Tests
                 Como(new SolicitudesController(e.Db, new SinAuditoria(), NullLogger<SolicitudesController>.Instance), quien);
             Assert.IsType<NotFoundResult>(await Solicitudes(delSur).Revisar(solicitud.Id));
             Assert.IsType<ViewResult>(await Solicitudes(deLaPrincipal).Revisar(solicitud.Id));
+
+            // El aviso le llega solo al supervisor de esa bodega
+            Assert.True(await e.Db.Notificaciones.AnyAsync(n => n.UsuarioDestinoId == deLaPrincipal.Id));
+            Assert.False(await e.Db.Notificaciones.AnyAsync(n => n.UsuarioDestinoId == delSur.Id));
+        }
+
+        [Fact]
+        public async Task ElDashboardYLosReportesSoloCuentanLaBodegaPropia()
+        {
+            using var e = new Escenario();
+            var ubicacion = e.Ubicacion(Escenario.Mediano);
+            e.Pedido(PedidoEstados.Pendiente, (ubicacion, 1));
+            var delSur = Usuario(e, Roles.IdSupervisor, new Bodega { Codigo = "BOD-91", Nombre = "Sur" });
+            var admin = Usuario(e, Roles.IdAdministrador, null);
+            var pdf = new ReportService(new ReportesPdfTests.Entorno(), NullLogger<ReportService>.Instance);
+
+            HomeController Inicio(Usuario quien) => Como(new HomeController(e.Db, pdf, new SinAuditoria()), quien);
+            static DashboardViewModel Tablero(IActionResult r) => (DashboardViewModel)((ViewResult)r).Model!;
+            Assert.Equal(0, Tablero(await Inicio(delSur).Index()).TotalPendientes);
+            Assert.Equal(1, Tablero(await Inicio(admin).Index()).TotalPendientes);
+
+            // Con la bodega de otro en la URL, el supervisor recibe el reporte de la suya
+            var reportes = Como(new ReportesController(e.Db, pdf, new SinAuditoria()), delSur);
+            var archivo = Assert.IsType<FileContentResult>(await reportes.PedidosPorPeriodo(Principal(e).Id, null, null));
+            Assert.Contains("BOD-91", archivo.FileDownloadName);
         }
     }
 }

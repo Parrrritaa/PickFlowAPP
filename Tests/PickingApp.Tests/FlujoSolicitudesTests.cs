@@ -9,7 +9,8 @@ namespace PickingApp.Tests
     {
         private static Usuario Usuario(Escenario e, int rolId)
         {
-            var usuario = new Usuario { NombreCompleto = "Usuario de prueba", Correo = $"{Guid.NewGuid():N}@prueba.com", PasswordHash = "hash", RolId = rolId };
+            var usuario = new Usuario { NombreCompleto = "Usuario de prueba", Correo = $"{Guid.NewGuid():N}@prueba.com", PasswordHash = "hash", RolId = rolId,
+                BodegaId = rolId == Roles.IdAdministrador ? null : e.Db.Bodegas.Single(b => b.Codigo == "BOD-01").Id };
             e.Db.Usuarios.Add(usuario);
             e.Db.SaveChanges();
             e.Db.Entry(usuario).Reference(u => u.Rol).Load();

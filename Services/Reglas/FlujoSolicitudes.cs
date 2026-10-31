@@ -20,7 +20,8 @@ namespace PickingApp.Services
             solicitud.BodegaId = solicitante.IdBodega();
             context.Solicitudes.Add(solicitud);
             await Avisos.AlRolAsync(context, tipo == TipoGestionableSupervisor ? Roles.IdSupervisor : Roles.IdAdministrador,
-                tituloAviso, $"El {solicitante.DescripcionParaNotificacion()} solicitó {queSolicito}.", tipoAviso, "/Solicitudes/Index");
+                tituloAviso, $"El {solicitante.DescripcionParaNotificacion()} solicitó {queSolicito}.", tipoAviso, "/Solicitudes/Index",
+                solicitud.BodegaId);
             await context.SaveChangesAsync();
             return solicitud;
         }
