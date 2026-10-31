@@ -90,7 +90,7 @@ namespace PickingApp.Controllers
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync(AccionesLog.AtenderNovedad, "Pedidos", 
-                $"Novedad #{novedad.Id} del pedido {novedad.Pedido?.CodigoPedido} marcada como atendida.");
+                $"Novedad #{novedad.Id} del pedido {novedad.Pedido?.CodigoPedido} marcada como atendida. Observación: {novedad.ObservacionesAtencion}");
 
             TempData["SuccessMessage"] = "La novedad ha sido marcada como atendida.";
             return RedirectToAction(nameof(Detalle), new { id = novedad.PedidoId });

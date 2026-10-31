@@ -286,7 +286,7 @@ namespace PickingApp.Services
         public void LogAtenciones(List<NovedadPedido> novedades)
         {
             foreach (var n in novedades.Where(n => n.Atendida))
-                Log(n.FechaAtencion!.Value, Administrador, AccionesLog.AtenderNovedad, $"Novedad #{n.Id} del pedido {n.Pedido!.CodigoPedido} marcada como atendida.");
+                Log(n.FechaAtencion!.Value, Administrador, AccionesLog.AtenderNovedad, $"Novedad #{n.Id} del pedido {n.Pedido!.CodigoPedido} marcada como atendida. Observación: {n.ObservacionesAtencion}");
         }
 
         private void ElegirCancelaciones(List<Pedido> trabajo)

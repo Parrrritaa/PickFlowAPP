@@ -307,10 +307,17 @@
                                     <td>
                                         <div class="fw-semibold">@nov.TipoNovedad</div>
                                         @nov.Descripcion
+                                        @if (nov.Atendida)
+                                        {
+                                            @* La respuesta del Administrador: así quien la registró ve cómo se resolvió *@
+                                            <div class="text-secondary small mt-1">
+                                                Atendida@(string.IsNullOrWhiteSpace(nov.AtendidaPor) ? "" : $" por {nov.AtendidaPor}")@(nov.FechaAtencion is DateTime atencion ? $" el {atencion:dd/MM/yyyy HH:mm}" : "")@(string.IsNullOrWhiteSpace(nov.ObservacionesAtencion) ? "." : $": {nov.ObservacionesAtencion}")
+                                            </div>
+                                        }
                                     </td>
                                     <td>
                                         <span class="pf-num text-nowrap">@nov.FechaRegistro.ToString("dd/MM/yyyy")</span>
-                                        <div class="text-secondary small">@nov.FechaRegistro.ToString("HH:mm") · @nov.RegistradoPor</div>
+                                        <div class="text-secondary small">@nov.FechaRegistro.ToString("HH:mm") · <span class="text-nowrap">@nov.RegistradoPor</span></div>
                                     </td>
                                     <td>
                                         <span class="pf-marca-novedad @(nov.Atendida ? "is-atendida" : "is-pendiente")">
