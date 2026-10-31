@@ -99,6 +99,8 @@
                 <li><i class="bi bi-geo-alt" aria-hidden="true"></i>@totalUbicaciones @(totalUbicaciones == 1 ? "ubicación" : "ubicaciones")</li>
                 <li><i class="bi bi-box-seam" aria-hidden="true"></i>@unidades @(unidades == 1 ? "unidad" : "unidades")</li>
                 <li><i class="bi bi-clock" aria-hidden="true"></i>Cargado <time datetime="@pedido.FechaCarga.ToString("s")">@pedido.FechaCarga.ToString("dd/MM/yyyy HH:mm")</time></li>
+                <li><i class="bi bi-play-circle" aria-hidden="true"></i>Inicio @if (pedido.FechaInicioProceso.HasValue) { <time datetime="@pedido.FechaInicioProceso.Value.ToString("s")">@pedido.FechaInicioProceso.Value.ToString("dd/MM/yyyy HH:mm")</time> } else { <span class="pf-ped-tenue">Sin iniciar</span> }</li>
+                <li><i class="bi bi-check2-circle" aria-hidden="true"></i>Fin @if (pedido.FechaFinalizacion.HasValue) { <time datetime="@pedido.FechaFinalizacion.Value.ToString("s")">@pedido.FechaFinalizacion.Value.ToString("dd/MM/yyyy HH:mm")</time> } else { <span class="pf-ped-tenue">Sin finalizar</span> }</li>
             </ul>
         </header>
 
