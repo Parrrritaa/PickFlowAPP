@@ -290,10 +290,9 @@
                     <table class="pf-table">
                         <thead>
                             <tr>
-                                <th>Fecha</th>
-                                <th>Tipo</th>
-                                <th>Descripción</th>
-                                <th>Registrada por</th>
+                                @* Tres columnas y no cinco: junto al panel de acciones la columna es angosta y la tabla se recortaba *@
+                                <th>Novedad</th>
+                                <th>Registro</th>
                                 <th>Estado</th>
                                 @if (userRole == Roles.Administrador)
                                 {
@@ -305,10 +304,14 @@
                             @foreach (var nov in pedido.Novedades.OrderByDescending(n => n.FechaRegistro))
                             {
                                 <tr>
-                                    <td class="pf-num text-nowrap">@nov.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</td>
-                                    <td>@nov.TipoNovedad</td>
-                                    <td>@nov.Descripcion</td>
-                                    <td class="text-nowrap">@nov.RegistradoPor</td>
+                                    <td>
+                                        <div class="fw-semibold">@nov.TipoNovedad</div>
+                                        @nov.Descripcion
+                                    </td>
+                                    <td>
+                                        <span class="pf-num text-nowrap">@nov.FechaRegistro.ToString("dd/MM/yyyy")</span>
+                                        <div class="text-secondary small">@nov.FechaRegistro.ToString("HH:mm") · @nov.RegistradoPor</div>
+                                    </td>
                                     <td>
                                         <span class="pf-marca-novedad @(nov.Atendida ? "is-atendida" : "is-pendiente")">
                                             <i class="bi @(nov.Atendida ? "bi-check2" : "bi-exclamation-triangle-fill")" aria-hidden="true"></i>@(nov.Atendida ? "Atendida" : "Sin atender")
