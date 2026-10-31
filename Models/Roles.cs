@@ -13,6 +13,7 @@ namespace PickingApp.Models
 
         // Para [Authorize(Roles = ...)], que recibe los roles separados por coma
         public const string AdministradorOSupervisor = Administrador + "," + Supervisor;
+        public const string AdministradorSupervisorOAuxiliar = AdministradorOSupervisor + "," + Auxiliar;
 
         public static readonly string[] Todos = { Administrador, Supervisor, Auxiliar };
 

@@ -418,6 +418,20 @@
                 </button>
             </div>
         }
+        else
+        {
+            <div class="d-grid gap-2">
+                @if (pedido.EmpleadoId != null)
+                {
+                    <a asp-action="Imprimir" asp-route-id="@pedido.Id" target="_blank" rel="noopener" class="btn-pf-gray text-center" data-pf-imprimir>
+                        <i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir orden
+                    </a>
+                }
+                <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Registrar novedad
+                </button>
+            </div>
+        }
 
         <div class="pf-ped-panel-pie">
             <a asp-action="Index" class="btn-pf-gray pf-ped-pie-btn" data-pf-volver>

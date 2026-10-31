@@ -11,7 +11,7 @@ namespace PickingApp.Controllers
     public partial class PedidosController
     {
         // CU-29: Registrar novedad al pedido
-        [Authorize(Roles = Roles.AdministradorOSupervisor)]
+        [Authorize(Roles = Roles.AdministradorSupervisorOAuxiliar)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RegistrarNovedad(int pedidoId, string tipoNovedad,

@@ -135,6 +135,19 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public async Task ElAuxiliarPuedeImprimirYRegistrarNovedadesEnSuBodega()
+        {
+            using var e = new Escenario();
+            var pedido = e.Pedido(PedidoEstados.Pendiente, (e.Ubicacion(Escenario.Mediano), 1));
+            var auxiliar = Usuario(e, Roles.IdAuxiliar, Principal(e));
+
+            Assert.IsType<ViewResult>(await Pedidos(e, auxiliar).Imprimir(pedido.Id));
+
+            await Pedidos(e, auxiliar).RegistrarNovedad(pedido.Id, TiposNovedad.Faltante, "Faltan 2 unidades");
+            Assert.Equal(auxiliar.Id, e.Db.NovedadesPedido.Single().RegistradoPorId);
+        }
+
+        [Fact]
         public async Task AlAtenderUnaNovedadSeAvisaAQuienLaRegistro()
         {
             using var e = new Escenario();
