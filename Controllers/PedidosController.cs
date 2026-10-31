@@ -175,6 +175,34 @@ namespace PickingApp.Controllers
             });
         }
 
+        // Orden de picking impresa para el empleado: hoja vertical en blanco y negro con todo el pedido y su asignación
+        // (Views/Pedidos/Imprimir.cshtml, sin la plantilla de la app). Detalle la abre sola tras asignar o reasignar.
+        public async Task<IActionResult> Imprimir(int id)
+        {
+            var pedido = await _context.Pedidos.DelAlcance(User)
+                .Include(p => p.Bodega)
+                .Include(p => p.Empleado)
+                .Include(p => p.AsignadoPor).ThenInclude(u => u!.Rol)
+                .Include(p => p.Detalles)
+                    .ThenInclude(d => d.Ubicacion)
+                        .ThenInclude(u => u!.Producto)
+                            .ThenInclude(pr => pr!.Categoria)
+                .Include(p => p.Novedades)
+                .Include(p => p.PedidoPadre)
+                    .ThenInclude(pp => pp!.Partes)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedido == null) return NotFound();
+
+            return View(new PedidoImpresionViewModel
+            {
+                Pedido = pedido,
+                CategoriaPredeterminada = await _context.CategoriasProducto
+                    .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "Predeterminada"
+            });
+        }
+
         // Detalle de Pedido (con ruta de picking de ubicaciones, productos, novedades)
         public async Task<IActionResult> Detalle(int id)
         {

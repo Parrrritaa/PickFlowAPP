@@ -589,6 +589,9 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AsignadoPorId")
+                        .HasColumnType("int");
+
                     b.Property<int>("BodegaId")
                         .HasColumnType("int");
 
@@ -647,6 +650,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("double");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AsignadoPorId");
 
                     b.HasIndex("EmpleadoId");
 
@@ -1043,6 +1048,11 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>
                 {
+                    b.HasOne("PickingApp.Models.Usuario", "AsignadoPor")
+                        .WithMany()
+                        .HasForeignKey("AsignadoPorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PickingApp.Models.Bodega", "Bodega")
                         .WithMany("Pedidos")
                         .HasForeignKey("BodegaId")
@@ -1058,6 +1068,8 @@ namespace PickingApp.Migrations
                         .WithMany("Partes")
                         .HasForeignKey("PedidoPadreId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AsignadoPor");
 
                     b.Navigation("Bodega");
 

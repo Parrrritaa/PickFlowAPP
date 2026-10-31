@@ -186,6 +186,13 @@ namespace PickingApp.Data
                 .HasForeignKey(p => p.EmpleadoId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // SetNull: borrar al usuario que asignó no borra el pedido ni su historial
+            modelBuilder.Entity<Pedido>()
+                .HasOne(p => p.AsignadoPor)
+                .WithMany()
+                .HasForeignKey(p => p.AsignadoPorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Partes de un pedido dividido: no se puede borrar el pedido original mientras tenga partes
             modelBuilder.Entity<Pedido>()
                 .HasOne(p => p.PedidoPadre)

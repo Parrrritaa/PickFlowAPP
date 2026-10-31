@@ -16,6 +16,9 @@
     var puedeDividir = pedido.MotivoNoDivisible() == null;
     var puedeDeshacerDivision = pedido.PuedeDeshacerDivision;
     var esGestor = userRole == Roles.Administrador || userRole == Roles.Supervisor;
+    // Recién asignado o reasignado: la orden se imprime sola una vez. Se lee aquí arriba: TempData se guarda cuando la
+    // respuesta empieza a enviarse, y en una página tan larga eso ocurre antes de llegar al botón (no se borraría)
+    var imprimirAhora = TempData["ImprimirPedido"] is true;
     if (totalUbicaciones == 0) totalUbicaciones = pedido.Detalles.Count;
     var pasillosPedido = pedido.Detalles
         .Where(d => d.Ubicacion != null)
@@ -395,6 +398,19 @@
                     <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-gray text-center">Reasignar</a>
                 }
 
+                @if (pedido.EmpleadoId != null)
+                {
+                    @* Orden impresa para el empleado (site.js, data-pf-imprimir) *@
+                    <a asp-action="Imprimir" asp-route-id="@pedido.Id" target="_blank" rel="noopener" class="btn-pf-gray text-center" data-pf-imprimir>
+                        <i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir orden
+                    </a>
+                    @if (imprimirAhora)
+                    {
+                        @* Tras asignar o reasignar se abre sola una vez. Elemento aparte: en un enlace con asp-action un
+                           atributo con valor null no se omite (queda vacío) y la orden se imprimía en cada carga *@
+                        <span hidden data-pf-imprimir-auto="@Url.Action("Imprimir", new { id = pedido.Id })"></span>
+                    }
+                }
                 <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
                     <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Registrar novedad
                 </button>

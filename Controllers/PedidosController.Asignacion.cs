@@ -101,6 +101,7 @@ namespace PickingApp.Controllers
             // Cambia estado, empleado, fechas y tiempos del pedido (Models/Pedido.cs) y luego los guarda con un UPDATE
             pedido.Asignar(empleadoId, DateTime.Now.AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos)),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
+            pedido.AsignadoPorId = User.IdUsuario();
 
             await _context.SaveChangesAsync();
             await transaccion.CommitAsync();
@@ -117,6 +118,7 @@ namespace PickingApp.Controllers
                 TempData["WarningMessage"] = validacion.MensajeAdvertencia;
             }
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' asignado exitosamente a '{empleado.NombreCompleto}'.";
+            TempData["ImprimirPedido"] = true; // Detalle abre la orden impresa para el empleado
 
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
@@ -178,6 +180,7 @@ namespace PickingApp.Controllers
 
             pedido.Reasignar(nuevoEmpleadoId, motivo, DateTime.Now.AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos)),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
+            pedido.AsignadoPorId = User.IdUsuario();
 
             await _context.SaveChangesAsync();
             await transaccion.CommitAsync();
@@ -194,6 +197,7 @@ namespace PickingApp.Controllers
                 TempData["WarningMessage"] = validacion.MensajeAdvertencia;
             }
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' reasignado exitosamente a '{nuevoEmpleado.NombreCompleto}'.";
+            TempData["ImprimirPedido"] = true; // Detalle abre la orden impresa para el empleado
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 

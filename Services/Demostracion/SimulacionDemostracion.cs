@@ -311,6 +311,7 @@ namespace PickingApp.Services
         {
             var estimado = Estimado(tiempoEstandar, o);
             p.Asignar(o.Empleado.Id, momento.AddMinutes(_margen), estimado, tiempoEstandar);
+            p.AsignadoPorId = SupervisorDe(p.BodegaId).Id;
             p.FechaAsignacion = momento;
             Log(momento, SupervisorDe(p.BodegaId), AccionesLog.AsignarPedido,
                 $"Pedido {p.CodigoPedido} asignado al empleado {o.Empleado.NombreCompleto}. Estimado: {Formato.Duracion(estimado)} (estándar {Formato.Duracion(tiempoEstandar)} × rendimiento {o.Factor:0.00})");
@@ -322,6 +323,7 @@ namespace PickingApp.Services
             var anterior = _operarios.First(x => x.Empleado.Id == p.EmpleadoId).Empleado.NombreCompleto;
             var estimado = Estimado(tiempoEstandar, o);
             p.Reasignar(o.Empleado.Id, motivo, momento.AddMinutes(_margen), estimado, tiempoEstandar);
+            p.AsignadoPorId = SupervisorDe(p.BodegaId).Id;
             p.FechaAsignacion = momento;
             Log(momento, SupervisorDe(p.BodegaId), AccionesLog.ReasignarPedido,
                 $"Pedido {p.CodigoPedido} reasignado de {anterior} a {o.Empleado.NombreCompleto}. Estimado: {Formato.Duracion(estimado)}. Motivo: {motivo}");

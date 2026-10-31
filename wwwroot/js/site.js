@@ -385,6 +385,43 @@ document.addEventListener('click', function (e) {
     });
 })();
 
+// Orden impresa: a[data-pf-imprimir] carga su href en un marco invisible y abre el cuadro de imprimir sin salir de la
+// página ni abrir una ventana que el navegador bloquee. Un elemento [data-pf-imprimir-auto="url"] la imprime sola al
+// cargar (Detalle, después de asignar). Ctrl+clic, o sin JavaScript, la hoja se abre en otra pestaña.
+(function () {
+    function imprimir(url) {
+        var anterior = document.getElementById('pfMarcoImpresion');
+        if (anterior) anterior.remove();
+        var marco = document.createElement('iframe');
+        marco.id = 'pfMarcoImpresion';
+        marco.title = 'Orden para imprimir';
+        marco.tabIndex = -1;
+        marco.setAttribute('aria-hidden', 'true');
+        marco.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+        // 'load' llega con el logo ya cargado: la hoja sale completa
+        marco.addEventListener('load', function () {
+            try {
+                marco.contentWindow.focus();
+                marco.contentWindow.print();
+            } catch (e) {
+                window.open(url, '_blank', 'noopener');
+            }
+        });
+        marco.src = url;
+        document.body.appendChild(marco);
+    }
+
+    document.addEventListener('click', function (e) {
+        var enlace = e.target.closest('a[data-pf-imprimir]');
+        if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        imprimir(enlace.href);
+    });
+
+    var automatica = document.querySelector('[data-pf-imprimir-auto]');
+    if (automatica) window.addEventListener('load', function () { imprimir(automatica.dataset.pfImprimirAuto); });
+})();
+
 // Cuadro de búsqueda de una tabla: <input data-pf-buscar-en="idTabla">. Filtra las filas por todo su texto, sin
 // distinguir tildes ni mayúsculas ("andres" encuentra "Andrés"), muestra la fila [data-pf-sin-resultados] si ninguna
 // coincide y vuelve a paginar desde la primera página.

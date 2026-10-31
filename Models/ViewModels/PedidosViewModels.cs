@@ -33,6 +33,13 @@ namespace PickingApp.Models.ViewModels
         public int DivididosEnCurso { get; init; }
     }
 
+    // Views/Pedidos/Imprimir.cshtml: la orden de picking que se entrega al empleado
+    public class PedidoImpresionViewModel
+    {
+        public Pedido Pedido { get; init; } = null!;
+        public string CategoriaPredeterminada { get; init; } = "Predeterminada";
+    }
+
     // Views/Pedidos/Detalle.cshtml
     public class PedidoDetalleViewModel
     {
