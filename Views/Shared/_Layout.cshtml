@@ -23,12 +23,11 @@
         var esSupervisor = userRole == Roles.Supervisor;
         var puedeCargar = esAdmin || esSupervisor;
 
-        // Datos del perfil en el menú de la cuenta. La bodega se lee de la base (no de la cookie) para mostrar
-        // la actual si el Administrador traslada al usuario; el Administrador no tiene bodega: ve todas.
-        var correo = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-        var bodegaPerfil = User.IdBodega() is int idBodegaPerfil
-            ? await Db.Bodegas.Where(b => b.Id == idBodegaPerfil).Select(b => new { b.Nombre, b.Codigo }).FirstOrDefaultAsync()
-            : null;
+        // Datos del perfil (menú de la cuenta y diálogo "Ver perfil"). Se leen de la base, no de la cookie, para mostrar
+        // lo actual si el Administrador los cambia; el Administrador no tiene bodega: ve todas.
+        var idPerfil = User.IdUsuario();
+        var perfil = await Db.Usuarios.AsNoTracking().Include(u => u.Rol).Include(u => u.Bodega).FirstOrDefaultAsync(u => u.Id == idPerfil);
+        var bodegaPerfil = perfil?.Bodega;
 
         // Apartado actual para la ruta sobre el título: grupo de la navegación y nombre de la opción
         var enCargarExcel = currentController == "Pedidos" && currentAction == "CargarExcel";
@@ -190,15 +189,8 @@
                                 <span class="pf-cuenta-rol">@userRole</span>
                             </span>
                         </div>
-                        @* Datos de solo lectura: con quién está la sesión y en qué bodega trabaja *@
+                        @* Dato de solo lectura: en qué bodega trabaja; el resto del perfil está en "Ver perfil" *@
                         <dl class="pf-cuenta-detalles">
-                            @if (!string.IsNullOrEmpty(correo))
-                            {
-                                <div class="pf-cuenta-detalle" title="@correo">
-                                    <dt><partial name="_Icono" model='"correo"' /><span class="visually-hidden">Correo</span></dt>
-                                    <dd>@correo</dd>
-                                </div>
-                            }
                             <div class="pf-cuenta-detalle pf-cuenta-detalle--bodega" title="@(bodegaPerfil != null ? $"{bodegaPerfil.Nombre} ({bodegaPerfil.Codigo})" : null)">
                                 <dt><partial name="_Icono" model='"bodegas"' /><span class="visually-hidden">Bodega</span></dt>
                                 <dd>
@@ -214,6 +206,9 @@
                             </div>
                         </dl>
                         <div class="dropdown-divider"></div>
+                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#pfModalPerfil">
+                            <partial name="_Icono" model='"perfil"' />Ver perfil
+                        </button>
                         <a class="dropdown-item" asp-controller="Account" asp-action="CambiarContrasena">
                             <partial name="_Icono" model='"llave"' />Cambiar contraseña
                         </a>
@@ -322,6 +317,64 @@
                 </div>
             </div>
         </div>
+
+        @if (perfil != null)
+        {
+            @* Ver perfil: todos los datos de la cuenta, solo para consultar (los cambia un Administrador desde Usuarios) *@
+            <div class="modal fade" id="pfModalPerfil" tabindex="-1" aria-labelledby="pfPerfilTitulo" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered pf-perfil-dialog">
+                    <div class="modal-content">
+                        <div class="pf-perfil-cab">
+                            <span class="pf-avatar pf-avatar--grande" aria-hidden="true">@displayName[0]</span>
+                            <h2 class="pf-perfil-nombre" id="pfPerfilTitulo">@perfil.NombreCompleto</h2>
+                            <span class="pf-perfil-rol">@perfil.NombreRol</span>
+                        </div>
+                        <dl class="pf-perfil-datos">
+                            <div>
+                                <dt>Correo</dt>
+                                <dd>@perfil.Correo</dd>
+                            </div>
+                            <div>
+                                <dt>Identificación</dt>
+                                <dd class="pf-num">@(string.IsNullOrWhiteSpace(perfil.Identificacion) ? "Sin registrar" : perfil.Identificacion)</dd>
+                            </div>
+                            <div>
+                                <dt>Bodega</dt>
+                                <dd>
+                                    @if (bodegaPerfil != null)
+                                    {
+                                        @bodegaPerfil.Nombre <span class="pf-cuenta-codigo">@bodegaPerfil.Codigo</span>
+                                    }
+                                    else
+                                    {
+                                        @(esAdmin ? "Todas las bodegas" : "Sin bodega asignada")
+                                    }
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Estado</dt>
+                                <dd>@perfil.Estado</dd>
+                            </div>
+                            <div>
+                                <dt>Miembro desde</dt>
+                                <dd class="pf-num">@perfil.FechaRegistro.ToString("dd/MM/yyyy")</dd>
+                            </div>
+                            @if (perfil.UltimoAcceso is DateTime ultimoAcceso)
+                            {
+                                <div>
+                                    <dt>Último inicio de sesión</dt>
+                                    <dd class="pf-num">@ultimoAcceso.ToString("dd/MM/yyyy HH:mm")</dd>
+                                </div>
+                            }
+                        </dl>
+                        <p class="pf-perfil-nota">@(esAdmin ? "Estos datos se cambian en Sistema · Usuarios y roles." : "Si algún dato no es correcto, pídele a un Administrador que lo corrija.")</p>
+                        <div class="pf-alert-actions">
+                            <button type="button" class="pf-alert-btn pf-alert-btn--secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
 
         <div class="pf-main-wrapper">
             <main class="pf-content">

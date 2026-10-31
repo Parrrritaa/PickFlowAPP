@@ -749,7 +749,81 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     text-overflow: ellipsis;
 }
 
-/* La bodega (nombre largo + código) pasa a dos renglones en vez de cortarse; el correo sí se recorta con "…" */
+/* Diálogo "Ver perfil": mismo marco que los diálogos de confirmación; los datos se leen, no se editan */
+.pf-perfil-dialog {
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 16px;
+}
+
+.pf-perfil-dialog .modal-content {
+    padding: 28px 24px 20px;
+}
+
+.pf-perfil-cab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 18px;
+    text-align: center;
+}
+
+.pf-avatar--grande {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 8px;
+    font-size: 22px;
+}
+
+.pf-perfil-nombre {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--pf-ink);
+}
+
+.pf-perfil-rol {
+    font-size: 13px;
+    color: var(--pf-ink2);
+}
+
+/* Etiqueta arriba y valor abajo: un correo largo pasa de renglón en vez de cortarse */
+.pf-perfil-datos {
+    margin: 0;
+    border-top: 1px solid var(--pf-line);
+}
+
+.pf-perfil-datos > div {
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-perfil-datos dt {
+    margin-bottom: 2px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--pf-ink3);
+}
+
+.pf-perfil-datos dd {
+    margin: 0;
+    font-size: 14px;
+    color: var(--pf-ink);
+    overflow-wrap: anywhere;
+}
+
+.pf-perfil-nota {
+    margin: 14px 0 16px;
+    font-size: 13px;
+    text-align: center;
+    color: var(--pf-ink2);
+}
+
+.pf-perfil-dialog .pf-alert-actions { grid-template-columns: 1fr; }
+
+/* La bodega (nombre largo + código) pasa a dos renglones en vez de cortarse */
 .pf-cuenta-detalle--bodega {
     align-items: flex-start;
     padding-top: 6px;
