@@ -1438,6 +1438,85 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     box-shadow: 0 0 0 3px var(--pf-pill);
 }
 
+/* Pedidos: pestañas de estado sobre la tabla. Subrayadas y no segmentadas, para no confundirse con el
+   selector Pedidos / Divididos de arriba: aquí se filtra la tabla, allá se cambia de vista */
+.pf-pedidos-barra {
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--pf-line);
+}
+
+.pf-estado-tabs {
+    display: flex;
+    gap: 2px;
+    min-width: 0;
+    margin-bottom: -1px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.pf-estado-tabs::-webkit-scrollbar { display: none; }
+
+.pf-estado-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-bottom: 2px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--pf-ink2);
+    text-decoration: none;
+    transition: color var(--pf-duration-fast) var(--pf-ease), border-color var(--pf-duration-fast) var(--pf-ease);
+}
+
+.pf-estado-tabs a:hover { color: var(--pf-ink); }
+
+.pf-estado-tabs a.activo {
+    color: var(--pf-ink);
+    border-bottom-color: var(--pf-accent);
+}
+
+.pf-estado-tabs a:focus-visible {
+    outline: 2px solid var(--pf-accent);
+    outline-offset: -2px;
+    border-radius: 6px;
+}
+
+.pf-estado-tabs__n {
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--pf-ink3);
+}
+
+/* Búsqueda de pedidos, a la derecha del título */
+.pf-pedidos-buscar {
+    position: relative;
+}
+
+.pf-pedidos-buscar > .bi {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    transform: translateY(-50%);
+    color: var(--pf-ink3);
+    pointer-events: none;
+}
+
+.pf-pedidos-buscar .pf-search-input {
+    width: 280px;
+    height: 44px;
+    padding-left: 38px;
+}
+
+/* Celular: la búsqueda pasa debajo del título a todo el ancho; las pestañas se desplazan de lado */
+@media (max-width: 767.98px) {
+    .pf-pedidos-buscar,
+    .pf-pedidos-buscar .pf-search-input { width: 100%; }
+}
+
 /* Filtros integrados en los encabezados de tabla (Pedidos) */
 .th-filtro-btn {
     background: none;

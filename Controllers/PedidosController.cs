@@ -57,12 +57,8 @@ namespace PickingApp.Controllers
                 ? query.Where(p => p.Partes.Any())
                 : query.Where(p => p.PedidoPadreId == null && !p.Partes.Any());
 
-            // Cada filtro que llega desde el formulario de búsqueda agrega un WHERE a la consulta
-            if (!string.IsNullOrEmpty(estado))
-            {
-                query = query.Where(p => p.Estado == estado);
-            }
-
+            // Cada filtro que llega desde el formulario de búsqueda agrega un WHERE a la consulta.
+            // El estado va al final: las pestañas cuentan sus pedidos con todos los demás filtros.
             if (!string.IsNullOrEmpty(prioridad))
             {
                 query = query.Where(p => p.Prioridad == prioridad);
@@ -75,10 +71,12 @@ namespace PickingApp.Controllers
 
             if (!string.IsNullOrWhiteSpace(busqueda))
             {
-                // La intercalación de MySQL ya compara sin distinguir mayúsculas
+                // La intercalación de MySQL ya compara sin distinguir mayúsculas. En los divididos el empleado está en las partes.
                 var b = busqueda.Trim();
                 query = query.Where(p => p.CodigoPedido.Contains(b) ||
-                                         p.Detalles.Any(d => d.NombreProducto.Contains(b) || d.CodigoProducto.Contains(b)));
+                                         p.Detalles.Any(d => d.NombreProducto.Contains(b) || d.CodigoProducto.Contains(b)) ||
+                                         (p.Empleado != null && p.Empleado.NombreCompleto.Contains(b)) ||
+                                         p.Partes.Any(pa => pa.Empleado != null && pa.Empleado.NombreCompleto.Contains(b)));
             }
 
             // empleadoId = -1 filtra los pedidos sin empleado asignado; en los divididos se mira el empleado de sus partes
@@ -118,6 +116,14 @@ namespace PickingApp.Controllers
                     p.Partes.Any(pa => pa.Novedades.Any(n => (!soloSinAtender || !n.Atendida) && (tipo == null || n.TipoNovedad == tipo))));
             }
 
+            var conteoPorEstado = await query.GroupBy(p => p.Estado)
+                .Select(g => new { Estado = g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(g => g.Estado, g => g.Cantidad);
+            if (!string.IsNullOrEmpty(estado))
+            {
+                query = query.Where(p => p.Estado == estado);
+            }
+
             // Resumen de novedades para la franja de arriba, solo de los pedidos de esta pestaña:
             // en Pedidos, los que no se dividieron; en Divididos, las partes y los pedidos originales
             var novedadesVista = verDivididos
@@ -148,6 +154,7 @@ namespace PickingApp.Controllers
                 Bodegas = await _context.Bodegas.DelAlcance(User).OrderBy(b => b.Codigo).ToListAsync(),
                 Empleados = await _context.Empleados.DelAlcance(User).OrderBy(e => e.NombreCompleto).ToListAsync(),
                 FiltroEstado = estado,
+                ConteoPorEstado = conteoPorEstado,
                 FiltroPrioridad = prioridad,
                 FiltroBodegaId = bodegaId,
                 FiltroEmpleadoId = empleadoId,

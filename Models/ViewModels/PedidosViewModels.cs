@@ -12,6 +12,9 @@ namespace PickingApp.Models.ViewModels
         public List<Empleado> Empleados { get; init; } = new();
 
         public string? FiltroEstado { get; init; }
+
+        // Pedidos de cada estado con los demás filtros y la búsqueda: el número de cada pestaña
+        public Dictionary<string, int> ConteoPorEstado { get; init; } = new();
         public string? FiltroPrioridad { get; init; }
         public int? FiltroBodegaId { get; init; }
         public int? FiltroEmpleadoId { get; init; }
