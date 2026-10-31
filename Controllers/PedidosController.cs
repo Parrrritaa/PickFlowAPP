@@ -195,6 +195,10 @@ namespace PickingApp.Controllers
 
             if (pedido == null) return NotFound();
 
+            // Detalle la imprime desde un marco oculto de la misma app. Program.cs pone X-Frame-Options: DENY en todo
+            // (ninguna página se deja mostrar en un marco); esta sí, pero solo dentro de PickFlow, no en otro sitio.
+            Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+
             return View(new PedidoImpresionViewModel
             {
                 Pedido = pedido,

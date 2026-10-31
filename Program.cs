@@ -144,6 +144,7 @@ app.UseHttpsRedirection();
 
 // Cabeceras de seguridad en todas las respuestas: ninguna otra página puede mostrar PickFlow dentro de un marco
 // (evita que la disfracen para engañar clics) y el navegador no adivina tipos de archivo distintos al declarado.
+// Única excepción: la orden de picking (PedidosController.Imprimir) admite marcos de la misma app para imprimirse.
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
