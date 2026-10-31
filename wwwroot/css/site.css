@@ -1438,50 +1438,83 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     box-shadow: 0 0 0 3px var(--pf-pill);
 }
 
-/* Pedidos: pestañas de estado sobre la tabla. Subrayadas y no segmentadas, para no confundirse con el
-   selector Pedidos / Divididos de arriba: aquí se filtra la tabla, allá se cambia de vista */
+/* Pedidos: pestañas de estado sobre la tabla, con la misma píldora de la barra superior (fondo --pf-pill que se
+   desliza, Views/Pedidos/Index.cshtml) y el punto del color de cada estado (pf-estado-punto) */
 .pf-pedidos-barra {
     margin-bottom: 4px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--pf-line);
 }
 
 .pf-estado-tabs {
+    position: relative;
     display: flex;
     gap: 2px;
     min-width: 0;
-    margin-bottom: -1px;
     overflow-x: auto;
     scrollbar-width: none;
 }
 
 .pf-estado-tabs::-webkit-scrollbar { display: none; }
 
+.pf-estado-tabs__pildora {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 11px;
+    background: var(--pf-pill);
+    pointer-events: none;
+}
+
+/* Movimiento en pantalla de una pestaña a otra: transform y ancho, rápido y con la curva de la barra superior */
+.pf-estado-tabs__pildora.pf-animando {
+    transition: transform 260ms var(--pf-ease-sheet), width 260ms var(--pf-ease-sheet);
+}
+
 .pf-estado-tabs a {
+    position: relative;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-height: 44px;
+    gap: 7px;
+    height: 36px;
     padding: 0 12px;
-    border-bottom: 2px solid transparent;
+    border-radius: 11px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
     color: var(--pf-ink2);
     text-decoration: none;
-    transition: color var(--pf-duration-fast) var(--pf-ease), border-color var(--pf-duration-fast) var(--pf-ease);
+    transition: color var(--pf-duration-fast) var(--pf-ease), background-color var(--pf-duration-fast) var(--pf-ease),
+        transform var(--pf-duration-fast) var(--pf-ease-out);
 }
 
-.pf-estado-tabs a:hover { color: var(--pf-ink); }
+@media (hover: hover) and (pointer: fine) {
+    .pf-estado-tabs a:not(.activo):hover {
+        background-color: var(--pf-hover);
+        color: var(--pf-ink);
+    }
+}
+
+/* Respuesta al presionar, igual que en la barra superior */
+.pf-estado-tabs a:active { transform: scale(0.97); }
 
 .pf-estado-tabs a.activo {
     color: var(--pf-ink);
-    border-bottom-color: var(--pf-accent);
+    font-weight: 600;
 }
+
+/* Sin JavaScript la pestaña activa lleva su propio fondo; con la píldora, el fondo es la píldora */
+.pf-estado-tabs:not(.pf-con-pildora) a.activo { background-color: var(--pf-pill); }
 
 .pf-estado-tabs a:focus-visible {
     outline: 2px solid var(--pf-accent);
     outline-offset: -2px;
-    border-radius: 6px;
+}
+
+/* En pantallas táctiles, el alto mínimo para tocar con el dedo */
+@media (pointer: coarse) {
+    .pf-estado-tabs a { height: 44px; }
 }
 
 .pf-estado-tabs__n {

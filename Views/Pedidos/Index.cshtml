@@ -183,7 +183,10 @@
                 @foreach (var (estadoPestana, texto) in pestanas)
                 {
                     var activa = (filtroEstado ?? "") == (estadoPestana ?? "");
-                    <a href="@UrlPestana(estadoPestana)" data-estado="@estadoPestana" class="@(activa ? "activo" : "")" aria-current="@(activa ? "page" : null)">
+                    @* El punto lleva el color del estado, el mismo de la columna Estado (pf-estado-punto) *@
+                    <a href="@UrlPestana(estadoPestana)" data-estado="@estadoPestana"
+                       class="@(activa ? "activo" : "") @(estadoPestana == null ? "" : "pf-estado-punto " + ClaseEstado(estadoPestana))"
+                       aria-current="@(activa ? "page" : null)">
                         @texto <span class="pf-estado-tabs__n">@ConteoPestana(estadoPestana)</span>
                     </a>
                 }
@@ -430,7 +433,40 @@
             var tabla = form.querySelector('table.pf-table');
             var espera, pedido;
 
-            function actualizar(enfocarPestana) {
+            // Píldora de las pestañas, como la de la barra superior: un solo fondo que se desliza hasta la pestaña
+            // activa (transform y ancho, con transición para poder cambiar de pestaña a mitad del recorrido)
+            var pestanas = document.getElementById('pfEstadoTabs');
+            var pildora = document.createElement('span');
+            pildora.className = 'pf-estado-tabs__pildora';
+            pildora.setAttribute('aria-hidden', 'true');
+            pestanas.prepend(pildora);
+            pestanas.classList.add('pf-con-pildora');
+
+            function moverPildora(animar) {
+                var activa = pestanas.querySelector('a.activo');
+                pildora.hidden = !activa;
+                if (!activa) return;
+                pildora.classList.toggle('pf-animando', animar && !pfReducirMovimiento());
+                pildora.style.width = activa.offsetWidth + 'px';
+                pildora.style.height = activa.offsetHeight + 'px';
+                pildora.style.transform = 'translate(' + activa.offsetLeft + 'px, ' + activa.offsetTop + 'px)';
+                // En el celular las pestañas se desplazan de lado: la elegida queda a la vista
+                if (animar) activa.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: pfReducirMovimiento() ? 'auto' : 'smooth' });
+            }
+
+            function marcarActiva(enlace) {
+                pestanas.querySelectorAll('a').forEach(function (a) {
+                    a.classList.toggle('activo', a === enlace);
+                    if (a === enlace) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+                });
+            }
+
+            moverPildora(false);
+            // La fuente llega después del primer pintado y cambia el ancho de las pestañas
+            if (document.fonts) document.fonts.ready.then(function () { moverPildora(false); });
+            window.addEventListener('resize', function () { moverPildora(false); });
+
+            function actualizar() {
                 var url = new URL(form.getAttribute('action'), location.href);
                 new FormData(form).forEach(function (valor, clave) { if (valor !== '') url.searchParams.append(clave, valor); });
                 if (pedido) pedido.abort();
@@ -445,7 +481,14 @@
                         var doc = new DOMParser().parseFromString(html, 'text/html');
                         var tablaNueva = doc.querySelector('#formFiltrosPedidos table.pf-table');
                         if (!tablaNueva) throw new Error();
-                        document.getElementById('pfEstadoTabs').replaceWith(doc.getElementById('pfEstadoTabs'));
+                        // Las pestañas se actualizan en su lugar (enlace y número), así la píldora no salta
+                        var nuevas = doc.querySelectorAll('#pfEstadoTabs a');
+                        pestanas.querySelectorAll('a').forEach(function (a, i) {
+                            if (!nuevas[i]) return;
+                            a.setAttribute('href', nuevas[i].getAttribute('href'));
+                            a.querySelector('.pf-estado-tabs__n').textContent = nuevas[i].querySelector('.pf-estado-tabs__n').textContent;
+                        });
+                        moverPildora(true);
                         document.querySelector('.pf-page-sub').replaceWith(doc.querySelector('.pf-page-sub'));
                         tabla.tBodies[0].replaceWith(tablaNueva.tBodies[0]);
                         // La última columna del encabezado trae "Limpiar filtros" cuando hay alguno
@@ -455,7 +498,6 @@
                         if (nav) nav.remove();
                         if (navNueva) form.after(navNueva);
                         history.replaceState(null, '', url);
-                        if (enfocarPestana) document.querySelector('#pfEstadoTabs a.activo').focus();
                     })
                     .catch(function (e) { if (e.name !== 'AbortError') location.href = url; })
                     .finally(function () { tabla.classList.remove('pf-paginando'); });
@@ -472,13 +514,15 @@
                 actualizar();
             });
 
-            // Las pestañas se cambian por JavaScript (se reemplazan tras cada búsqueda); Ctrl+clic sigue abriendo otra pestaña
-            document.addEventListener('click', function (e) {
-                var enlace = e.target.closest('#pfEstadoTabs a');
+            // Al elegir una pestaña la píldora sale de inmediato, sin esperar al servidor; Ctrl+clic abre otra pestaña
+            pestanas.addEventListener('click', function (e) {
+                var enlace = e.target.closest('a');
                 if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
+                marcarActiva(enlace);
+                moverPildora(true);
                 campoEstado.value = enlace.dataset.estado || '';
-                actualizar(true);
+                actualizar();
             });
         })();
     </script>
