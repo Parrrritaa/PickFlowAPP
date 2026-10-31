@@ -8,6 +8,7 @@
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
     var ocupados = Model.EmpleadosOcupados;
     var rendimientos = Model.Rendimientos;
+    var bodegaElegida = Model.Bodegas.FirstOrDefault(b => b.Id == Model.FiltroBodegaId);
 }
 
 <h1 class="pf-page-title">Gestión de empleados</h1>
@@ -27,6 +28,26 @@
             </a>
         </div>
     </div>
+
+    @if (Model.Bodegas.Count > 1)
+    {
+        @* Solo el Administrador ve varias bodegas: cada pestaña recarga con ?bodegaId (la píldora la pone site.js) *@
+        <div class="pf-estado-barra">
+            <nav class="pf-estado-tabs" aria-label="Bodega de los empleados">
+                <a asp-action="Index" class="@(bodegaElegida == null ? "activo" : "")" aria-current="@(bodegaElegida == null ? "page" : null)">
+                    Todas <span class="pf-estado-tabs__n">@Model.TotalEmpleados</span>
+                </a>
+                @foreach (var b in Model.Bodegas)
+                {
+                    var activa = b.Id == bodegaElegida?.Id;
+                    <a asp-action="Index" asp-route-bodegaId="@b.Id" class="@(activa ? "activo" : "")" aria-current="@(activa ? "page" : null)"
+                       title="@b.Codigo@(b.Activa ? "" : " · inactiva")">
+                        @b.Nombre <span class="pf-estado-tabs__n">@Model.EmpleadosPorBodega.GetValueOrDefault(b.Id)</span>
+                    </a>
+                }
+            </nav>
+        </div>
+    }
 
     <div class="table-responsive">
         <table class="pf-table" id="tablaEmpleados" data-pf-paginar>
@@ -116,7 +137,7 @@
                 else
                 {
                     <tr>
-                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">@(esAdmin ? "No hay empleados registrados." : "Aún no hay empleados en tu bodega.")</td>
+                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">@(bodegaElegida != null ? $"{bodegaElegida.Nombre} no tiene empleados todavía." : esAdmin ? "No hay empleados registrados." : "Aún no hay empleados en tu bodega.")</td>
                     </tr>
                 }
                 <tr class="d-none" data-pf-sin-resultados>

@@ -26,16 +26,35 @@ namespace PickingApp.Controllers
         }
 
         // CU-16: Consultar empleados
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? bodegaId)
         {
             var empleados = await _context.Empleados.DelAlcance(User)
                 .Include(e => e.Bodega)
                 .OrderBy(e => e.NombreCompleto)
                 .ToListAsync();
 
+            // Pestañas por bodega (solo el Administrador ve varias): cuántos empleados tiene cada una, antes de filtrar
+            var total = empleados.Count;
+            var porBodega = empleados.Where(e => e.BodegaId != null).GroupBy(e => e.BodegaId!.Value).ToDictionary(g => g.Key, g => g.Count());
+            var bodegas = User.IsInRole(Roles.Administrador)
+                ? await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync()
+                : new List<Bodega>();
+            if (bodegaId.HasValue && bodegas.Any(b => b.Id == bodegaId.Value))
+            {
+                empleados = empleados.Where(e => e.BodegaId == bodegaId.Value).ToList();
+            }
+            else
+            {
+                bodegaId = null;
+            }
+
             return View(new EmpleadosIndexViewModel
             {
                 Empleados = empleados,
+                Bodegas = bodegas,
+                EmpleadosPorBodega = porBodega,
+                FiltroBodegaId = bodegaId,
+                TotalEmpleados = total,
                 // Un empleado está "Ocupado" si tiene un pedido Asignado o Reasignado
                 EmpleadosOcupados = (await _context.Pedidos
                     .Where(p => p.EmpleadoId != null && PedidoEstados.EnCurso.Contains(p.Estado))

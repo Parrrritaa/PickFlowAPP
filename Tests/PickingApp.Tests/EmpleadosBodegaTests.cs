@@ -124,5 +124,24 @@ namespace PickingApp.Tests
 
             Assert.Contains(controlador.ModelState["Identificacion"]!.Errors, x => x.ErrorMessage.Contains("bodega Norte"));
         }
+
+        [Fact]
+        public async Task ElAdministradorVeLosEmpleadosDeUnaBodegaElegida()
+        {
+            using var e = new Escenario();
+            var norte = new Bodega { Codigo = "BOD-90", Nombre = "Norte" };
+            e.Db.Bodegas.Add(norte);
+            e.Empleado();
+            e.Empleado().Bodega = norte;
+            e.Db.SaveChanges();
+            var admin = Usuario(e, Roles.IdAdministrador, null);
+
+            var vista = (PickingApp.Models.ViewModels.EmpleadosIndexViewModel)((ViewResult)await Como(e, admin).Index(norte.Id)).Model!;
+
+            Assert.Equal(norte.Id, Assert.Single(vista.Empleados).BodegaId);
+            Assert.Equal(2, vista.TotalEmpleados);
+            Assert.Equal(1, vista.EmpleadosPorBodega[norte.Id]);
+            Assert.Equal(norte.Id, vista.FiltroBodegaId);
+        }
     }
 }
