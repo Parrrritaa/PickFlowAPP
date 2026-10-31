@@ -262,6 +262,7 @@ namespace PickingApp.Services
                 var (tipo, descripcion, atencion) = DatosDemostracion.Novedades[_azar.Next(DatosDemostracion.Novedades.Length)];
                 var atendida = p != abierto;
                 var atencionFecha = Minimo(fecha.AddMinutes(_azar.Next(15, 120)), Ahora);
+                var registra = SupervisorDe(p.BodegaId);
 
                 novedades.Add(new NovedadPedido
                 {
@@ -269,7 +270,8 @@ namespace PickingApp.Services
                     TipoNovedad = tipo,
                     Descripcion = descripcion,
                     FechaRegistro = fecha,
-                    RegistradoPor = SupervisorDe(p.BodegaId).NombreCompleto,
+                    RegistradoPor = registra.NombreCompleto,
+                    RegistradoPorId = registra.Id,
                     Atendida = atendida,
                     AtendidaPor = atendida ? Administrador.NombreCompleto : null,
                     FechaAtencion = atendida ? atencionFecha : null,
@@ -277,7 +279,13 @@ namespace PickingApp.Services
                 });
                 NotificarRol(fecha, Roles.IdAdministrador, "Novedad en Pedido", $"Se registró una novedad de tipo '{tipo}' en el pedido {p.CodigoPedido}.",
                     TiposNotificacion.Warning, $"/Pedidos/Detalle/{p.Id}", leida: atendida);
-                Log(fecha, SupervisorDe(p.BodegaId), AccionesLog.RegistrarNovedad, $"Novedad registrada en pedido {p.CodigoPedido}: [{tipo}] {descripcion}");
+                Log(fecha, registra, AccionesLog.RegistrarNovedad, $"Novedad registrada en pedido {p.CodigoPedido}: [{tipo}] {descripcion}");
+                // Igual que PedidosController.AtenderNovedad: quien la registró se entera de cómo se resolvió
+                if (atendida && registra.Id != Administrador.Id)
+                    NotificarUsuario(atencionFecha, registra.Id, "Novedad Atendida",
+                        $"La novedad '{tipo}' del pedido {p.CodigoPedido} fue atendida por el " +
+                        $"{ClaimsPrincipalExtensions.DescribirUsuario(Administrador.NombreCompleto, Administrador.NombreRol)}. Observación: {atencion}",
+                        TiposNotificacion.Success, $"/Pedidos/Detalle/{p.Id}#novedades");
             }
             return novedades;
         }

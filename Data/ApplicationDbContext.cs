@@ -223,6 +223,13 @@ namespace PickingApp.Data
                 .HasForeignKey(s => s.UsuarioRespondeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // SetNull: la novedad es historial del pedido; si se borra quien la registró, queda su nombre en texto
+            modelBuilder.Entity<NovedadPedido>()
+                .HasOne<Usuario>()
+                .WithMany()
+                .HasForeignKey(n => n.RegistradoPorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Cascade: una notificación no tiene sentido sin su destinatario.
             modelBuilder.Entity<Notificacion>()
                 .HasOne(n => n.UsuarioDestino)

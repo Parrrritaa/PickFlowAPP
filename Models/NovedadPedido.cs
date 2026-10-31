@@ -27,6 +27,10 @@ namespace PickingApp.Models
         [StringLength(100)]
         public string RegistradoPor { get; set; } = string.Empty;
 
+        // Cuenta de quien la registró: a ella le llega el aviso cuando la atienden. El nombre de arriba puede
+        // repetirse entre usuarios; este Id no. Null si el usuario ya no existe o no se pudo identificar.
+        public int? RegistradoPorId { get; set; }
+
         public bool Atendida { get; set; } = false;
 
         [StringLength(100)]

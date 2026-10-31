@@ -71,7 +71,11 @@ namespace PickingApp.Controllers
             // hace todos los INSERT en una sola transacción: se guardan todos o ninguno.
             // Las novedades de productos no disponibles van en los pedidos y se insertan en la misma transacción
             var noDisponibles = validacion.PedidosValidados.SelectMany(p => p.Novedades).ToList();
-            noDisponibles.ForEach(n => n.RegistradoPor = User.Identity?.Name ?? "Usuario");
+            noDisponibles.ForEach(n =>
+            {
+                n.RegistradoPor = User.Identity?.Name ?? "Usuario";
+                n.RegistradoPorId = User.IdUsuario();
+            });
             _context.Pedidos.AddRange(validacion.PedidosValidados);
 
             await _context.SaveChangesAsync();

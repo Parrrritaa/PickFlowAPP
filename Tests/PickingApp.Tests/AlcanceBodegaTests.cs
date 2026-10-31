@@ -135,6 +135,24 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public async Task AlAtenderUnaNovedadSeAvisaAQuienLaRegistro()
+        {
+            using var e = new Escenario();
+            var pedido = e.Pedido(PedidoEstados.Pendiente, (e.Ubicacion(Escenario.Mediano), 1));
+            var supervisor = Usuario(e, Roles.IdSupervisor, Principal(e));
+            var admin = Usuario(e, Roles.IdAdministrador, null);
+
+            await Pedidos(e, supervisor).RegistrarNovedad(pedido.Id, TiposNovedad.Faltante, "Faltan 2 unidades");
+            var novedad = e.Db.NovedadesPedido.Single();
+            Assert.Equal(supervisor.Id, novedad.RegistradoPorId);
+
+            await Pedidos(e, admin).AtenderNovedad(novedad.Id, "Se completó con stock de reserva");
+            var aviso = e.Db.Notificaciones.Single(n => n.UsuarioDestinoId == supervisor.Id);
+            Assert.Equal("Novedad Atendida", aviso.Titulo);
+            Assert.Contains("Se completó con stock de reserva", aviso.Mensaje);
+        }
+
+        [Fact]
         public async Task ElDashboardYLosReportesSoloCuentanLaBodegaPropia()
         {
             using var e = new Escenario();

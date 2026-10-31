@@ -364,6 +364,9 @@ namespace PickingApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<int?>("RegistradoPorId")
+                        .HasColumnType("int");
+
                     b.Property<string>("TipoNovedad")
                         .IsRequired()
                         .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Diferencia Cantidad','Otro','No disponible')");
@@ -371,6 +374,8 @@ namespace PickingApp.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PedidoId");
+
+                    b.HasIndex("RegistradoPorId");
 
                     b.ToTable("NovedadesPedido");
                 });
@@ -1016,6 +1021,11 @@ namespace PickingApp.Migrations
                         .HasForeignKey("PedidoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("PickingApp.Models.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("RegistradoPorId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Pedido");
                 });

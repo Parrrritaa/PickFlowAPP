@@ -40,6 +40,7 @@ namespace PickingApp.Controllers
                 Descripcion = descripcion.Trim(),
                 FechaRegistro = DateTime.Now,
                 RegistradoPor = userName,
+                RegistradoPorId = User.IdUsuario(),
                 Atendida = false
             };
 
@@ -86,6 +87,15 @@ namespace PickingApp.Controllers
             novedad.AtendidaPor = userName;
             novedad.FechaAtencion = DateTime.Now;
             novedad.ObservacionesAtencion = observacionesAtencion?.Trim() ?? "Atendida y solventada";
+
+            // Quien la registró se entera de cómo se resolvió (se guarda junto con la atención)
+            if (novedad.RegistradoPorId is int registrante && registrante != User.IdUsuario())
+            {
+                Avisos.AlUsuario(_context, registrante, "Novedad Atendida",
+                    $"La novedad '{novedad.TipoNovedad}' del pedido {novedad.Pedido?.CodigoPedido} fue atendida por el {User.DescripcionParaNotificacion()}. " +
+                    $"Observación: {novedad.ObservacionesAtencion}",
+                    TiposNotificacion.Success, $"/Pedidos/Detalle/{novedad.PedidoId}#novedades");
+            }
 
             await _context.SaveChangesAsync();
 
