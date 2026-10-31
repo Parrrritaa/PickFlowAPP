@@ -164,10 +164,6 @@ namespace PickingApp.Controllers
             {
                 query = query.Where(s => s.TipoSolicitudId == filtros.Tipo.Value);
             }
-            if (!string.IsNullOrEmpty(filtros.Estado))
-            {
-                query = query.Where(s => s.Estado == filtros.Estado);
-            }
             if (esBandeja && filtros.SolicitanteId.HasValue)
             {
                 query = query.Where(s => s.UsuarioSolicitanteId == filtros.SolicitanteId.Value);
@@ -183,8 +179,18 @@ namespace PickingApp.Controllers
                 query = query.Where(s => s.FechaSolicitud < hastaExclusivo);
             }
 
+            // El estado va al final: las pestañas cuentan sus solicitudes con todos los demás filtros
+            var conteoPorEstado = await query.GroupBy(s => s.Estado)
+                .Select(g => new { Estado = g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(g => g.Estado, g => g.Cantidad);
+            if (!string.IsNullOrEmpty(filtros.Estado))
+            {
+                query = query.Where(s => s.Estado == filtros.Estado);
+            }
+
             var modelo = new SolicitudesListaViewModel
             {
+                ConteoPorEstado = conteoPorEstado,
                 // Pendientes primero; dentro de cada grupo, las más recientes
                 Solicitudes = await query
                     .OrderByDescending(s => s.Estado == EstadosSolicitud.Pendiente)

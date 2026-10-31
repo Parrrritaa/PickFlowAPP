@@ -1438,9 +1438,9 @@ html.pf-hoja-abierta .pf-hoja-fondo {
     box-shadow: 0 0 0 3px var(--pf-pill);
 }
 
-/* Pedidos: pestañas de estado sobre la tabla, con la misma píldora de la barra superior (fondo --pf-pill que se
-   desliza, Views/Pedidos/Index.cshtml) y el punto del color de cada estado (pf-estado-punto) */
-.pf-pedidos-barra {
+/* Pestañas de estado sobre la tabla (Pedidos, Solicitudes), con la misma píldora de la barra superior (fondo
+   --pf-pill que se desliza, site.js) y el punto del color de cada estado (pf-estado-punto) */
+.pf-estado-barra {
     margin-bottom: 4px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--pf-line);
@@ -5632,6 +5632,10 @@ select.pf-input:not([multiple]):not([size]) {
 .pf-estado-punto.is-completado { --dot: var(--pf-green-fill); }
 .pf-estado-punto.is-cancelado { --dot: var(--pf-red-fill); }
 .pf-estado-punto.is-dividido { --dot: var(--pf-blue-fill); }
+/* Solicitudes: los mismos colores de su etiqueta de estado (.pf-estado--...) */
+.pf-estado-punto.is-sol-pendiente { --dot: var(--pf-warning-text); }
+.pf-estado-punto.is-sol-aprobada { --dot: var(--pf-green); }
+.pf-estado-punto.is-sol-rechazada { --dot: var(--pf-red); }
 
 /* Botón cuadrado para abrir el registro de una fila */
 .pf-btn-abrir {

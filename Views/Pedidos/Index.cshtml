@@ -178,7 +178,7 @@
         @* La pestaña elegida viaja con los filtros de las columnas y con la búsqueda *@
         <input type="hidden" name="estado" value="@filtroEstado" id="filtroEstado" />
 
-        <div class="pf-pedidos-barra">
+        <div class="pf-estado-barra">
             <nav class="pf-estado-tabs" id="pfEstadoTabs" aria-label="Estado de los pedidos">
                 @foreach (var (estadoPestana, texto) in pestanas)
                 {
@@ -433,38 +433,8 @@
             var tabla = form.querySelector('table.pf-table');
             var espera, pedido;
 
-            // Píldora de las pestañas, como la de la barra superior: un solo fondo que se desliza hasta la pestaña
-            // activa (transform y ancho, con transición para poder cambiar de pestaña a mitad del recorrido)
+            // La píldora de las pestañas la pone site.js (.pf-estado-tabs); aquí solo se cambian sus números
             var pestanas = document.getElementById('pfEstadoTabs');
-            var pildora = document.createElement('span');
-            pildora.className = 'pf-estado-tabs__pildora';
-            pildora.setAttribute('aria-hidden', 'true');
-            pestanas.prepend(pildora);
-            pestanas.classList.add('pf-con-pildora');
-
-            function moverPildora(animar) {
-                var activa = pestanas.querySelector('a.activo');
-                pildora.hidden = !activa;
-                if (!activa) return;
-                pildora.classList.toggle('pf-animando', animar && !pfReducirMovimiento());
-                pildora.style.width = activa.offsetWidth + 'px';
-                pildora.style.height = activa.offsetHeight + 'px';
-                pildora.style.transform = 'translate(' + activa.offsetLeft + 'px, ' + activa.offsetTop + 'px)';
-                // En el celular las pestañas se desplazan de lado: la elegida queda a la vista
-                if (animar) activa.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: pfReducirMovimiento() ? 'auto' : 'smooth' });
-            }
-
-            function marcarActiva(enlace) {
-                pestanas.querySelectorAll('a').forEach(function (a) {
-                    a.classList.toggle('activo', a === enlace);
-                    if (a === enlace) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-                });
-            }
-
-            moverPildora(false);
-            // La fuente llega después del primer pintado y cambia el ancho de las pestañas
-            if (document.fonts) document.fonts.ready.then(function () { moverPildora(false); });
-            window.addEventListener('resize', function () { moverPildora(false); });
 
             function actualizar() {
                 var url = new URL(form.getAttribute('action'), location.href);
@@ -488,7 +458,7 @@
                             a.setAttribute('href', nuevas[i].getAttribute('href'));
                             a.querySelector('.pf-estado-tabs__n').textContent = nuevas[i].querySelector('.pf-estado-tabs__n').textContent;
                         });
-                        moverPildora(true);
+                        pestanas.dispatchEvent(new CustomEvent('pf:pildora')); // los números cambian el ancho
                         document.querySelector('.pf-page-sub').replaceWith(doc.querySelector('.pf-page-sub'));
                         tabla.tBodies[0].replaceWith(tablaNueva.tBodies[0]);
                         // La última columna del encabezado trae "Limpiar filtros" cuando hay alguno
@@ -514,13 +484,11 @@
                 actualizar();
             });
 
-            // Al elegir una pestaña la píldora sale de inmediato, sin esperar al servidor; Ctrl+clic abre otra pestaña
+            // La pestaña se atiende aquí sin recargar (site.js ya mueve la píldora al instante); Ctrl+clic abre otra pestaña
             pestanas.addEventListener('click', function (e) {
                 var enlace = e.target.closest('a');
                 if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
-                marcarActiva(enlace);
-                moverPildora(true);
                 campoEstado.value = enlace.dataset.estado || '';
                 actualizar();
             });

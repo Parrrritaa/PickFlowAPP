@@ -489,6 +489,76 @@ document.addEventListener('click', function (e) {
     });
 })();
 
+// Pestañas de estado sobre una tabla (.pf-estado-tabs: Pedidos, Solicitudes): la píldora de la barra superior,
+// un solo fondo que se desliza hasta la pestaña activa con transform y ancho (transición: se puede cambiar de
+// pestaña a mitad del recorrido). Si la vista atiende el clic sin recargar (preventDefault), solo se mueve; si se
+// navega, la página siguiente la recibe donde quedó y termina el recorrido. La vista que cambie los números de
+// las pestañas lanza 'pf:pildora' sobre el nav para reacomodarla.
+(function () {
+    var CLAVE = 'pf-estado-pildora';
+    document.querySelectorAll('.pf-estado-tabs').forEach(function (nav) {
+        var pildora = document.createElement('span');
+        pildora.className = 'pf-estado-tabs__pildora';
+        pildora.setAttribute('aria-hidden', 'true');
+        nav.prepend(pildora);
+        nav.classList.add('pf-con-pildora');
+
+        function colocar(x, ancho, alto, y, animar) {
+            pildora.classList.toggle('pf-animando', animar && !pfReducirMovimiento());
+            pildora.style.width = ancho + 'px';
+            pildora.style.height = alto + 'px';
+            pildora.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+        }
+
+        function mover(animar) {
+            var activa = nav.querySelector('a.activo');
+            pildora.hidden = !activa;
+            if (!activa) return;
+            colocar(activa.offsetLeft, activa.offsetWidth, activa.offsetHeight, activa.offsetTop, animar);
+            // En el celular las pestañas se desplazan de lado: la elegida queda a la vista
+            if (animar) activa.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: pfReducirMovimiento() ? 'auto' : 'smooth' });
+        }
+
+        // Llegada desde otra pestaña de esta misma lista hace un momento: se parte de donde quedó la píldora
+        var guardada = null;
+        var llegando = false;
+        try { guardada = JSON.parse(sessionStorage.getItem(CLAVE) || 'null'); sessionStorage.removeItem(CLAVE); } catch (e) { }
+        if (guardada && guardada.ruta === location.pathname && Date.now() - guardada.t < 5000 && nav.querySelector('a.activo')) {
+            llegando = true;
+            colocar(guardada.x, guardada.ancho, guardada.alto, guardada.y, false);
+            requestAnimationFrame(function () { requestAnimationFrame(function () { mover(true); llegando = false; }); });
+        } else {
+            mover(false);
+        }
+
+        // La fuente llega después del primer pintado y cambia el ancho de las pestañas. Si la píldora va llegando
+        // (o ya se desliza), se reacomoda animada: colocarla de golpe se comería el recorrido.
+        if (document.fonts) document.fonts.ready.then(function () { mover(llegando || pildora.classList.contains('pf-animando')); });
+        window.addEventListener('resize', function () { mover(false); });
+        nav.addEventListener('pf:pildora', function () { mover(true); });
+
+        // Se escucha en el documento para que el clic de la vista (si lo atiende ella) ya haya ocurrido
+        document.addEventListener('click', function (e) {
+            var enlace = e.target.closest('a');
+            if (!enlace || enlace.parentElement !== nav || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            var anterior = nav.querySelector('a.activo');
+            nav.querySelectorAll('a').forEach(function (a) {
+                a.classList.toggle('activo', a === enlace);
+                if (a === enlace) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+            });
+            mover(true);
+            if (e.defaultPrevented || !anterior) return;
+            // Se navega: la página siguiente arranca la píldora desde la pestaña anterior
+            try {
+                sessionStorage.setItem(CLAVE, JSON.stringify({
+                    ruta: location.pathname, t: Date.now(),
+                    x: anterior.offsetLeft, y: anterior.offsetTop, ancho: anterior.offsetWidth, alto: anterior.offsetHeight
+                }));
+            } catch (err) { }
+        });
+    });
+})();
+
 // Ojito para mostrar/ocultar contraseña: envuelve cada input[type="password"] con un botón de alternar,
 // sin necesidad de tocarlo en cada vista. Corre una sola vez por input (marca data-pf-ojito).
 document.addEventListener('DOMContentLoaded', function () {
