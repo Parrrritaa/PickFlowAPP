@@ -706,8 +706,69 @@ html.pf-hoja-abierta .pf-hoja-fondo {
 }
 
 .pf-cuenta-menu {
-    width: 240px;
+    width: 260px;
     padding: 6px;
+    /* Crece desde el avatar que lo abre (esquina superior derecha), no desde la izquierda como los demás paneles */
+    transform-origin: calc(100% - 20px) top;
+}
+
+/* Correo y bodega de la sesión: datos de solo lectura, más bajos y en gris para no parecer opciones */
+.pf-cuenta-detalles {
+    margin: 0;
+    padding: 2px 0;
+}
+
+.pf-cuenta-detalle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 13px;
+    color: var(--pf-ink2);
+}
+
+.pf-cuenta-detalle dt {
+    display: flex;
+    flex: none;
+    margin: 0;
+}
+
+.pf-cuenta-detalle dt svg {
+    width: 16px;
+    height: 16px;
+    color: var(--pf-ink3);
+}
+
+.pf-cuenta-detalle dd {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* La bodega (nombre largo + código) pasa a dos renglones en vez de cortarse; el correo sí se recorta con "…" */
+.pf-cuenta-detalle--bodega {
+    align-items: flex-start;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.pf-cuenta-detalle--bodega dt { padding-top: 1px; }
+
+.pf-cuenta-detalle--bodega dd {
+    white-space: normal;
+    line-height: 1.35;
+}
+
+.pf-cuenta-codigo {
+    margin-left: 2px;
+    white-space: nowrap;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--pf-ink3);
 }
 
 .pf-cuenta-menu .dropdown-item,

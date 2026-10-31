@@ -1,5 +1,8 @@
 @* Plantilla común de todas las páginas con sesión: barra superior de navegación y mensajes.
    Cada vista se inserta donde está @RenderBody(). *@
+@using Microsoft.EntityFrameworkCore
+@using PickingApp.Services
+@inject PickingApp.Data.ApplicationDbContext Db
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -19,6 +22,13 @@
         var esAdmin = userRole == Roles.Administrador;
         var esSupervisor = userRole == Roles.Supervisor;
         var puedeCargar = esAdmin || esSupervisor;
+
+        // Datos del perfil en el menú de la cuenta. La bodega se lee de la base (no de la cookie) para mostrar
+        // la actual si el Administrador traslada al usuario; el Administrador no tiene bodega: ve todas.
+        var correo = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+        var bodegaPerfil = User.IdBodega() is int idBodegaPerfil
+            ? await Db.Bodegas.Where(b => b.Id == idBodegaPerfil).Select(b => new { b.Nombre, b.Codigo }).FirstOrDefaultAsync()
+            : null;
 
         // Apartado actual para la ruta sobre el título: grupo de la navegación y nombre de la opción
         var enCargarExcel = currentController == "Pedidos" && currentAction == "CargarExcel";
@@ -180,6 +190,30 @@
                                 <span class="pf-cuenta-rol">@userRole</span>
                             </span>
                         </div>
+                        @* Datos de solo lectura: con quién está la sesión y en qué bodega trabaja *@
+                        <dl class="pf-cuenta-detalles">
+                            @if (!string.IsNullOrEmpty(correo))
+                            {
+                                <div class="pf-cuenta-detalle" title="@correo">
+                                    <dt><partial name="_Icono" model='"correo"' /><span class="visually-hidden">Correo</span></dt>
+                                    <dd>@correo</dd>
+                                </div>
+                            }
+                            <div class="pf-cuenta-detalle pf-cuenta-detalle--bodega" title="@(bodegaPerfil != null ? $"{bodegaPerfil.Nombre} ({bodegaPerfil.Codigo})" : null)">
+                                <dt><partial name="_Icono" model='"bodegas"' /><span class="visually-hidden">Bodega</span></dt>
+                                <dd>
+                                    @if (bodegaPerfil != null)
+                                    {
+                                        @bodegaPerfil.Nombre <span class="pf-cuenta-codigo">@bodegaPerfil.Codigo</span>
+                                    }
+                                    else
+                                    {
+                                        @(esAdmin ? "Todas las bodegas" : "Sin bodega asignada")
+                                    }
+                                </dd>
+                            </div>
+                        </dl>
+                        <div class="dropdown-divider"></div>
                         <a class="dropdown-item" asp-controller="Account" asp-action="CambiarContrasena">
                             <partial name="_Icono" model='"llave"' />Cambiar contraseña
                         </a>
