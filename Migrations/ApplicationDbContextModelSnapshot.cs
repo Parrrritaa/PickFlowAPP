@@ -951,6 +951,9 @@ namespace PickingApp.Migrations
                     b.HasIndex("Correo")
                         .IsUnique();
 
+                    b.HasIndex("Identificacion")
+                        .IsUnique();
+
                     b.HasIndex("RolId");
 
                     b.ToTable("Usuarios");

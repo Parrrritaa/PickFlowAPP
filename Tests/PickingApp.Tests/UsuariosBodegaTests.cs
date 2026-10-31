@@ -127,5 +127,32 @@ namespace PickingApp.Tests
             await Como(e, admin).Crear(otroAdmin, "Clave123", "Clave123");
             Assert.Null(e.Db.Usuarios.Single(u => u.Correo == otroAdmin.Correo).BodegaId);
         }
+
+        // Caso real: un auxiliar quedó registrado con la cédula de su supervisor
+        [Fact]
+        public async Task DosUsuariosNoCompartenIdentificacion()
+        {
+            using var e = new Escenario();
+            var norte = new Bodega { Codigo = "BOD-90", Nombre = "Norte" };
+            var supervisor = Usuario(e, Roles.IdSupervisor, norte);
+            var auxiliar = Usuario(e, Roles.IdAuxiliar, norte);
+            supervisor.Identificacion = "1014861690";
+            auxiliar.Identificacion = "555";
+            e.Db.SaveChanges();
+
+            var model = Nuevo(Roles.IdAuxiliar, norte.Id);
+            model.Identificacion = " 1014861690 ";
+            var controlador = Como(e, supervisor);
+            await controlador.Crear(model, "Clave123", "Clave123");
+            Assert.True(controlador.ModelState.ContainsKey("Identificacion"));
+            Assert.False(e.Db.Usuarios.Any(u => u.Correo == model.Correo));
+
+            await Como(e, supervisor).Editar(auxiliar.Id, "Auxiliar", "1014861690", auxiliar.RolId, EstadosUsuario.Activo, norte.Id);
+            Assert.Equal("555", auxiliar.Identificacion);
+
+            // Guardar sin cambiar la propia sí se puede
+            await Como(e, supervisor).Editar(auxiliar.Id, "Auxiliar", "555", auxiliar.RolId, EstadosUsuario.Activo, norte.Id);
+            Assert.Equal("Auxiliar", auxiliar.NombreCompleto);
+        }
     }
 }

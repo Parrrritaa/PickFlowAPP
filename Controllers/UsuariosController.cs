@@ -32,6 +32,19 @@ namespace PickingApp.Controllers
             return _context.Usuarios.Where(u => u.RolId == Roles.IdAuxiliar && u.BodegaId == bodegaId);
         }
 
+        // La identificación es de una sola persona: dos usuarios no pueden compartirla (también la cuida el índice
+        // único de ApplicationDbContext). usuarioId excluye al que se edita. Un usuario y un empleado sí pueden
+        // tenerla igual: es la misma persona con cuenta en el sistema.
+        private async Task<string?> ErrorIdentificacionAsync(string identificacion, int? usuarioId, int? bodegaId)
+        {
+            var registrado = await _context.Usuarios.Where(u => u.Identificacion == identificacion && u.Id != usuarioId)
+                .Select(u => new { u.BodegaId }).FirstOrDefaultAsync();
+            if (registrado == null) return null;
+            return !EsAdministrador && registrado.BodegaId != null && registrado.BodegaId != bodegaId
+                ? "Esa identificación pertenece a un usuario de otra bodega. Si se trasladó a la tuya, pide al Administrador que le cambie la bodega."
+                : "Ya existe un usuario con este número de identificación.";
+        }
+
         // El Administrador no tiene bodega; Supervisor y Auxiliar necesitan una activa
         // (o conservar la que ya tenían, aunque se haya inactivado después).
         private async Task<string?> ErrorBodegaAsync(int rolId, int? bodegaId, int? bodegaActual)
@@ -137,6 +150,10 @@ namespace PickingApp.Controllers
             {
                 ModelState.AddModelError("Identificacion", "El número de identificación es obligatorio.");
             }
+            else if (await ErrorIdentificacionAsync(model.Identificacion, null, model.BodegaId) is string errorIdentificacion)
+            {
+                ModelState.AddModelError("Identificacion", errorIdentificacion);
+            }
 
             if (!ModelState.IsValid)
             {
@@ -203,6 +220,15 @@ namespace PickingApp.Controllers
             {
                 ModelState.AddModelError(string.Empty, errorBodega);
             }
+            identificacion = (identificacion ?? string.Empty).Trim();
+            if (identificacion.Length == 0)
+            {
+                ModelState.AddModelError(string.Empty, "El número de identificación es obligatorio.");
+            }
+            else if (await ErrorIdentificacionAsync(identificacion, id, bodegaId) is string errorIdentificacion)
+            {
+                ModelState.AddModelError(string.Empty, errorIdentificacion);
+            }
             if (!ModelState.IsValid)
             {
                 TempData["ErrorMessage"] = ModelState.PrimerError();
@@ -221,7 +247,7 @@ namespace PickingApp.Controllers
             // La contraseña únicamente puede ser cambiada por el propio usuario (Account/CambiarContrasena)
             // o mediante el flujo de aprobación de CU-41/CU-42. No se acepta aquí bajo ningún parámetro.
             usuario.NombreCompleto = nombreCompleto.Trim();
-            usuario.Identificacion = (identificacion ?? string.Empty).Trim();
+            usuario.Identificacion = identificacion;
             usuario.RolId = rolId;
             usuario.Estado = estado;
             usuario.BodegaId = bodegaId;

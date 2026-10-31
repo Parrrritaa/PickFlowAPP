@@ -66,6 +66,11 @@ namespace PickingApp.Data
                 .HasIndex(u => u.Correo)
                 .IsUnique();
 
+            // Varios NULL sí se permiten (usuarios antiguos sin identificación); dos iguales no
+            modelBuilder.Entity<Usuario>()
+                .HasIndex(u => u.Identificacion)
+                .IsUnique();
+
             modelBuilder.Entity<Empleado>()
                 .HasIndex(e => e.Identificacion)
                 .IsUnique();
