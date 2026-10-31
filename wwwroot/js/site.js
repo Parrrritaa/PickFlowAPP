@@ -196,6 +196,22 @@ document.addEventListener('click', function (e) {
         if (location.href.split('#')[0] !== urlMostrada) location.reload();
     });
 
+    // La página a la vista queda en la URL (?pagina=, ?pagina2= para la segunda tabla de la página): al volver a esta
+    // lista con "Volver", atrás o recargando, se abre en la misma página. Las que pagina el servidor ya la llevan.
+    function parametroPagina(contenedor) {
+        var i = paginados.indexOf(contenedor);
+        return i > 0 ? 'pagina' + (i + 1) : 'pagina';
+    }
+
+    function recordarPagina(contenedor, pagina) {
+        var url = new URL(location.href);
+        if (pagina > 1) url.searchParams.set(parametroPagina(contenedor), pagina);
+        else url.searchParams.delete(parametroPagina(contenedor));
+        if (url.href === location.href) return;
+        history.replaceState(history.state, '', url);
+        urlMostrada = location.href.split('#')[0]; // es la misma página: atrás/adelante no debe recargarla
+    }
+
     // paginaPedida: la que eligió el usuario (o la de una fila destacada); sin ella se conserva la que estaba a la vista
     function paginar(contenedor, paginaPedida) {
         var estado = contenedor._pfPaginacion;
@@ -211,6 +227,7 @@ document.addEventListener('click', function (e) {
         else if (estado.porPagina) estado.pagina = Math.floor((estado.pagina - 1) * estado.porPagina / porPagina) + 1;
         estado.pagina = Math.min(Math.max(1, estado.pagina), paginas);
         estado.porPagina = porPagina;
+        recordarPagina(contenedor, estado.pagina);
         var desde = (estado.pagina - 1) * porPagina;
         items.forEach(function (f, i) { f.hidden = i < desde || i >= desde + porPagina; });
         dibujarBarra(contenedor, estado, paginas, total, desde, porPagina);
@@ -285,7 +302,7 @@ document.addEventListener('click', function (e) {
     paginados.forEach(function (contenedor) {
         // Si la vista resalta una fila recién creada o editada, se abre en su página
         var destacada = filas(contenedor).findIndex(function (f) { return f.classList.contains('pf-row-flash'); });
-        contenedor._pfPaginacion = { pagina: 1 };
+        contenedor._pfPaginacion = { pagina: Number(new URLSearchParams(location.search).get(parametroPagina(contenedor))) || 1 };
         contenedor.addEventListener('pf:repaginar', function (e) {
             paginar(contenedor, e.detail && e.detail.inicio ? 1 : undefined);
         });
@@ -322,6 +339,49 @@ document.addEventListener('click', function (e) {
                 document.cookie = 'pf_filas_' + c.dataset.pfFilasServidor + '=' + porPagina + '; path=/; max-age=31536000; SameSite=Lax';
             });
         }, 150);
+    });
+})();
+
+// "Volver" lleva a la página exacta donde estaba el usuario, con su página de la lista y sus filtros (van en la URL).
+// En sessionStorage (por pestaña) cada página guarda de dónde se llegó a ella y la última URL de cada página visitada:
+//  - [data-pf-volver]: vuelve a la página de origen (p. ej. del pedido a la lista, al Inicio o a las notificaciones).
+//  - [data-pf-volver="ultima"]: el destino es su href (p. ej. "Volver al pedido"), en la última URL que tuvo.
+// Sin datos guardados (pestaña nueva, enlace directo) el enlace conserva su href.
+(function () {
+    function leer(clave) { try { return sessionStorage.getItem(clave); } catch (e) { return null; } }
+    function guardar(clave, valor) { try { sessionStorage.setItem(clave, valor); } catch (e) { } }
+    function quitar(clave) { try { sessionStorage.removeItem(clave); } catch (e) { } }
+    function ruta(url) { return url.split(/[?#]/)[0]; }
+
+    var aqui = location.pathname;
+    var anterior = leer('pf-ultima');
+    var enviado = leer('pf-envio');
+    quitar('pf-envio');
+    if (anterior && ruta(anterior) !== aqui) {
+        var origenDeAnterior = leer('pf-origen:' + ruta(anterior));
+        if (origenDeAnterior && ruta(origenDeAnterior) === aqui) {
+            // Regreso desde una página que se abrió desde esta (p. ej. de Asignar al pedido): se conserva su origen
+        } else if (enviado === ruta(anterior)) {
+            // Se llegó guardando un formulario (p. ej. aprobar una solicitud y pasar a la siguiente): hereda el origen
+            if (origenDeAnterior) guardar('pf-origen:' + aqui, origenDeAnterior); else quitar('pf-origen:' + aqui);
+        } else {
+            guardar('pf-origen:' + aqui, anterior);
+        }
+    }
+
+    document.querySelectorAll('a[data-pf-volver]').forEach(function (a) {
+        var destino = a.dataset.pfVolver === 'ultima'
+            ? leer('pf-visita:' + ruta(a.getAttribute('href')))
+            : leer('pf-origen:' + aqui);
+        if (destino && destino.charAt(0) === '/' && destino.charAt(1) !== '/') a.setAttribute('href', destino);
+    });
+
+    document.addEventListener('submit', function (e) { if (!e.defaultPrevented) guardar('pf-envio', location.pathname); });
+    // Al salir se guarda la URL tal como quedó (página de la lista, filtros y búsqueda que cambian sin recargar)
+    window.addEventListener('pagehide', function () {
+        var url = location.pathname + location.search + location.hash;
+        guardar('pf-ultima', url);
+        guardar('pf-visita:' + location.pathname, url);
     });
 })();
 
