@@ -24,7 +24,6 @@ namespace PickingApp.Services
         private readonly IReadOnlyList<Usuario> _usuarios;
 
         public DateTime Ahora { get; }
-        public Usuario Supervisor { get; }
         public Usuario Administrador { get; }
 
         // Pedidos de la última carga de hoy: quedan pendientes para asignarlos en vivo
@@ -33,15 +32,14 @@ namespace PickingApp.Services
         public List<LogSistema> Logs { get; } = new();
         public List<Notificacion> Notificaciones { get; } = new();
 
-        // usuarios: quienes reciben los avisos dirigidos a un rol
+        // usuarios: quienes reciben los avisos dirigidos a un rol y, por bodega, quién firma el trabajo en el LOG
         public SimulacionDemostracion(DateTime ahora, Random azar, List<Empleado> empleados, int margenInicioMinutos,
-            Usuario supervisor, Usuario administrador, IReadOnlyList<Usuario> usuarios)
+            Usuario administrador, IReadOnlyList<Usuario> usuarios)
         {
             Ahora = ahora;
             _usuarios = usuarios;
             _azar = azar;
             _margen = margenInicioMinutos;
-            Supervisor = supervisor;
             Administrador = administrador;
             // Unos empleados son más rápidos que el estándar y otros más lentos: así el rendimiento de cada uno varía
             _operarios = empleados.Select(e => new Operario { Empleado = e, Factor = 0.8 + _azar.NextDouble() * 0.45 }).ToList();
@@ -62,14 +60,20 @@ namespace PickingApp.Services
                 Detalle = PrefijoLog + detalle
             });
 
+        // Quien trabaja los pedidos de una bodega: su Supervisor; si no tiene, el Administrador (que ve todas)
+        public Usuario SupervisorDe(int? bodegaId) =>
+            _usuarios.FirstOrDefault(u => u.RolId == Roles.IdSupervisor && u.BodegaId != null && u.BodegaId == bodegaId) ?? Administrador;
+
+        // Un Excel con pedidos de varias bodegas solo lo puede cargar el Administrador
         public void LogCarga(DateTime fecha, List<Pedido> lote) =>
-            Log(fecha, Supervisor, AccionesLog.CargaExcelPedidos,
+            Log(fecha, lote.Select(p => p.BodegaId).Distinct().Count() == 1 ? SupervisorDe(lote[0].BodegaId) : Administrador,
+                AccionesLog.CargaExcelPedidos,
                 $"Se procesó el archivo 'Pedidos_{fecha:yyyyMMdd_HHmm}.xlsx' registrando {lote.Count} pedidos ({lote.Sum(p => p.Detalles.Count)} líneas de productos).");
 
-        // Igual que Avisos.AlRolAsync: una copia por cada usuario del rol
-        public void NotificarRol(DateTime fecha, int rolId, string titulo, string mensaje, string tipo, string enlace, bool? leida = null)
+        // Igual que Avisos.AlRolAsync: una copia por cada usuario del rol; fuera del Administrador, solo los de esa bodega
+        public void NotificarRol(DateTime fecha, int rolId, string titulo, string mensaje, string tipo, string enlace, bool? leida = null, int? bodegaId = null)
         {
-            foreach (var usuario in _usuarios.Where(u => u.RolId == rolId))
+            foreach (var usuario in _usuarios.Where(u => u.RolId == rolId && (rolId == Roles.IdAdministrador || (u.BodegaId != null && u.BodegaId == bodegaId))))
                 NotificarUsuario(fecha, usuario.Id, titulo, mensaje, tipo, enlace, leida);
         }
 
@@ -119,10 +123,13 @@ namespace PickingApp.Services
             }
         }
 
-        // Lo toma el empleado que quede libre primero y alcance a terminarlo en su jornada; si ninguno, sigue pendiente
+        // Solo el personal de la bodega del pedido puede tomarlo (regla 0 de PickingEngine)
+        private static bool DeSuBodega(Operario o, Pedido p) => o.Empleado.BodegaId != null && o.Empleado.BodegaId == p.BodegaId;
+
+        // Lo toma el empleado de su bodega que quede libre primero y alcance a terminarlo en su jornada; si ninguno, sigue pendiente
         private void TomarPedido(Pedido pedido, double tiempoEstandar, DateTime dia)
         {
-            foreach (var o in _operarios.Where(o => o.Trabaja).OrderBy(o => o.Libre))
+            foreach (var o in _operarios.Where(o => o.Trabaja && DeSuBodega(o, pedido)).OrderBy(o => o.Libre))
             {
                 var asignacion = Maximo(o.Libre, pedido.FechaCarga.AddMinutes(_azar.Next(5, 20)));
                 if (asignacion > Ahora) return; // todavía no ha pasado (hoy)
@@ -147,7 +154,7 @@ namespace PickingApp.Services
 
                 // Reasignado a otro empleado que esté libre en ese momento
                 var cambio = inicio.AddMinutes(real * (0.3 + _azar.NextDouble() * 0.25));
-                var otro = _operarios.FirstOrDefault(x => x != o && x.Trabaja && x.Libre <= cambio);
+                var otro = _operarios.FirstOrDefault(x => x != o && x.Trabaja && DeSuBodega(x, pedido) && x.Libre <= cambio);
                 if (otro != null && cambio <= Ahora && _azar.NextDouble() < 0.12)
                 {
                     var avance = (cambio - inicio).TotalMinutes / real;
@@ -191,8 +198,9 @@ namespace PickingApp.Services
             {
                 var convertible = enCurso.FirstOrDefault(p => p.Estado == PedidoEstados.Asignado);
                 var p = convertible ?? Pendiente();
-                var destino = convertible != null ? activos.First(o => o.Empleado.Id == convertible.EmpleadoId) : Libres().FirstOrDefault();
-                var anterior = destino == null ? null : activos.FirstOrDefault(o => o != destino);
+                var destino = convertible != null ? activos.First(o => o.Empleado.Id == convertible.EmpleadoId)
+                    : p == null ? null : Libres().FirstOrDefault(o => DeSuBodega(o, p));
+                var anterior = destino == null ? null : activos.FirstOrDefault(o => o != destino && DeSuBodega(o, p!));
                 if (p != null && destino != null && anterior != null)
                 {
                     // El pedido estuvo antes con otro empleado; se reasignó hace un rato al que lo tiene.
@@ -209,7 +217,7 @@ namespace PickingApp.Services
             if (!enCurso.Any(p => p.Estado == PedidoEstados.Asignado))
             {
                 var p = Pendiente();
-                var destino = Libres().FirstOrDefault();
+                var destino = p == null ? null : Libres().FirstOrDefault(o => DeSuBodega(o, p));
                 if (p != null && destino != null)
                 {
                     Asignar(p, destino, Maximo(p.FechaCarga.AddMinutes(3), Ahora.AddMinutes(-_azar.Next(10, 25))), estandar[p.Id]);
@@ -222,7 +230,7 @@ namespace PickingApp.Services
             {
                 var p = trabajo.FirstOrDefault(x => x.Estado == PedidoEstados.Completado && x.TiempoProcesamientoMinutos >= 20);
                 var destino = p == null ? null : activos.First(o => o.Empleado.Id == p.EmpleadoId);
-                var anterior = destino == null ? null : activos.FirstOrDefault(o => o != destino);
+                var anterior = destino == null ? null : activos.FirstOrDefault(o => o != destino && DeSuBodega(o, p!));
                 if (p != null && anterior != null)
                 {
                     var fin = p.FechaFinalizacion!.Value;
@@ -254,6 +262,7 @@ namespace PickingApp.Services
                 var (tipo, descripcion, atencion) = DatosDemostracion.Novedades[_azar.Next(DatosDemostracion.Novedades.Length)];
                 var atendida = p != abierto;
                 var atencionFecha = Minimo(fecha.AddMinutes(_azar.Next(15, 120)), Ahora);
+                var registra = SupervisorDe(p.BodegaId);
 
                 novedades.Add(new NovedadPedido
                 {
@@ -261,7 +270,8 @@ namespace PickingApp.Services
                     TipoNovedad = tipo,
                     Descripcion = descripcion,
                     FechaRegistro = fecha,
-                    RegistradoPor = Supervisor.NombreCompleto,
+                    RegistradoPor = registra.NombreCompleto,
+                    RegistradoPorId = registra.Id,
                     Atendida = atendida,
                     AtendidaPor = atendida ? Administrador.NombreCompleto : null,
                     FechaAtencion = atendida ? atencionFecha : null,
@@ -269,7 +279,13 @@ namespace PickingApp.Services
                 });
                 NotificarRol(fecha, Roles.IdAdministrador, "Novedad en Pedido", $"Se registró una novedad de tipo '{tipo}' en el pedido {p.CodigoPedido}.",
                     TiposNotificacion.Warning, $"/Pedidos/Detalle/{p.Id}", leida: atendida);
-                Log(fecha, Supervisor, AccionesLog.RegistrarNovedad, $"Novedad registrada en pedido {p.CodigoPedido}: [{tipo}] {descripcion}");
+                Log(fecha, registra, AccionesLog.RegistrarNovedad, $"Novedad registrada en pedido {p.CodigoPedido}: [{tipo}] {descripcion}");
+                // Igual que PedidosController.AtenderNovedad: quien la registró se entera de cómo se resolvió
+                if (atendida && registra.Id != Administrador.Id)
+                    NotificarUsuario(atencionFecha, registra.Id, "Novedad Atendida",
+                        $"La novedad '{tipo}' del pedido {p.CodigoPedido} fue atendida por el " +
+                        $"{ClaimsPrincipalExtensions.DescribirUsuario(Administrador.NombreCompleto, Administrador.NombreRol)}. Observación: {atencion}",
+                        TiposNotificacion.Success, $"/Pedidos/Detalle/{p.Id}#novedades");
             }
             return novedades;
         }
@@ -278,7 +294,7 @@ namespace PickingApp.Services
         public void LogAtenciones(List<NovedadPedido> novedades)
         {
             foreach (var n in novedades.Where(n => n.Atendida))
-                Log(n.FechaAtencion!.Value, Administrador, AccionesLog.AtenderNovedad, $"Novedad #{n.Id} del pedido {n.Pedido!.CodigoPedido} marcada como atendida.");
+                Log(n.FechaAtencion!.Value, Administrador, AccionesLog.AtenderNovedad, $"Novedad #{n.Id} del pedido {n.Pedido!.CodigoPedido} marcada como atendida. Observación: {n.ObservacionesAtencion}");
         }
 
         private void ElegirCancelaciones(List<Pedido> trabajo)
@@ -295,8 +311,9 @@ namespace PickingApp.Services
         {
             var estimado = Estimado(tiempoEstandar, o);
             p.Asignar(o.Empleado.Id, momento.AddMinutes(_margen), estimado, tiempoEstandar);
+            p.AsignadoPorId = SupervisorDe(p.BodegaId).Id;
             p.FechaAsignacion = momento;
-            Log(momento, Supervisor, AccionesLog.AsignarPedido,
+            Log(momento, SupervisorDe(p.BodegaId), AccionesLog.AsignarPedido,
                 $"Pedido {p.CodigoPedido} asignado al empleado {o.Empleado.NombreCompleto}. Estimado: {Formato.Duracion(estimado)} (estándar {Formato.Duracion(tiempoEstandar)} × rendimiento {o.Factor:0.00})");
             _logAsignacion[p] = Logs[^1];
         }
@@ -306,8 +323,9 @@ namespace PickingApp.Services
             var anterior = _operarios.First(x => x.Empleado.Id == p.EmpleadoId).Empleado.NombreCompleto;
             var estimado = Estimado(tiempoEstandar, o);
             p.Reasignar(o.Empleado.Id, motivo, momento.AddMinutes(_margen), estimado, tiempoEstandar);
+            p.AsignadoPorId = SupervisorDe(p.BodegaId).Id;
             p.FechaAsignacion = momento;
-            Log(momento, Supervisor, AccionesLog.ReasignarPedido,
+            Log(momento, SupervisorDe(p.BodegaId), AccionesLog.ReasignarPedido,
                 $"Pedido {p.CodigoPedido} reasignado de {anterior} a {o.Empleado.NombreCompleto}. Estimado: {Formato.Duracion(estimado)}. Motivo: {motivo}");
         }
 
@@ -317,7 +335,7 @@ namespace PickingApp.Services
             p.ConfirmacionFisica = true;
             p.FechaFinalizacion = fin;
             p.TiempoProcesamientoMinutos = Pedido.CalcularTiempoProcesamiento(p.FechaInicioProceso!.Value, fin);
-            Log(fin, Supervisor, AccionesLog.CompletarPedido,
+            Log(fin, SupervisorDe(p.BodegaId), AccionesLog.CompletarPedido,
                 $"Pedido {p.CodigoPedido} marcado como completado con entrega física. Tiempo real calculado: {p.TiempoProcesamientoMinutos} min");
         }
 
@@ -327,7 +345,7 @@ namespace PickingApp.Services
             p.Estado = PedidoEstados.Cancelado;
             p.MotivoCancelacion = motivo;
             p.FechaFinalizacion = momento;
-            Log(momento, Supervisor, AccionesLog.CancelarPedido, $"Pedido {p.CodigoPedido} cancelado. Motivo: {motivo}");
+            Log(momento, SupervisorDe(p.BodegaId), AccionesLog.CancelarPedido, $"Pedido {p.CodigoPedido} cancelado. Motivo: {motivo}");
         }
 
         // Minutos reales: el estándar ajustado por el ritmo del empleado, con la variación de cada día

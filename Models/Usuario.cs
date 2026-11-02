@@ -50,6 +50,12 @@ namespace PickingApp.Models
         [NotMapped]
         public string NombreRol => Rol?.Nombre ?? string.Empty;
 
+        // Supervisor y Auxiliar trabajan en una sola bodega; el Administrador no tiene (ve todas).
+        public int? BodegaId { get; set; }
+
+        [ForeignKey("BodegaId")]
+        public virtual Bodega? Bodega { get; set; }
+
         [Required]
         public string Estado { get; set; } = EstadosUsuario.Activo; // Valores en EstadosUsuario
 

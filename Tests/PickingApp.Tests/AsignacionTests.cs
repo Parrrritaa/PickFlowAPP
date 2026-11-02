@@ -27,6 +27,26 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public async Task SoloElPersonalDeLaBodegaDelPedidoLoRecibe()
+        {
+            using var e = new Escenario();
+            var pedido = PedidoPequeno(e);
+            var deOtraBodega = e.Empleado();
+            deOtraBodega.Bodega = new Bodega { Codigo = "BOD-91", Nombre = "Sur" };
+            var sinBodega = e.Empleado();
+            sinBodega.Bodega = null;
+            sinBodega.BodegaId = null;
+            var deLaBodega = e.Empleado();
+            e.Db.SaveChanges();
+
+            var r = await e.Motor().ValidarAsignacionesAsync(pedido.Id, new[] { deOtraBodega.Id, sinBodega.Id, deLaBodega.Id });
+
+            Assert.Equal("De otra bodega", r[deOtraBodega.Id].MotivoCorto);
+            Assert.Contains("no tiene bodega asignada", r[sinBodega.Id].MensajeError);
+            Assert.True(r[deLaBodega.Id].PuedeAsignar);
+        }
+
+        [Fact]
         public async Task UnEmpleadoInactivoNoRecibePedidos()
         {
             using var e = new Escenario();

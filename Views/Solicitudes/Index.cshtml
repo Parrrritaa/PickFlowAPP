@@ -10,6 +10,23 @@
     var activoSolicitante = f.SolicitanteId.HasValue;
     var activoFecha = f.FechaDesde.HasValue || f.FechaHasta.HasValue;
     var activoEstado = !string.IsNullOrEmpty(f.Estado);
+
+    // Pestañas de estado sobre la tabla (la primera, Todas, sin filtro); el punto lleva el color de cada estado
+    var pestanas = new (string? Estado, string Texto)[]
+    {
+        (null, "Todas"), (EstadosSolicitud.Pendiente, "Pendientes"), (EstadosSolicitud.Aprobada, "Aprobadas"), (EstadosSolicitud.Rechazada, "Rechazadas")
+    };
+    int ConteoPestana(string? estado) => estado == null ? Model.ConteoPorEstado.Values.Sum() : Model.ConteoPorEstado.GetValueOrDefault(estado);
+
+    // La URL actual con otro estado: conserva los demás filtros
+    string UrlPestana(string? estado)
+    {
+        var query = new Microsoft.AspNetCore.Http.Extensions.QueryBuilder(Context.Request.Query
+            .Where(q => q.Key is not ("estado" or "Estado" or "pagina") && !string.IsNullOrEmpty(q.Value))
+            .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string>(q.Key, v ?? ""))));
+        if (estado != null) query.Add("estado", estado);
+        return Context.Request.PathBase + Context.Request.Path + query.ToQueryString();
+    }
 }
 
 <h1 class="pf-page-title">Solicitudes</h1>
@@ -52,6 +69,23 @@
 
     @* Los filtros viajan por GET en la URL y llegan a SolicitudesController como FiltrosSolicitudes *@
     <form method="get" asp-action="@accion" id="formFiltrosSolicitudes">
+        @* La pestaña elegida viaja con los filtros de las columnas *@
+        <input type="hidden" name="estado" value="@f.Estado" />
+
+        <div class="pf-estado-barra">
+            <nav class="pf-estado-tabs" aria-label="Estado de las solicitudes">
+                @foreach (var (estadoPestana, texto) in pestanas)
+                {
+                    var activa = (f.Estado ?? "") == (estadoPestana ?? "");
+                    <a href="@UrlPestana(estadoPestana)"
+                       class="@(activa ? "activo" : "") @(estadoPestana == null ? "" : "pf-estado-punto is-sol-" + estadoPestana.ToLowerInvariant())"
+                       aria-current="@(activa ? "page" : null)">
+                        @texto <span class="pf-estado-tabs__n">@ConteoPestana(estadoPestana)</span>
+                    </a>
+                }
+            </nav>
+        </div>
+
         <div class="table-responsive">
             <table class="pf-table" data-pf-paginar>
                 <thead>
@@ -130,22 +164,8 @@
                                 </div>
                             </div>
                         </th>
-                        <th>
-                            <div class="dropdown">
-                                <button type="button" class="th-filtro-btn @(activoEstado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                                    Estado <i class="bi @(activoEstado ? "bi-funnel-fill" : "bi-funnel")"></i>
-                                </button>
-                                <div class="dropdown-menu th-filtro-menu">
-                                    <select name="estado" class="form-select form-select-sm filtro-auto">
-                                        <option value="">Todos</option>
-                                        @foreach (var estado in EstadosSolicitud.Todos)
-                                        {
-                                            <option value="@estado" selected="@(f.Estado == estado)">@estado</option>
-                                        }
-                                    </select>
-                                </div>
-                            </div>
-                        </th>
+                        @* El estado se elige en las pestañas de arriba *@
+                        <th>Estado</th>
                         @if (!Model.EsBandeja)
                         {
                             <th>Respuesta</th>

@@ -26,6 +26,12 @@ namespace PickingApp.Models.ViewModels
 
         // Factor de rendimiento de cada empleado, por Id
         public Dictionary<int, RendimientoEmpleado> Rendimientos { get; init; } = new();
+
+        // Pestañas por bodega (solo el Administrador; vacío para los demás): la elegida y los empleados de cada una
+        public List<Bodega> Bodegas { get; init; } = new();
+        public Dictionary<int, int> EmpleadosPorBodega { get; init; } = new();
+        public int? FiltroBodegaId { get; init; }
+        public int TotalEmpleados { get; init; }
     }
 
     // Views/Empleados/Historial.cshtml: tiempos reales contra estimados de los pedidos que completó un empleado

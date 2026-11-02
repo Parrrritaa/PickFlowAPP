@@ -12,6 +12,9 @@ namespace PickingApp.Models.ViewModels
         public List<Empleado> Empleados { get; init; } = new();
 
         public string? FiltroEstado { get; init; }
+
+        // Pedidos de cada estado con los demás filtros y la búsqueda: el número de cada pestaña
+        public Dictionary<string, int> ConteoPorEstado { get; init; } = new();
         public string? FiltroPrioridad { get; init; }
         public int? FiltroBodegaId { get; init; }
         public int? FiltroEmpleadoId { get; init; }
@@ -28,6 +31,13 @@ namespace PickingApp.Models.ViewModels
         // true: pestaña de pedidos divididos con sus partes
         public bool VerDivididos { get; init; }
         public int DivididosEnCurso { get; init; }
+    }
+
+    // Views/Pedidos/Imprimir.cshtml: la orden de picking que se entrega al empleado
+    public class PedidoImpresionViewModel
+    {
+        public Pedido Pedido { get; init; } = null!;
+        public string CategoriaPredeterminada { get; init; } = "Predeterminada";
     }
 
     // Views/Pedidos/Detalle.cshtml

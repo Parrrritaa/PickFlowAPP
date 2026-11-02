@@ -27,6 +27,13 @@ namespace PickingApp.Models
         [ForeignKey("UsuarioSolicitanteId")]
         public virtual Usuario? UsuarioSolicitante { get; set; }
 
+        // Bodega del solicitante al crearla: la solicitud sigue en esa bodega aunque él se traslade después.
+        // Null en las anteriores a las bodegas del personal (solo las ve el Administrador).
+        public int? BodegaId { get; set; }
+
+        [ForeignKey("BodegaId")]
+        public virtual Bodega? Bodega { get; set; }
+
         [Required]
         public string Estado { get; set; } = EstadosSolicitud.Pendiente; // Valores en EstadosSolicitud
 

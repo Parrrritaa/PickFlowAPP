@@ -17,37 +17,31 @@ namespace PickingApp.Services
         public bool EstructuraValida { get; set; }
         public int FilasConCantidadInvalida { get; set; }
         public int FilasConBodegaNoRegistrada { get; set; }
+        // Filas de una bodega que no es la del Supervisor que carga el archivo
+        public int FilasDeOtraBodega { get; set; }
+        public int FilasConProductoNoRegistrado { get; set; }
         public int FilasConPedidoDuplicado { get; set; }
 
-        // Filas con un problema de producto o ubicación que el usuario resuelve en pantalla (Incidencias):
-        // no son errores del archivo, así que siguen a las verificaciones siguientes.
-        public int FilasConProductoNoRegistrado { get; set; }
-        public int FilasConUbicacionNoRegistrada { get; set; }
-        public int FilasConProductoIncorrecto { get; set; }
+        // Un nombre distinto al registrado no es un error del archivo: el usuario confirma en pantalla (Incidencias)
         public int FilasConNombreDistinto { get; set; }
-
         public List<IncidenciaExcel> Incidencias { get; set; } = new();
 
         // Clave de la incidencia → por qué no se pudo aplicar la decisión enviada
         public Dictionary<string, string> ErroresResolucion { get; set; } = new();
 
-        // Productos y ubicaciones que se crean o modifican al guardar, para la auditoría
-        public List<string> Cambios { get; set; } = new();
+        // Productos que la bodega del pedido no tiene: la línea no entra y el pedido queda con una novedad
+        // "No disponible". No impiden la carga; se muestran como aviso antes de confirmar.
+        public int FilasNoDisponibles { get; set; }
+        public List<string> NoDisponibles { get; set; } = new();
     }
 
     public static class TiposIncidenciaExcel
     {
-        public const string ProductoNoRegistrado = "producto-no-registrado";
-        public const string UbicacionNoRegistrada = "ubicacion-no-registrada";
-        public const string UbicacionVacia = "ubicacion-vacia";
-        public const string ProductoIncorrecto = "producto-incorrecto";
-        public const string UbicacionInactiva = "ubicacion-inactiva";
         // El producto existe, pero el nombre del archivo no es el registrado para ese código
         public const string NombreDistinto = "nombre-distinto";
     }
 
-    // Filas del Excel que comparten un mismo problema de producto o ubicación y se resuelven con una sola decisión.
-    // Un producto no registrado agrupa todas sus filas; los demás casos, las filas del mismo producto y ubicación.
+    // Filas del Excel con el mismo producto y el mismo nombre distinto al registrado; se confirman con una sola decisión.
     public class IncidenciaExcel
     {
         public string Clave { get; set; } = string.Empty;
@@ -58,61 +52,24 @@ namespace PickingApp.Services
         public string CodigoProducto { get; set; } = string.Empty;
         public string NombreProducto { get; set; } = string.Empty;
 
-        // Ubicación escrita en el Excel. Pasillo/Estante/Nivel quedan vacíos si no eran números.
-        public int BodegaId { get; set; }
-        public string Pasillo { get; set; } = string.Empty;
-        public string Estante { get; set; } = string.Empty;
-        public string Nivel { get; set; } = string.Empty;
-        public bool UbicacionExiste { get; set; }
-
-        // "Corregir" deja lista la ubicación del Excel: le asigna el producto si está vacía y la activa si está inactiva.
-        // Modifica una ubicación existente, por eso solo lo hace el Administrador.
-        public string? TextoCorregir { get; set; }
-
-        // Ubicaciones activas del producto donde se pueden recoger estas filas
-        public List<OpcionUbicacionExcel> Ubicaciones { get; set; } = new();
-
         public List<int> Filas { get; set; } = new();
         public List<string> Pedidos { get; set; } = new();
-    }
-
-    public class OpcionUbicacionExcel
-    {
-        public int Id { get; set; }
-        public string Codigo { get; set; } = string.Empty;
-        public int BodegaId { get; set; }
-        public string Bodega { get; set; } = string.Empty;
     }
 
     // Decisión del usuario sobre una incidencia (campos resoluciones[i].* del formulario de CargarExcel)
     public class ResolucionExcel
     {
-        public const string OpcionNueva = "nueva";
-        public const string OpcionCorregir = "corregir";
         public const string OpcionNombreRegistrado = "nombre-registrado";
 
         public string? Clave { get; set; }
-
-        // Id de una ubicación del producto, "nueva" o "corregir" ("nombre-registrado" en un nombre distinto)
         public string? Opcion { get; set; }
-
-        // Ubicación nueva
-        public int? BodegaId { get; set; }
-        public string? Pasillo { get; set; }
-        public string? Estante { get; set; }
-        public string? Nivel { get; set; }
-
-        // Producto no registrado
-        public string? NombreProducto { get; set; }
-        public string? CategoriaProductoId { get; set; }
-        public string? UnidadesPorCaja { get; set; }
     }
 
     // Contrato del servicio de Excel; la implementación está en ExcelService.cs
     public interface IExcelService
     {
         // resoluciones: decisiones sobre las incidencias (vacío en la primera validación).
-        // puedeEditarUbicaciones: permite la opción "corregir" (Administrador).
-        Task<ExcelValidationResult> ValidarArchivoExcelAsync(Stream stream, IReadOnlyList<ResolucionExcel> resoluciones, bool puedeEditarUbicaciones);
+        // bodegaDelUsuario: la del Supervisor, que solo carga pedidos de su bodega; null para el Administrador.
+        Task<ExcelValidationResult> ValidarArchivoExcelAsync(Stream stream, IReadOnlyList<ResolucionExcel> resoluciones, int? bodegaDelUsuario);
     }
 }

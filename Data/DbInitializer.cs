@@ -109,12 +109,18 @@ namespace PickingApp.Data
                     new Ubicacion { BodegaId = bodegaSecundaria.Id, CodigoUbicacion = "PAS01-EST01-NIV01", Pasillo = "1", Estante = "1", Nivel = "1", Activa = true }
                 };
                 await context.Ubicaciones.AddRangeAsync(ubicaciones);
+
+                // El supervisor y el auxiliar de prueba trabajan en la bodega principal
+                await context.Usuarios.Where(u => u.RolId != Roles.IdAdministrador && u.BodegaId == null)
+                    .ForEachAsync(u => u.BodegaId = bodegaPrincipal.Id);
                 await context.SaveChangesAsync();
             }
 
             // 5. Empleados de Prueba con distinta experiencia y turnos (CU-06)
             if (!await context.Empleados.AnyAsync())
             {
+                // Dos en la primera bodega y uno en la última, para probar que cada bodega ve solo a su personal
+                var bodegas = await context.Bodegas.OrderBy(b => b.Id).Select(b => (int?)b.Id).ToListAsync();
                 var empleados = new List<Empleado>
                 {
                     new Empleado
@@ -125,7 +131,8 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddYears(-2), // 24 meses experiencia (> 6 meses)
-                        Activo = true
+                        Activo = true,
+                        BodegaId = bodegas.FirstOrDefault()
                     },
                     new Empleado
                     {
@@ -135,7 +142,8 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-3), // 3 meses experiencia (< 6 meses -> generará advertencia si pedido > 10 ubicaciones)
-                        Activo = true
+                        Activo = true,
+                        BodegaId = bodegas.FirstOrDefault()
                     },
                     new Empleado
                     {
@@ -145,7 +153,8 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(14, 0, 0),
                         HorarioSalida = new TimeSpan(22, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-10), // 10 meses experiencia
-                        Activo = true
+                        Activo = true,
+                        BodegaId = bodegas.LastOrDefault()
                     }
                 };
                 await context.Empleados.AddRangeAsync(empleados);

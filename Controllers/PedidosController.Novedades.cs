@@ -11,7 +11,7 @@ namespace PickingApp.Controllers
     public partial class PedidosController
     {
         // CU-29: Registrar novedad al pedido
-        [Authorize(Roles = Roles.AdministradorOSupervisor)]
+        [Authorize(Roles = Roles.AdministradorSupervisorOAuxiliar)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RegistrarNovedad(int pedidoId, string tipoNovedad,
@@ -28,7 +28,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             var userName = User.Identity?.Name ?? "Usuario";
@@ -40,6 +40,7 @@ namespace PickingApp.Controllers
                 Descripcion = descripcion.Trim(),
                 FechaRegistro = DateTime.Now,
                 RegistradoPor = userName,
+                RegistradoPorId = User.IdUsuario(),
                 Atendida = false
             };
 
@@ -68,7 +69,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> AtenderNovedad(int novedadId,
             [StringLength(500, ErrorMessage = "Las observaciones admiten hasta {1} caracteres.")] string? observacionesAtencion)
         {
-            var novedad = await _context.NovedadesPedido
+            var novedad = await _context.NovedadesPedido.DelAlcance(User)
                 .Include(n => n.Pedido)
                 .FirstOrDefaultAsync(n => n.Id == novedadId);
 
@@ -87,10 +88,19 @@ namespace PickingApp.Controllers
             novedad.FechaAtencion = DateTime.Now;
             novedad.ObservacionesAtencion = observacionesAtencion?.Trim() ?? "Atendida y solventada";
 
+            // Quien la registró se entera de cómo se resolvió (se guarda junto con la atención)
+            if (novedad.RegistradoPorId is int registrante && registrante != User.IdUsuario())
+            {
+                Avisos.AlUsuario(_context, registrante, "Novedad Atendida",
+                    $"La novedad '{novedad.TipoNovedad}' del pedido {novedad.Pedido?.CodigoPedido} fue atendida por el {User.DescripcionParaNotificacion()}. " +
+                    $"Observación: {novedad.ObservacionesAtencion}",
+                    TiposNotificacion.Success, $"/Pedidos/Detalle/{novedad.PedidoId}#novedades");
+            }
+
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync(AccionesLog.AtenderNovedad, "Pedidos", 
-                $"Novedad #{novedad.Id} del pedido {novedad.Pedido?.CodigoPedido} marcada como atendida.");
+                $"Novedad #{novedad.Id} del pedido {novedad.Pedido?.CodigoPedido} marcada como atendida. Observación: {novedad.ObservacionesAtencion}");
 
             TempData["SuccessMessage"] = "La novedad ha sido marcada como atendida.";
             return RedirectToAction(nameof(Detalle), new { id = novedad.PedidoId });

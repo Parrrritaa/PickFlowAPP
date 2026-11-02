@@ -39,7 +39,8 @@ namespace PickingApp.ViewComponents
                     await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente),
 
                 "solicitudes" when userRole == Roles.Supervisor =>
-                    await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor),
+                    await _context.Solicitudes.DelAlcance(UserClaimsPrincipal)
+                        .CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor),
 
                 _ => 0
             };

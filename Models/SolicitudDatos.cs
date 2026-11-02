@@ -81,6 +81,8 @@
         public TimeSpan HorarioEntrada { get; set; }
         public TimeSpan HorarioSalida { get; set; }
         public DateTime FechaIngreso { get; set; }
+        // Bodega de quien solicitó el registro; null en solicitudes anteriores a las bodegas del personal
+        public int? BodegaId { get; set; }
 
         public static DatosEmpleadoSolicitud Desde(Empleado empleado) => new()
         {
@@ -90,7 +92,8 @@
             Correo = empleado.Correo,
             HorarioEntrada = empleado.HorarioEntrada,
             HorarioSalida = empleado.HorarioSalida,
-            FechaIngreso = empleado.FechaIngreso
+            FechaIngreso = empleado.FechaIngreso,
+            BodegaId = empleado.BodegaId
         };
     }
 
