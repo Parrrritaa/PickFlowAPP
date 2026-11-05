@@ -114,6 +114,70 @@ namespace PickingApp.Controllers
             return IrARevisar(primera.Value, cadena: true, tipo);
         }
 
+        // El Supervisor pide trasladar a un empleado o auxiliar de su bodega; lo aprueba el Administrador
+        [Authorize(Roles = Roles.Supervisor)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SolicitarTraslado(bool esEmpleado, int id, int? bodegaDestinoId, string? motivo)
+        {
+            var origenId = User.BodegaVisible()!.Value;
+            string nombre;
+            string? identificacion;
+            Solicitud? pendiente;
+            string? pedidoEnCurso = null;
+
+            if (esEmpleado)
+            {
+                var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(e => e.Id == id);
+                if (empleado == null) return NotFound();
+                (nombre, identificacion) = (empleado.NombreCompleto, empleado.Identificacion);
+                pendiente = await SolicitudesPendientes.DeEmpleadoAsync(_context, id);
+                pedidoEnCurso = await FlujoSolicitudes.PedidoEnCursoAsync(_context, id);
+            }
+            else
+            {
+                var auxiliar = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id && u.RolId == Roles.IdAuxiliar && u.BodegaId == origenId);
+                if (auxiliar == null) return NotFound();
+                (nombre, identificacion) = (auxiliar.NombreCompleto, auxiliar.Identificacion);
+                pendiente = await SolicitudesPendientes.DeTrasladoDeUsuarioAsync(_context, id);
+            }
+
+            motivo = (motivo ?? string.Empty).Trim();
+            var origen = await _context.Bodegas.FindAsync(origenId);
+            var destino = await _context.Bodegas.FirstOrDefaultAsync(b => b.Id == bodegaDestinoId && b.Activa && b.Id != origenId);
+            var volver = RedirectToAction("Index", esEmpleado ? "Empleados" : "Usuarios");
+
+            var error = destino == null ? "Elige una bodega activa distinta a la tuya."
+                : motivo.Length == 0 ? "Debe indicar el motivo del traslado."
+                : pendiente != null ? SolicitudesPendientes.Mensaje(pendiente, $"'{nombre}'")
+                : pedidoEnCurso != null ? $"No se puede solicitar el traslado de '{nombre}' porque tiene el pedido {pedidoEnCurso} en curso. Reasigne, complete o cancele el pedido primero."
+                : null;
+            if (error != null)
+            {
+                TempData["ErrorMessage"] = error;
+                return volver;
+            }
+
+            await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.Traslado, new SolicitudTraslado
+            {
+                EsEmpleado = esEmpleado,
+                PersonaId = id,
+                NombreCompleto = nombre,
+                Identificacion = identificacion,
+                BodegaOrigenId = origenId,
+                BodegaOrigen = origen!.Nombre,
+                BodegaDestinoId = destino!.Id,
+                BodegaDestino = destino.Nombre,
+                Motivo = motivo
+            }, "Solicitud de Traslado", $"trasladar a {nombre} a la bodega {destino.Nombre}", TiposNotificacion.Info);
+
+            await _auditService.RegistrarAsync(AccionesLog.SolicitudTraslado, "Solicitudes",
+                $"Solicitud de traslado de {nombre} de {origen.Nombre} a {destino.Nombre}. Motivo: {motivo}");
+
+            TempData["SuccessMessage"] = $"Se ha generado la solicitud para trasladar a '{nombre}' a {destino.Nombre}. Requiere aprobación del Administrador.";
+            return volver;
+        }
+
         // Bandeja de aprobación para Administrador y Supervisor
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         public Task<IActionResult> Index(FiltrosSolicitudes filtros) => ListarAsync(esBandeja: true, filtros);
@@ -373,6 +437,22 @@ namespace PickingApp.Controllers
                             : await _context.DetallesPedido.AnyAsync(d => d.UbicacionId == ubicacion.Id)
                                 ? "La ubicación tiene pedidos asociados: no se puede eliminar. Rechace la solicitud."
                                 : null;
+                    }
+                    break;
+                }
+                case TiposSolicitud.Traslado:
+                {
+                    var traslado = solicitud.LeerDatos<SolicitudTraslado>();
+                    modelo.TituloDatos = traslado.EsEmpleado ? "Empleado a trasladar" : "Auxiliar a trasladar";
+                    modelo.Datos.Add(("Nombre completo", traslado.NombreCompleto));
+                    modelo.Datos.Add(("Número de documento", traslado.Identificacion ?? "Sin registrar"));
+                    modelo.Datos.Add(("Bodega de origen", traslado.BodegaOrigen));
+                    modelo.Datos.Add(("Bodega de destino", traslado.BodegaDestino));
+                    modelo.Motivo = traslado.Motivo;
+
+                    if (pendiente && await FlujoSolicitudes.ImpedimentoTrasladoAsync(_context, traslado) is string impedimento)
+                    {
+                        modelo.Aviso = $"No se puede aprobar: {impedimento}";
                     }
                     break;
                 }

@@ -4,6 +4,7 @@
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var esAdmin = userRole == Roles.Administrador;
     var esAuxiliar = userRole == Roles.Auxiliar;
+    var esSupervisor = userRole == Roles.Supervisor;
     // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
     var ocupados = Model.EmpleadosOcupados;
@@ -65,7 +66,7 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model.Empleados.Any())
+                @if (Model.Empleados.Any() || Model.Trasladados.Any())
                 {
                     @foreach (var emp in Model.Empleados)
                     {
@@ -129,8 +130,41 @@
                                             Reiniciar rendimiento
                                         </button>
                                     }
+                                    @if (esSupervisor)
+                                    {
+                                        <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                                data-bs-toggle="modal" data-bs-target="#modalTraslado"
+                                                data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
+                                            Solicitar traslado
+                                        </button>
+                                    }
                                 </div>
                             </td>
+                        </tr>
+                    }
+                    @* Ya no trabajan en esta bodega: solo se consulta lo que hicieron aquí *@
+                    @foreach (var salida in Model.Trasladados)
+                    {
+                        var emp = salida.Empleado!;
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@emp.NombreCompleto</div>
+                                @if (!esAuxiliar)
+                                {
+                                    <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
+                                        Ver historial<span class="visually-hidden"> de @emp.NombreCompleto</span>
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
+                                }
+                            </td>
+                            <td>Inactivo · Trasladado a @salida.BodegaDestino!.Nombre el @salida.Fecha.ToString("dd/MM/yyyy")</td>
+                            @if (!esAuxiliar)
+                            {
+                                <td>-</td>
+                                <td>-</td>
+                            }
+                            <td>-</td>
+                            <td class="text-center">-</td>
                         </tr>
                     }
                 }
@@ -176,6 +210,11 @@
         </div>
     </div>
 </div>
+
+@if (esSupervisor)
+{
+    <partial name="_ModalTraslado" model="true" />
+}
 
 @if (esAdmin)
 {

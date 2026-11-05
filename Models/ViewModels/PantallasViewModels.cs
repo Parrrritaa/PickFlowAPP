@@ -20,6 +20,7 @@ namespace PickingApp.Models.ViewModels
     public class EmpleadosIndexViewModel
     {
         public List<Empleado> Empleados { get; init; } = new();
+        public List<TrasladoPersonal> Trasladados { get; init; } = new();
 
         // Ids de los empleados con un pedido Asignado o Reasignado
         public HashSet<int> EmpleadosOcupados { get; init; } = new();
@@ -38,6 +39,10 @@ namespace PickingApp.Models.ViewModels
     public class EmpleadoHistorialViewModel
     {
         public Empleado Empleado { get; init; } = null!;
+        public List<PickingApp.Services.PeriodoBodega> Periodos { get; init; } = new();
+
+        // Si dejó la bodega de quien consulta: su salida. En esa bodega se muestra como trasladado.
+        public TrasladoPersonal? SalidaDeEstaBodega { get; init; }
         public bool Ocupado { get; init; }
         public RendimientoEmpleado Rendimiento { get; init; } = null!;
         public TendenciaRendimiento Tendencia { get; init; } = null!;

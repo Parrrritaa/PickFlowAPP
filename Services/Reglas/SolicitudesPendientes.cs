@@ -11,10 +11,19 @@ namespace PickingApp.Services
     {
         public static async Task<Solicitud?> DeEmpleadoAsync(ApplicationDbContext context, int empleadoId)
         {
-            var pendientes = await PendientesAsync(context, TiposSolicitud.EdicionEmpleado, TiposSolicitud.InactivacionEmpleado);
-            return pendientes.FirstOrDefault(s => s.TipoSolicitudId == TiposSolicitud.EdicionEmpleado
-                ? s.LeerDatos<SolicitudEdicionEmpleado>().NuevosDatos.Id == empleadoId
-                : s.LeerDatos<SolicitudInactivacionEmpleado>().EmpleadoId == empleadoId);
+            var pendientes = await PendientesAsync(context, TiposSolicitud.EdicionEmpleado, TiposSolicitud.InactivacionEmpleado, TiposSolicitud.Traslado);
+            return pendientes.FirstOrDefault(s => s.TipoSolicitudId switch
+            {
+                TiposSolicitud.EdicionEmpleado => s.LeerDatos<SolicitudEdicionEmpleado>().NuevosDatos.Id == empleadoId,
+                TiposSolicitud.InactivacionEmpleado => s.LeerDatos<SolicitudInactivacionEmpleado>().EmpleadoId == empleadoId,
+                _ => s.LeerDatos<SolicitudTraslado>() is { EsEmpleado: true } traslado && traslado.PersonaId == empleadoId
+            });
+        }
+
+        public static async Task<Solicitud?> DeTrasladoDeUsuarioAsync(ApplicationDbContext context, int usuarioId)
+        {
+            var pendientes = await PendientesAsync(context, TiposSolicitud.Traslado);
+            return pendientes.FirstOrDefault(s => s.LeerDatos<SolicitudTraslado>() is { EsEmpleado: false } traslado && traslado.PersonaId == usuarioId);
         }
 
         public static async Task<Solicitud?> DeRegistroAsync(ApplicationDbContext context, string identificacion)

@@ -24,6 +24,10 @@ namespace PickingApp.Services
         public static IQueryable<Empleado> DelAlcance(this IQueryable<Empleado> q, ClaimsPrincipal user) =>
             user.BodegaVisible() is int b ? q.Where(x => x.BodegaId == b) : q;
 
+        // Solo para consultar su historial: incluye a quienes dejaron la bodega por un traslado
+        public static IQueryable<Empleado> ConPasoPorBodega(this IQueryable<Empleado> q, ClaimsPrincipal user) =>
+            user.BodegaVisible() is int b ? q.Where(x => x.BodegaId == b || x.Traslados.Any(t => t.BodegaOrigenId == b)) : q;
+
         public static IQueryable<NovedadPedido> DelAlcance(this IQueryable<NovedadPedido> q, ClaimsPrincipal user) =>
             user.BodegaVisible() is int b ? q.Where(x => x.Pedido!.BodegaId == b) : q;
 

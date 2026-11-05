@@ -15,10 +15,11 @@ namespace PickingApp.ViewComponents
             _context = context;
         }
 
-        public async Task<IViewComponentResult> InvokeAsync(int? seleccionada)
+        // excluida: la bodega propia, al pedir un traslado a otra
+        public async Task<IViewComponentResult> InvokeAsync(int? seleccionada, int? excluida = null)
         {
             var bodegas = await _context.Bodegas.AsNoTracking()
-                .Where(b => b.Activa || b.Id == seleccionada)
+                .Where(b => (b.Activa || b.Id == seleccionada) && b.Id != excluida)
                 .OrderBy(b => b.Nombre)
                 .ToListAsync();
             return View((bodegas, seleccionada));

@@ -5,6 +5,7 @@
     ViewData["Title"] = esAdmin ? "Editar usuario" : "Editar auxiliar";
     // El propio rol y estado no se cambian aquí (UsuariosController.Editar lo rechaza)
     var esUnoMismo = Model.Id == User.IdUsuario();
+    var periodos = ViewData["Periodos"] as List<PeriodoBodega> ?? new();
 }
 
 <h1 class="pf-page-title">@ViewData["Title"]</h1>
@@ -90,4 +91,8 @@
             </button>
         </div>
     </form>
+</div>
+
+<div class="mt-4">
+    <partial name="_PasoPorBodegas" model="periodos" />
 </div>

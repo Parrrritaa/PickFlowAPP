@@ -83,7 +83,13 @@ namespace PickingApp.Models
             Nueva(18, TiposSolicitud.EliminacionUbicacion, DecisionesSolicitud.Rechazar, "Ubicación en uso"),
             Nueva(19, TiposSolicitud.EliminacionUbicacion, DecisionesSolicitud.Rechazar, "Tiene producto asignado"),
             Nueva(20, TiposSolicitud.EliminacionUbicacion, DecisionesSolicitud.Rechazar, "Se recomienda inactivar en vez de eliminar"),
-            Nueva(21, TiposSolicitud.EliminacionUbicacion, DecisionesSolicitud.Aprobar, "Eliminación verificada")
+            Nueva(21, TiposSolicitud.EliminacionUbicacion, DecisionesSolicitud.Aprobar, "Eliminación verificada"),
+
+            // Id altos: las bases en uso pueden tener ya observaciones agregadas por el Administrador con los siguientes
+            Nueva(1001, TiposSolicitud.Traslado, DecisionesSolicitud.Rechazar, "Motivo insuficiente"),
+            Nueva(1002, TiposSolicitud.Traslado, DecisionesSolicitud.Rechazar, "La bodega de destino no requiere personal"),
+            Nueva(1003, TiposSolicitud.Traslado, DecisionesSolicitud.Rechazar, "Se necesita en la bodega actual"),
+            Nueva(1004, TiposSolicitud.Traslado, DecisionesSolicitud.Aprobar, "Traslado autorizado")
         };
 
         private static ObservacionSolicitud Nueva(int id, int tipo, string decision, string texto) =>
