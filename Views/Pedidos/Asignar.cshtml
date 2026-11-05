@@ -103,7 +103,14 @@
                 else
                 {
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">No hay empleados registrados.</td>
+                        @* Solo se listan los empleados activos de la bodega del pedido (PedidosController.Asignar) *@
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No hay empleados activos en la bodega de este pedido.
+                            @if (User.IsInRole(Roles.Administrador))
+                            {
+                                <a asp-controller="Empleados" asp-action="Index">Asignar bodega a los empleados</a>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -126,7 +133,7 @@
     }
 
     <div class="mt-4 pt-2">
-        <a asp-action="Detalle" asp-route-id="@pedido?.Id" class="btn-pf-gray">
+        <a asp-action="Detalle" asp-route-id="@pedido?.Id" class="btn-pf-gray" data-pf-volver="ultima">
             Volver al pedido
         </a>
     </div>

@@ -40,7 +40,7 @@ namespace PickingApp.Controllers
 
             // Include trae también los datos relacionados (JOIN), así la vista puede mostrar el nombre de la bodega
             // o del empleado. La consulta aún no se ejecuta: se van sumando filtros y se lanza en ToListAsync
-            var query = _context.Pedidos
+            var query = _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
                 .Include(p => p.Partes)
@@ -57,12 +57,8 @@ namespace PickingApp.Controllers
                 ? query.Where(p => p.Partes.Any())
                 : query.Where(p => p.PedidoPadreId == null && !p.Partes.Any());
 
-            // Cada filtro que llega desde el formulario de búsqueda agrega un WHERE a la consulta
-            if (!string.IsNullOrEmpty(estado))
-            {
-                query = query.Where(p => p.Estado == estado);
-            }
-
+            // Cada filtro que llega desde el formulario de búsqueda agrega un WHERE a la consulta.
+            // El estado va al final: las pestañas cuentan sus pedidos con todos los demás filtros.
             if (!string.IsNullOrEmpty(prioridad))
             {
                 query = query.Where(p => p.Prioridad == prioridad);
@@ -75,10 +71,12 @@ namespace PickingApp.Controllers
 
             if (!string.IsNullOrWhiteSpace(busqueda))
             {
-                // La intercalación de MySQL ya compara sin distinguir mayúsculas
+                // La intercalación de MySQL ya compara sin distinguir mayúsculas. En los divididos el empleado está en las partes.
                 var b = busqueda.Trim();
                 query = query.Where(p => p.CodigoPedido.Contains(b) ||
-                                         p.Detalles.Any(d => d.NombreProducto.Contains(b) || d.CodigoProducto.Contains(b)));
+                                         p.Detalles.Any(d => d.NombreProducto.Contains(b) || d.CodigoProducto.Contains(b)) ||
+                                         (p.Empleado != null && p.Empleado.NombreCompleto.Contains(b)) ||
+                                         p.Partes.Any(pa => pa.Empleado != null && pa.Empleado.NombreCompleto.Contains(b)));
             }
 
             // empleadoId = -1 filtra los pedidos sin empleado asignado; en los divididos se mira el empleado de sus partes
@@ -118,11 +116,19 @@ namespace PickingApp.Controllers
                     p.Partes.Any(pa => pa.Novedades.Any(n => (!soloSinAtender || !n.Atendida) && (tipo == null || n.TipoNovedad == tipo))));
             }
 
+            var conteoPorEstado = await query.GroupBy(p => p.Estado)
+                .Select(g => new { Estado = g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(g => g.Estado, g => g.Cantidad);
+            if (!string.IsNullOrEmpty(estado))
+            {
+                query = query.Where(p => p.Estado == estado);
+            }
+
             // Resumen de novedades para la franja de arriba, solo de los pedidos de esta pestaña:
             // en Pedidos, los que no se dividieron; en Divididos, las partes y los pedidos originales
             var novedadesVista = verDivididos
-                ? _context.NovedadesPedido.Where(n => n.Pedido!.PedidoPadreId != null || n.Pedido.Partes.Any())
-                : _context.NovedadesPedido.Where(n => n.Pedido!.PedidoPadreId == null && !n.Pedido.Partes.Any());
+                ? _context.NovedadesPedido.DelAlcance(User).Where(n => n.Pedido!.PedidoPadreId != null || n.Pedido.Partes.Any())
+                : _context.NovedadesPedido.DelAlcance(User).Where(n => n.Pedido!.PedidoPadreId == null && !n.Pedido.Partes.Any());
             var sinAtender = novedadesVista.Where(n => !n.Atendida);
 
             // Solo se trae la página pedida: primero se cuenta el total con los filtros y luego Skip/Take.
@@ -145,9 +151,10 @@ namespace PickingApp.Controllers
                 Pedidos = pedidos,
                 Paginacion = paginacion,
                 // Se listan todas las bodegas (no solo las activas) para poder consultar pedidos históricos de bodegas desactivadas
-                Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync(),
-                Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync(),
+                Bodegas = await _context.Bodegas.DelAlcance(User).OrderBy(b => b.Codigo).ToListAsync(),
+                Empleados = await _context.Empleados.DelAlcance(User).OrderBy(e => e.NombreCompleto).ToListAsync(),
                 FiltroEstado = estado,
+                ConteoPorEstado = conteoPorEstado,
                 FiltroPrioridad = prioridad,
                 FiltroBodegaId = bodegaId,
                 FiltroEmpleadoId = empleadoId,
@@ -164,14 +171,46 @@ namespace PickingApp.Controllers
                 PedidosConNovedadSinAtender = await sinAtender.Select(n => n.Pedido!.PedidoPadreId ?? n.PedidoId).Distinct().CountAsync(),
                 HayNovedadesAtendidas = await novedadesVista.AnyAsync(n => n.Atendida),
                 VerDivididos = verDivididos,
-                DivididosEnCurso = await _context.Pedidos.CountAsync(p => p.Estado == PedidoEstados.Dividido)
+                DivididosEnCurso = await _context.Pedidos.DelAlcance(User).CountAsync(p => p.Estado == PedidoEstados.Dividido)
+            });
+        }
+
+        // Orden de picking impresa para el empleado: hoja vertical en blanco y negro con todo el pedido y su asignación
+        // (Views/Pedidos/Imprimir.cshtml, sin la plantilla de la app). Detalle la abre sola tras asignar o reasignar.
+        public async Task<IActionResult> Imprimir(int id)
+        {
+            var pedido = await _context.Pedidos.DelAlcance(User)
+                .Include(p => p.Bodega)
+                .Include(p => p.Empleado)
+                .Include(p => p.AsignadoPor).ThenInclude(u => u!.Rol)
+                .Include(p => p.Detalles)
+                    .ThenInclude(d => d.Ubicacion)
+                        .ThenInclude(u => u!.Producto)
+                            .ThenInclude(pr => pr!.Categoria)
+                .Include(p => p.Novedades)
+                .Include(p => p.PedidoPadre)
+                    .ThenInclude(pp => pp!.Partes)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedido == null) return NotFound();
+
+            // Detalle la imprime desde un marco oculto de la misma app. Program.cs pone X-Frame-Options: DENY en todo
+            // (ninguna página se deja mostrar en un marco); esta sí, pero solo dentro de PickFlow, no en otro sitio.
+            Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+
+            return View(new PedidoImpresionViewModel
+            {
+                Pedido = pedido,
+                CategoriaPredeterminada = await _context.CategoriasProducto
+                    .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "Predeterminada"
             });
         }
 
         // Detalle de Pedido (con ruta de picking de ubicaciones, productos, novedades)
         public async Task<IActionResult> Detalle(int id)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
                 .Include(p => p.Detalles)
@@ -216,7 +255,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             if (!pedido.EstaEnCurso)
@@ -264,7 +303,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             if (pedido.Estado == PedidoEstados.Cancelado)
@@ -326,7 +365,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             var prioridadAnterior = pedido.Prioridad;

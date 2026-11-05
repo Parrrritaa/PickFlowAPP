@@ -196,6 +196,9 @@ namespace PickingApp.Migrations
                     b.Property<bool>("Activo")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<int?>("BodegaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Correo")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
@@ -223,6 +226,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("varchar(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BodegaId");
 
                     b.HasIndex("Identificacion")
                         .IsUnique();
@@ -359,13 +364,18 @@ namespace PickingApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<int?>("RegistradoPorId")
+                        .HasColumnType("int");
+
                     b.Property<string>("TipoNovedad")
                         .IsRequired()
-                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Diferencia Cantidad','Otro')");
+                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Diferencia Cantidad','Otro','No disponible')");
 
                     b.HasKey("Id");
 
                     b.HasIndex("PedidoId");
+
+                    b.HasIndex("RegistradoPorId");
 
                     b.ToTable("NovedadesPedido");
                 });
@@ -579,6 +589,9 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AsignadoPorId")
+                        .HasColumnType("int");
+
                     b.Property<int>("BodegaId")
                         .HasColumnType("int");
 
@@ -638,14 +651,14 @@ namespace PickingApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BodegaId");
-
-                    b.HasIndex("CodigoPedido")
-                        .IsUnique();
+                    b.HasIndex("AsignadoPorId");
 
                     b.HasIndex("EmpleadoId");
 
                     b.HasIndex("PedidoPadreId");
+
+                    b.HasIndex("BodegaId", "CodigoPedido")
+                        .IsUnique();
 
                     b.ToTable("Pedidos");
                 });
@@ -730,6 +743,9 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BodegaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("DatosJson")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -761,6 +777,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BodegaId");
 
                     b.HasIndex("ObservacionId");
 
@@ -875,6 +893,9 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BodegaId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("CodigoVerificacionExpira")
                         .HasColumnType("datetime(6)");
 
@@ -935,7 +956,12 @@ namespace PickingApp.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BodegaId");
+
                     b.HasIndex("Correo")
+                        .IsUnique();
+
+                    b.HasIndex("Identificacion")
                         .IsUnique();
 
                     b.HasIndex("RolId");
@@ -960,6 +986,16 @@ namespace PickingApp.Migrations
                     b.Navigation("Pedido");
 
                     b.Navigation("Ubicacion");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.Empleado", b =>
+                {
+                    b.HasOne("PickingApp.Models.Bodega", "Bodega")
+                        .WithMany()
+                        .HasForeignKey("BodegaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Bodega");
                 });
 
             modelBuilder.Entity("PickingApp.Models.LogSistema", b =>
@@ -991,6 +1027,11 @@ namespace PickingApp.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("PickingApp.Models.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("RegistradoPorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Pedido");
                 });
 
@@ -1007,6 +1048,11 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>
                 {
+                    b.HasOne("PickingApp.Models.Usuario", "AsignadoPor")
+                        .WithMany()
+                        .HasForeignKey("AsignadoPorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PickingApp.Models.Bodega", "Bodega")
                         .WithMany("Pedidos")
                         .HasForeignKey("BodegaId")
@@ -1022,6 +1068,8 @@ namespace PickingApp.Migrations
                         .WithMany("Partes")
                         .HasForeignKey("PedidoPadreId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AsignadoPor");
 
                     b.Navigation("Bodega");
 
@@ -1042,6 +1090,11 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
+                    b.HasOne("PickingApp.Models.Bodega", "Bodega")
+                        .WithMany()
+                        .HasForeignKey("BodegaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PickingApp.Models.ObservacionSolicitud", "Observacion")
                         .WithMany()
                         .HasForeignKey("ObservacionId")
@@ -1063,6 +1116,8 @@ namespace PickingApp.Migrations
                         .HasForeignKey("UsuarioSolicitanteId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Bodega");
 
                     b.Navigation("Observacion");
 
@@ -1093,11 +1148,18 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Usuario", b =>
                 {
+                    b.HasOne("PickingApp.Models.Bodega", "Bodega")
+                        .WithMany()
+                        .HasForeignKey("BodegaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PickingApp.Models.Rol", "Rol")
                         .WithMany()
                         .HasForeignKey("RolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Bodega");
 
                     b.Navigation("Rol");
                 });

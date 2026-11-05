@@ -17,7 +17,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> Asignar(int id)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Detalles)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -34,7 +34,8 @@ namespace PickingApp.Controllers
 
             // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante),
             // evaluadas para todos los empleados en un número fijo de consultas
-            var empleados = await _context.Empleados.Where(e => e.Activo).ToListAsync();
+            // Solo el personal activo de la bodega del pedido (PickingEngine rechaza también a los de otra bodega)
+            var empleados = await _context.Empleados.Where(e => e.Activo && e.BodegaId == pedido.BodegaId).ToListAsync();
             var validaciones = await _pickingEngine.ValidarAsignacionesAsync(id, empleados.Select(e => e.Id).ToList());
 
             bool Asignable(Empleado e) => e.Id != empleadoActualId && validaciones[e.Id].PuedeAsignar;
@@ -56,7 +57,7 @@ namespace PickingApp.Controllers
                 EmpleadoRecomendadoId = empleados.FirstOrDefault(Asignable)?.Id,
                 EmpleadoActualId = empleadoActualId,
                 EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
-                    ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null)
+                    ?? (empleadoActualId.HasValue ? (await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == empleadoActualId.Value))?.NombreCompleto : null)
             });
         }
 
@@ -68,7 +69,7 @@ namespace PickingApp.Controllers
         {
             await using var transaccion = await BloquearAsignacionAsync(pedidoId, empleadoId);
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             // Un pedido en curso solo cambia de empleado por CU-27 (motivo obligatorio y liberación del anterior)
@@ -88,7 +89,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var empleado = await _context.Empleados.FindAsync(empleadoId);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == empleadoId);
             if (empleado == null) return NotFound();
 
             // Si genera advertencia de experiencia (umbrales de Configuración)
@@ -100,6 +101,7 @@ namespace PickingApp.Controllers
             // Cambia estado, empleado, fechas y tiempos del pedido (Models/Pedido.cs) y luego los guarda con un UPDATE
             pedido.Asignar(empleadoId, DateTime.Now.AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos)),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
+            pedido.AsignadoPorId = User.IdUsuario();
 
             await _context.SaveChangesAsync();
             await transaccion.CommitAsync();
@@ -116,6 +118,7 @@ namespace PickingApp.Controllers
                 TempData["WarningMessage"] = validacion.MensajeAdvertencia;
             }
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' asignado exitosamente a '{empleado.NombreCompleto}'.";
+            TempData["ImprimirPedido"] = true; // Detalle abre la orden impresa para el empleado
 
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
@@ -140,7 +143,7 @@ namespace PickingApp.Controllers
 
             await using var transaccion = await BloquearAsignacionAsync(pedidoId, nuevoEmpleadoId);
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             if (!pedido.EstaEnCurso || !pedido.EmpleadoId.HasValue)
@@ -162,7 +165,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Asignar), new { id = pedidoId });
             }
 
-            var nuevoEmpleado = await _context.Empleados.FindAsync(nuevoEmpleadoId);
+            var nuevoEmpleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == nuevoEmpleadoId);
             if (nuevoEmpleado == null) return NotFound();
 
             var nombreEmpleadoAnterior = await _context.Empleados
@@ -177,6 +180,7 @@ namespace PickingApp.Controllers
 
             pedido.Reasignar(nuevoEmpleadoId, motivo, DateTime.Now.AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos)),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
+            pedido.AsignadoPorId = User.IdUsuario();
 
             await _context.SaveChangesAsync();
             await transaccion.CommitAsync();
@@ -193,6 +197,7 @@ namespace PickingApp.Controllers
                 TempData["WarningMessage"] = validacion.MensajeAdvertencia;
             }
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' reasignado exitosamente a '{nuevoEmpleado.NombreCompleto}'.";
+            TempData["ImprimirPedido"] = true; // Detalle abre la orden impresa para el empleado
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 

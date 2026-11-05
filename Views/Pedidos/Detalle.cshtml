@@ -16,6 +16,9 @@
     var puedeDividir = pedido.MotivoNoDivisible() == null;
     var puedeDeshacerDivision = pedido.PuedeDeshacerDivision;
     var esGestor = userRole == Roles.Administrador || userRole == Roles.Supervisor;
+    // Recién asignado o reasignado: la orden se imprime sola una vez. Se lee aquí arriba: TempData se guarda cuando la
+    // respuesta empieza a enviarse, y en una página tan larga eso ocurre antes de llegar al botón (no se borraría)
+    var imprimirAhora = TempData["ImprimirPedido"] is true;
     if (totalUbicaciones == 0) totalUbicaciones = pedido.Detalles.Count;
     var pasillosPedido = pedido.Detalles
         .Where(d => d.Ubicacion != null)
@@ -96,6 +99,8 @@
                 <li><i class="bi bi-geo-alt" aria-hidden="true"></i>@totalUbicaciones @(totalUbicaciones == 1 ? "ubicación" : "ubicaciones")</li>
                 <li><i class="bi bi-box-seam" aria-hidden="true"></i>@unidades @(unidades == 1 ? "unidad" : "unidades")</li>
                 <li><i class="bi bi-clock" aria-hidden="true"></i>Cargado <time datetime="@pedido.FechaCarga.ToString("s")">@pedido.FechaCarga.ToString("dd/MM/yyyy HH:mm")</time></li>
+                <li><i class="bi bi-play-circle" aria-hidden="true"></i>Inicio @if (pedido.FechaInicioProceso.HasValue) { <time datetime="@pedido.FechaInicioProceso.Value.ToString("s")">@pedido.FechaInicioProceso.Value.ToString("dd/MM/yyyy HH:mm")</time> } else { <span class="pf-ped-tenue">Sin iniciar</span> }</li>
+                <li><i class="bi bi-check2-circle" aria-hidden="true"></i>Fin @if (pedido.FechaFinalizacion.HasValue) { <time datetime="@pedido.FechaFinalizacion.Value.ToString("s")">@pedido.FechaFinalizacion.Value.ToString("dd/MM/yyyy HH:mm")</time> } else { <span class="pf-ped-tenue">Sin finalizar</span> }</li>
             </ul>
         </header>
 
@@ -290,10 +295,9 @@
                     <table class="pf-table">
                         <thead>
                             <tr>
-                                <th>Fecha</th>
-                                <th>Tipo</th>
-                                <th>Descripción</th>
-                                <th>Registrada por</th>
+                                @* Tres columnas y no cinco: junto al panel de acciones la columna es angosta y la tabla se recortaba *@
+                                <th>Novedad</th>
+                                <th>Registro</th>
                                 <th>Estado</th>
                                 @if (userRole == Roles.Administrador)
                                 {
@@ -305,10 +309,21 @@
                             @foreach (var nov in pedido.Novedades.OrderByDescending(n => n.FechaRegistro))
                             {
                                 <tr>
-                                    <td class="pf-num text-nowrap">@nov.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</td>
-                                    <td>@nov.TipoNovedad</td>
-                                    <td>@nov.Descripcion</td>
-                                    <td class="text-nowrap">@nov.RegistradoPor</td>
+                                    <td>
+                                        <div class="fw-semibold">@nov.TipoNovedad</div>
+                                        @nov.Descripcion
+                                        @if (nov.Atendida)
+                                        {
+                                            @* La respuesta del Administrador: así quien la registró ve cómo se resolvió *@
+                                            <div class="text-secondary small mt-1">
+                                                Atendida@(string.IsNullOrWhiteSpace(nov.AtendidaPor) ? "" : $" por {nov.AtendidaPor}")@(nov.FechaAtencion is DateTime atencion ? $" el {atencion:dd/MM/yyyy HH:mm}" : "")@(string.IsNullOrWhiteSpace(nov.ObservacionesAtencion) ? "." : $": {nov.ObservacionesAtencion}")
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="pf-num text-nowrap">@nov.FechaRegistro.ToString("dd/MM/yyyy")</span>
+                                        <div class="text-secondary small">@nov.FechaRegistro.ToString("HH:mm") · <span class="text-nowrap">@nov.RegistradoPor</span></div>
+                                    </td>
                                     <td>
                                         <span class="pf-marca-novedad @(nov.Atendida ? "is-atendida" : "is-pendiente")">
                                             <i class="bi @(nov.Atendida ? "bi-check2" : "bi-exclamation-triangle-fill")" aria-hidden="true"></i>@(nov.Atendida ? "Atendida" : "Sin atender")
@@ -385,6 +400,33 @@
                     <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-gray text-center">Reasignar</a>
                 }
 
+                @if (pedido.EmpleadoId != null)
+                {
+                    @* Orden impresa para el empleado (site.js, data-pf-imprimir) *@
+                    <a asp-action="Imprimir" asp-route-id="@pedido.Id" target="_blank" rel="noopener" class="btn-pf-gray text-center" data-pf-imprimir>
+                        <i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir orden
+                    </a>
+                    @if (imprimirAhora)
+                    {
+                        @* Tras asignar o reasignar se abre sola una vez. Elemento aparte: en un enlace con asp-action un
+                           atributo con valor null no se omite (queda vacío) y la orden se imprimía en cada carga *@
+                        <span hidden data-pf-imprimir-auto="@Url.Action("Imprimir", new { id = pedido.Id })"></span>
+                    }
+                }
+                <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Registrar novedad
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="d-grid gap-2">
+                @if (pedido.EmpleadoId != null)
+                {
+                    <a asp-action="Imprimir" asp-route-id="@pedido.Id" target="_blank" rel="noopener" class="btn-pf-gray text-center" data-pf-imprimir>
+                        <i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir orden
+                    </a>
+                }
                 <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
                     <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Registrar novedad
                 </button>
@@ -392,7 +434,7 @@
         }
 
         <div class="pf-ped-panel-pie">
-            <a asp-action="Index" class="btn-pf-gray pf-ped-pie-btn">
+            <a asp-action="Index" class="btn-pf-gray pf-ped-pie-btn" data-pf-volver>
                 <i class="bi bi-arrow-left" aria-hidden="true"></i>Volver
             </a>
             @if (esGestor && !pedido.EstaFinalizado)

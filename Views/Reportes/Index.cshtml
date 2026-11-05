@@ -7,6 +7,8 @@
     // Reportes de análisis: los de gestión solo para el Administrador; los de operación de bodega también para el Supervisor
     var esAdmin = User.IsInRole(Roles.Administrador);
     var esAdminOSupervisor = esAdmin || User.IsInRole(Roles.Supervisor);
+    // Supervisor y Auxiliar no eligen bodega: ReportesController siempre usa la suya
+    var bodegaFija = esAdmin ? null : bodegas.FirstOrDefault();
 
     // Tarjeta de un reporte de análisis que abre su diálogo
     void TarjetaAnalisis(string titulo, string descripcion, string modal, string? etiqueta)
@@ -46,7 +48,7 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
-                            @if (conBodega)
+                            @if (conBodega && esAdmin)
                             {
                                 <fieldset class="pf-campo">
                                     <legend class="pf-campo-titulo">Bodegas</legend>
@@ -107,6 +109,10 @@
 }
 
 <h1 class="pf-page-title">Reportes</h1>
+@if (bodegaFija != null)
+{
+    <p class="pf-reporte-desc">Todos los reportes salen con los pedidos de tu bodega: @bodegaFija.Nombre.</p>
+}
 
 <div class="row g-4">
     <!-- Tarjeta destacada: reporte general del dashboard (cifras, gráfica configurable y pedidos recientes) -->
@@ -148,7 +154,7 @@
         <div class="pf-report-card">
             <div>
                 <h3>Tiempos generales de entrega</h3>
-                <p>Agrupados por bodega: todas o una en particular.</p>
+                <p>@(esAdmin ? "Agrupados por bodega: todas o una en particular." : "Cada pedido completado de tu bodega y cuánto tardó.")</p>
             </div>
             <div>
                 <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalReporteEntrega">
@@ -163,7 +169,7 @@
         <div class="pf-report-card">
             <div>
                 <h3>Pedidos por periodo</h3>
-                <p>Pedidos cargados en todo el historial o entre fechas, por bodega.</p>
+                <p>Pedidos cargados en todo el historial o entre fechas@(esAdmin ? ", por bodega" : "").</p>
             </div>
             <div>
                 <button type="button" class="btn-pf-blue w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalReportePedidos">
@@ -241,7 +247,8 @@
                             <fieldset class="pf-campo">
                                 <legend class="pf-campo-titulo">Agrupar por</legend>
                                 <div class="pf-pildoras" role="radiogroup" aria-label="Agrupar por">
-                                    @foreach (var (valor, nombre) in new[] { ("estado", "Estado"), ("prioridad", "Prioridad"), ("bodega", "Bodega"), ("empleado", "Empleado"), ("dia", "Día de carga") })
+                                    @foreach (var (valor, nombre) in new[] { ("estado", "Estado"), ("prioridad", "Prioridad"), ("bodega", "Bodega"), ("empleado", "Empleado"), ("dia", "Día de carga") }
+                                        .Where(o => esAdmin || o.Item1 != "bodega"))
                                     {
                                         <label class="pf-pildora">
                                             <input type="radio" class="visually-hidden" name="agrupar" value="@valor" checked="@(valor == "estado")" />
@@ -269,8 +276,10 @@
                                 </div>
                             </fieldset>
 
+                            @* rgBodega se queda en la página porque el script lo lee; sin selector va vacío y el servidor usa la bodega fija *@
+                            @{ var colFiltro = esAdmin ? "col-sm-4" : "col-sm-6"; }
                             <div class="row g-2">
-                                <div class="col-sm-4">
+                                <div class="@colFiltro">
                                     <label class="pf-campo-titulo d-block" for="rgDias">Periodo</label>
                                     <select class="form-select" id="rgDias" name="dias">
                                         <option value="0">Todo</option>
@@ -279,7 +288,7 @@
                                         <option value="90">Últimos 90 días</option>
                                     </select>
                                 </div>
-                                <div class="col-sm-4">
+                                <div class="col-sm-4 @(esAdmin ? "" : "d-none")">
                                     <label class="pf-campo-titulo d-block" for="rgBodega">Bodega</label>
                                     <select class="form-select" id="rgBodega" name="bodegaId">
                                         <option value="">Todas</option>
@@ -289,7 +298,7 @@
                                         }
                                     </select>
                                 </div>
-                                <div class="col-sm-4">
+                                <div class="@colFiltro">
                                     <label class="pf-campo-titulo d-block" for="rgPrioridad">Prioridad</label>
                                     <select class="form-select" id="rgPrioridad" name="prioridad">
                                         <option value="">Todas</option>
@@ -368,11 +377,13 @@
                 <div class="modal-header border-0 pb-0">
                     <div>
                         <h5 class="modal-title fw-bold text-dark" id="tituloReporteEntrega">Tiempos generales de entrega</h5>
-                        <p class="pf-reporte-desc">Elige si el reporte incluye todas las bodegas o solo una.</p>
+                        <p class="pf-reporte-desc">@(esAdmin ? "Elige si el reporte incluye todas las bodegas o solo una." : "El resumen de tu bodega y el detalle de cada pedido completado.")</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
+                    @if (esAdmin)
+                    {
                     <fieldset class="pf-campo">
                         <legend class="pf-campo-titulo">Bodegas</legend>
                         @{ Segmentado("_alcance", "ent", "Todas", "Una bodega"); }
@@ -388,6 +399,7 @@
                             <div class="form-text">Incluye su resumen y el detalle de cada pedido completado.</div>
                         </div>
                     </fieldset>
+                    }
                     @{ Periodo("ent"); }
                 </div>
                 <div class="modal-footer border-0 pt-0">
@@ -406,11 +418,13 @@
                 <div class="modal-header border-0 pb-0">
                     <div>
                         <h5 class="modal-title fw-bold text-dark" id="tituloReportePedidos">Pedidos por periodo</h5>
-                        <p class="pf-reporte-desc">Todos los pedidos cargados, de todas las bodegas o de una.</p>
+                        <p class="pf-reporte-desc">@(esAdmin ? "Todos los pedidos cargados, de todas las bodegas o de una." : "Todos los pedidos cargados en tu bodega.")</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
+                    @if (esAdmin)
+                    {
                     <fieldset class="pf-campo">
                         <legend class="pf-campo-titulo">Bodegas</legend>
                         @{ Segmentado("_alcance", "ped", "Todas", "Una bodega"); }
@@ -425,6 +439,7 @@
                             </select>
                         </div>
                     </fieldset>
+                    }
                     @{ Periodo("ped"); }
                 </div>
                 <div class="modal-footer border-0 pt-0">

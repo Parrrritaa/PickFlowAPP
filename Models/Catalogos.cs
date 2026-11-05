@@ -19,8 +19,10 @@
         public const string UbicacionIncorrecta = "Ubicación Incorrecta";
         public const string DiferenciaCantidad = "Diferencia Cantidad";
         public const string Otro = "Otro";
+        // La deja la carga de Excel: la bodega del pedido no tiene ese producto y la línea no entró
+        public const string NoDisponible = "No disponible";
 
-        public static readonly string[] Todos = { Faltante, Averia, UbicacionIncorrecta, DiferenciaCantidad, Otro };
+        public static readonly string[] Todos = { Faltante, Averia, UbicacionIncorrecta, DiferenciaCantidad, Otro, NoDisponible };
     }
 
     // Valores del filtro ?novedad= de la lista de pedidos (además de un tipo de TiposNovedad)

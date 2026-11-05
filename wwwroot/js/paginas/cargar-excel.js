@@ -13,6 +13,8 @@
     var textoConfirmar = btnConfirmar.innerHTML;
     var seccionIncidencias = document.getElementById('seccionIncidencias');
     var listaIncidencias = document.getElementById('listaIncidencias');
+    var avisos = document.getElementById('avisosNoDisponibles');
+    var listaNoDisponibles = document.getElementById('listaNoDisponibles');
     var urlValidar = pagina.urlValidar;
     var erroresVisiblesInicial = 5;
     // Clave de la incidencia → su tarjeta, para mostrar el error de cada decisión
@@ -88,7 +90,7 @@
         return visibles + ' y ' + (valores.length - max) + ' más';
     }
 
-    // estado: 'ok' | 'error' | 'revisar' | 'pendiente'. Todo se escribe como texto: los mensajes incluyen contenido del archivo.
+    // estado: 'ok' | 'error' | 'revisar' | 'aviso' | 'pendiente'. Todo se escribe como texto: los mensajes incluyen contenido del archivo.
     function verificacion(estado, texto, detalle) {
         var li = document.createElement('li');
         li.className = 'd-flex align-items-start text-dark';
@@ -96,14 +98,14 @@
         icono.setAttribute('aria-hidden', 'true');
         icono.className = 'bi me-2 fs-5 ' + (estado === 'ok' ? 'bi-check-circle-fill text-success'
             : estado === 'error' ? 'bi-x-circle-fill text-danger'
-            : estado === 'revisar' ? 'bi-exclamation-circle-fill pf-texto-revisar' : 'bi-dash-circle text-secondary');
+            : estado === 'revisar' || estado === 'aviso' ? 'bi-exclamation-circle-fill pf-texto-revisar' : 'bi-dash-circle text-secondary');
         var cuerpo = document.createElement('span');
         var titulo = document.createElement('span');
         titulo.textContent = texto;
         var estadoSr = document.createElement('span');
         estadoSr.className = 'visually-hidden';
         estadoSr.textContent = estado === 'ok' ? ' (correcto)' : estado === 'error' ? ' (con errores)'
-            : estado === 'revisar' ? ' (por decidir)' : ' (sin verificar)';
+            : estado === 'revisar' ? ' (por decidir)' : estado === 'aviso' ? ' (con aviso)' : ' (sin verificar)';
         cuerpo.append(titulo, estadoSr);
         if (detalle) {
             var small = document.createElement('div');
@@ -125,31 +127,36 @@
         verificacion(!r.tipoValido ? 'pendiente' : r.estructuraValida ? 'ok' : 'error', 'Estructura de archivo válida');
 
         // Una fila con error no pasa a las verificaciones siguientes: esas quedan pendientes hasta corregirla.
-        // Los pasos "decidir" no son errores del archivo: esas filas siguen y se resuelven abajo, en las tarjetas.
+        // Los pasos "decidir" y "aviso" no son errores del archivo: las filas por decidir se confirman abajo, en las
+        // tarjetas, y las no disponibles no se cargan (su pedido queda con una novedad).
+        // Mismo orden que ExcelService.ValidarArchivoExcelAsync.
         var pasos = [
             ['filasConCantidadInvalida', 'Cantidades válidas'],
-            ['filasConBodegaNoRegistrada', 'Bodegas registradas'],
-            ['filasConProductoNoRegistrado', 'Productos registrados', 'decidir'],
-            ['filasConNombreDistinto', 'Nombres coinciden con el código', 'decidir'],
-            ['filasConUbicacionNoRegistrada', 'Ubicaciones registradas y activas', 'decidir'],
-            ['filasConProductoIncorrecto', 'Productos corresponden a su ubicación', 'decidir'],
-            ['filasConPedidoDuplicado', 'Pedidos no registrados previamente']
+            ['filasConBodegaNoRegistrada', 'Bodegas registradas']
         ];
+        if (r.soloSuBodega) pasos.push(['filasDeOtraBodega', 'Pedidos de su bodega']);
+        pasos.push(
+            ['filasConProductoNoRegistrado', 'Productos registrados'],
+            ['filasConPedidoDuplicado', 'Pedidos no registrados previamente'],
+            ['filasNoDisponibles', 'Productos disponibles en la bodega del pedido', 'aviso'],
+            ['filasConNombreDistinto', 'Nombres coinciden con el código', 'decidir']
+        );
         var erroresPrevios = 0;
         pasos.forEach(function (p) {
             var filas = r[p[0]] || 0;
-            var decidir = p[2] === 'decidir';
+            var tipo = p[2];
             if (!estructura) {
                 verificacion('pendiente', p[1]);
             } else if (filas > 0) {
-                if (decidir) verificacion('revisar', p[1], plural(filas, 'fila por decidir', 'filas por decidir'));
+                if (tipo === 'decidir') verificacion('revisar', p[1], plural(filas, 'fila por decidir', 'filas por decidir'));
+                else if (tipo === 'aviso') verificacion('aviso', p[1], plural(filas, 'fila no se cargará', 'filas no se cargarán'));
                 else verificacion('error', p[1], plural(filas, 'fila con error', 'filas con error'));
             } else if (erroresPrevios > 0) {
                 verificacion('pendiente', p[1], 'Se verificará en las filas con errores cuando se corrijan');
             } else {
                 verificacion('ok', p[1]);
             }
-            if (!decidir) erroresPrevios += filas;
+            if (!tipo) erroresPrevios += filas;
         });
 
         var errores = r.errores || [];
@@ -162,11 +169,11 @@
             resumen.textContent = plural(r.totalPedidos, 'pedido', 'pedidos') + ' (' +
                 plural(r.totalFilas, 'línea de producto', 'líneas de producto') + ') listos para cargar.';
         } else if (incidencias.length && !errores.length) {
-            resumen.textContent = plural(r.totalPedidos, 'pedido', 'pedidos') + ' listos para cargar cuando decida qué hacer con ' +
+            resumen.textContent = plural(r.totalPedidos, 'pedido', 'pedidos') + ' listos para cargar cuando confirme el nombre de ' +
                 plural(filasPorDecidir, 'fila', 'filas') + '.';
         } else if (incidencias.length) {
-            resumen.textContent = 'El archivo no se puede cargar todavía. Cuando corrija los errores podrá decidir qué hacer con ' +
-                plural(filasPorDecidir, 'fila', 'filas') + ' de productos o ubicaciones.';
+            resumen.textContent = 'El archivo no se puede cargar todavía. Cuando corrija los errores podrá confirmar el nombre de ' +
+                plural(filasPorDecidir, 'fila', 'filas') + '.';
         } else {
             resumen.textContent = 'El archivo no se puede cargar todavía.';
         }
@@ -235,6 +242,11 @@
         }
         cajaErrores.hidden = errores.length === 0;
 
+        var noDisponibles = r.noDisponibles || [];
+        listaNoDisponibles.innerHTML = '';
+        noDisponibles.forEach(function (t) { listaNoDisponibles.appendChild(elemento('li', null, t)); });
+        avisos.hidden = noDisponibles.length === 0;
+
         // Las decisiones solo se piden cuando el archivo no tiene errores: al corregirlo se vuelve a validar desde cero
         listaIncidencias.innerHTML = '';
         tarjetas = {};
@@ -242,7 +254,7 @@
         var decidir = incidencias.length > 0 && errores.length === 0;
         if (decidir) {
             incidencias.forEach(function (inc, i) {
-                var t = tarjeta(inc, i, r);
+                var t = tarjeta(inc, i);
                 tarjetas[inc.clave] = t;
                 listaIncidencias.appendChild(t);
             });
@@ -261,13 +273,10 @@
         seccion.classList.add('pf-reveal');
     }
 
-    // Tarjeta de una incidencia. Los campos se envían como resoluciones[i].* (ResolucionExcel en el servidor);
-    // los de las opciones no elegidas van deshabilitados y no viajan.
-    function tarjeta(inc, i, datos) {
+    // Tarjeta de un nombre distinto al registrado. Los campos se envían como resoluciones[i].* (ResolucionExcel en el servidor).
+    function tarjeta(inc, i) {
         var prefijo = 'resoluciones[' + i + '].';
         var id = 'incidencia' + i;
-        var productoNuevo = inc.tipo === 'producto-no-registrado';
-        var nombreDistinto = inc.tipo === 'nombre-distinto';
 
         var card = elemento('section', 'pf-incidencia');
         card.setAttribute('aria-labelledby', id + '-titulo');
@@ -281,8 +290,7 @@
         var cabecera = elemento('div', 'pf-incidencia-cabecera');
         var icono = elemento('span', 'pf-incidencia-icono');
         icono.setAttribute('aria-hidden', 'true');
-        icono.appendChild(elemento('i', 'bi ' + (productoNuevo ? 'bi-box-seam' : nombreDistinto ? 'bi-tag'
-            : inc.tipo === 'ubicacion-inactiva' ? 'bi-slash-circle' : 'bi-geo-alt')));
+        icono.appendChild(elemento('i', 'bi bi-tag'));
         var textos = elemento('div');
         var titulo = elemento('h6', 'pf-incidencia-titulo', inc.titulo);
         titulo.id = id + '-titulo';
@@ -292,29 +300,12 @@
         cabecera.append(icono, textos);
         card.append(cabecera, elemento('p', 'pf-incidencia-texto', inc.detalle));
 
-        if (productoNuevo) card.appendChild(camposProducto(inc, prefijo, id, datos));
-
         var opciones = elemento('fieldset', 'pf-opciones');
-        opciones.appendChild(elemento('legend', 'pf-label',
-            nombreDistinto ? '¿Con qué nombre se carga?' : productoNuevo ? '¿Dónde se guarda?' : '¿De dónde se recoge?'));
+        opciones.appendChild(elemento('legend', 'pf-label', '¿Con qué nombre se carga?'));
         var lista = elemento('div', 'pf-opciones-lista');
-        if (nombreDistinto) {
-            lista.appendChild(opcion(prefijo, id, 'nombre-registrado', 'Cargar como ' + inc.codigoProducto + ' · ' + inc.nombreProducto,
-                'Se usa el nombre registrado en el sistema'));
-        }
-        inc.ubicaciones.forEach(function (u) {
-            lista.appendChild(opcion(prefijo, id, String(u.id), 'Recoger de ' + u.codigo,
-                u.bodega + (u.bodegaId === inc.bodegaId ? '' : ' · otra bodega')));
-        });
-        if (inc.textoCorregir) {
-            lista.appendChild(opcion(prefijo, id, 'corregir', inc.textoCorregir, 'Se modifica esa ubicación al confirmar la carga'));
-        }
-        if (!nombreDistinto) {
-            var nueva = opcion(prefijo, id, 'nueva', productoNuevo ? 'En una ubicación nueva' : 'Crear una ubicación nueva',
-                'Elija la bodega y la posición');
-            nueva.appendChild(camposUbicacion(inc, prefijo, id, datos));
-            lista.appendChild(nueva);
-        }
+        // Un nombre distinto se confirma siempre a mano: la única opción no se deja elegida
+        lista.appendChild(opcion(prefijo, 'nombre-registrado', 'Cargar como ' + inc.codigoProducto + ' · ' + inc.nombreProducto,
+            'Se usa el nombre registrado en el sistema'));
         opciones.appendChild(lista);
         card.appendChild(opciones);
 
@@ -322,30 +313,13 @@
         error.setAttribute('role', 'alert');
         error.hidden = true;
         card.appendChild(error);
-
-        // Una sola opción posible: se deja elegida. Un nombre distinto se confirma siempre a mano.
-        var radios = lista.querySelectorAll('input[type="radio"]');
-        if (radios.length === 1 && !nombreDistinto) radios[0].checked = true;
-
-        function actualizar() {
-            lista.querySelectorAll('.pf-opcion-fila').forEach(function (fila) {
-                var detalle = fila.querySelector('.pf-opcion-detalle');
-                if (!detalle) return;
-                var elegida = fila.querySelector('input[type="radio"]').checked;
-                detalle.hidden = !elegida;
-                detalle.querySelectorAll('input, select').forEach(function (campo) { campo.disabled = !elegida; });
-            });
-        }
-        lista.addEventListener('change', actualizar);
-        card.addEventListener('input', function () { error.hidden = true; });
         card.addEventListener('change', function () { error.hidden = true; });
-        actualizar();
 
         card._error = error;
         return card;
     }
 
-    function opcion(prefijo, id, valor, texto, nota) {
+    function opcion(prefijo, valor, texto, nota) {
         var fila = elemento('div', 'pf-opcion-fila');
         var label = elemento('label', 'pf-opcion');
         var radio = elemento('input', 'form-check-input');
@@ -360,79 +334,6 @@
         return fila;
     }
 
-    function campo(etiqueta, id, control, columnas) {
-        var col = elemento('div', columnas + ' pf-form-group');
-        var label = elemento('label', 'pf-label', etiqueta);
-        label.htmlFor = id;
-        control.id = id;
-        col.append(label, control);
-        return col;
-    }
-
-    function entrada(nombre, valor, extra) {
-        var el = elemento('input', 'pf-input');
-        el.name = nombre;
-        el.value = valor == null ? '' : valor;
-        el.required = true;
-        Object.keys(extra || {}).forEach(function (k) { el.setAttribute(k, extra[k]); });
-        return el;
-    }
-
-    function camposProducto(inc, prefijo, id, datos) {
-        var fila = elemento('div', 'row g-3 mb-3');
-        fila.appendChild(campo('Nombre del producto', id + '-nombre',
-            entrada(prefijo + 'NombreProducto', inc.nombreProducto, { maxlength: '150' }), 'col-12'));
-
-        var categoria = elemento('select', 'pf-input');
-        categoria.name = prefijo + 'CategoriaProductoId';
-        categoria.appendChild(new Option('Sin clasificar (usa «' + datos.categoriaPredeterminada + '»)', ''));
-        (datos.categorias || []).forEach(function (c) {
-            categoria.appendChild(new Option(c.nombre + ' · ' + c.minutos + ' min/u', String(c.id)));
-        });
-        fila.appendChild(campo('Categoría', id + '-categoria', categoria, 'col-md-7'));
-        fila.appendChild(campo('Cantidad máx. por caja', id + '-unidades',
-            entrada(prefijo + 'UnidadesPorCaja', '1', { type: 'number', min: '1', max: pagina.maxUnidades, step: '1' }), 'col-md-5'));
-        return fila;
-    }
-
-    // Bodega y posición de la ubicación nueva. Si la del Excel no existe, se propone esa misma.
-    function camposUbicacion(inc, prefijo, id, datos) {
-        var detalle = elemento('div', 'pf-opcion-detalle');
-        var fila = elemento('div', 'row g-2');
-
-        var bodega = elemento('select', 'pf-input');
-        bodega.name = prefijo + 'BodegaId';
-        bodega.required = true;
-        (datos.bodegas || []).forEach(function (b) {
-            bodega.appendChild(new Option(b.codigo + ' · ' + b.nombre, String(b.id), false, b.id === inc.bodegaId));
-        });
-        fila.appendChild(campo('Bodega', id + '-bodega', bodega, 'col-12 col-md-6'));
-
-        var propuesta = !inc.ubicacionExiste;
-        var numero = { inputmode: 'numeric', pattern: '\\d{1,9}', maxlength: '9', title: 'Solo números', placeholder: '1' };
-        var pasillo = entrada(prefijo + 'Pasillo', propuesta ? inc.pasillo : '', numero);
-        var estante = entrada(prefijo + 'Estante', propuesta ? inc.estante : '', numero);
-        var nivel = entrada(prefijo + 'Nivel', propuesta ? inc.nivel : '', numero);
-        fila.appendChild(campo('Pasillo', id + '-pasillo', pasillo, 'col-4 col-md-2'));
-        fila.appendChild(campo('Estante', id + '-estante', estante, 'col-4 col-md-2'));
-        fila.appendChild(campo('Nivel', id + '-nivel', nivel, 'col-4 col-md-2'));
-
-        var codigo = elemento('div', 'form-text small mt-2');
-        codigo.setAttribute('aria-live', 'polite');
-        function dos(v) { return String(parseInt(v, 10)).padStart(2, '0'); }
-        function actualizarCodigo() {
-            var ok = [pasillo, estante, nivel].every(function (c) { return /^\d{1,9}$/.test(c.value.trim()); });
-            codigo.textContent = ok
-                ? 'Código: PAS' + dos(pasillo.value) + '-EST' + dos(estante.value) + '-NIV' + dos(nivel.value)
-                : 'El código se genera a partir del pasillo, estante y nivel.';
-        }
-        [pasillo, estante, nivel].forEach(function (c) { c.addEventListener('input', actualizarCodigo); });
-        actualizarCodigo();
-
-        detalle.append(fila, codigo);
-        return detalle;
-    }
-
     function ponerCargando(texto) {
         btnConfirmar.classList.add('is-loading');
         btnConfirmar.innerHTML = '<span class="pf-spinner" aria-hidden="true"></span>' + texto;
@@ -444,7 +345,7 @@
     }
 
     // Antes de guardar, el servidor revisa las decisiones con el mismo archivo (sin registrar nada).
-    // Si alguna no sirve (p. ej. la ubicación nueva ya existe) se muestra en su tarjeta.
+    // Si alguna no sirve se muestra en su tarjeta.
     function revisarDecisiones() {
         ponerCargando('Revisando…');
         Object.keys(tarjetas).forEach(function (c) { tarjetas[c]._error.hidden = true; });
@@ -473,7 +374,7 @@
                 });
                 // Incidencias que no estaban al validar: algo cambió en el sistema mientras tanto
                 if ((!primera && !generales.length) || (r.incidencias || []).some(function (inc) { return !tarjetas[inc.clave]; })) {
-                    generales.push('Los productos o ubicaciones cambiaron desde la validación. Vuelva a validar el archivo.');
+                    generales.push('Los productos cambiaron desde la validación. Vuelva a validar el archivo.');
                 }
                 listaErrores.innerHTML = '';
                 generales.forEach(function (e) { listaErrores.appendChild(elemento('li', null, e)); });

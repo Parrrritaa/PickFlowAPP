@@ -1,5 +1,8 @@
 @* Plantilla común de todas las páginas con sesión: barra superior de navegación y mensajes.
    Cada vista se inserta donde está @RenderBody(). *@
+@using Microsoft.EntityFrameworkCore
+@using PickingApp.Services
+@inject PickingApp.Data.ApplicationDbContext Db
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,16 +20,26 @@
         var displayName = userName.Contains("@") ? userName.Split('@')[0] : userName;
         displayName = char.ToUpper(displayName[0]) + displayName.Substring(1);
         var esAdmin = userRole == Roles.Administrador;
-        var puedeCargar = esAdmin || userRole == Roles.Supervisor;
+        var esSupervisor = userRole == Roles.Supervisor;
+        var puedeCargar = esAdmin || esSupervisor;
+
+        // Datos del perfil (menú de la cuenta y diálogo "Ver perfil"). Se leen de la base, no de la cookie, para mostrar
+        // lo actual si el Administrador los cambia; el Administrador no tiene bodega: ve todas.
+        var idPerfil = User.IdUsuario();
+        var perfil = await Db.Usuarios.AsNoTracking().Include(u => u.Rol).Include(u => u.Bodega).FirstOrDefaultAsync(u => u.Id == idPerfil);
+        var bodegaPerfil = perfil?.Bodega;
 
         // Apartado actual para la ruta sobre el título: grupo de la navegación y nombre de la opción
         var enCargarExcel = currentController == "Pedidos" && currentAction == "CargarExcel";
         var enConfiguracion = currentController == "Auditoria" && currentAction == "Configuracion";
-        var enRecursos = currentController is "Empleados" or "Bodegas" or "Productos";
-        var enSistema = currentController is "Usuarios" or "Auditoria" or "Observaciones";
+        // Pantalla de error (Home/Estado): no es Inicio, así que no marca esa opción ni la pone en la ruta
+        var enInicio = currentController == "Home" && currentAction != "Estado";
+        // El Supervisor entra a Usuarios solo para los auxiliares de su bodega: para él es un recurso, no el sistema
+        var enRecursos = currentController is "Empleados" or "Bodegas" or "Productos" || (esSupervisor && currentController == "Usuarios");
+        var enSistema = currentController is "Auditoria" or "Observaciones" || (esAdmin && currentController == "Usuarios");
         var (grupoActual, apartadoActual) = currentController switch
         {
-            "Home" => ("Operación", "Inicio"),
+            "Home" when enInicio => ("Operación", "Inicio"),
             "Pedidos" => ("Operación", enCargarExcel ? "Cargar Excel" : "Pedidos"),
             "Solicitudes" => ("Operación", "Solicitudes"),
             "Notificaciones" => ("Operación", "Notificaciones"),
@@ -34,7 +47,7 @@
             "Bodegas" => ("Recursos", "Bodegas"),
             "Productos" => ("Recursos", "Productos"),
             "Reportes" => ("Análisis", "Reportes"),
-            "Usuarios" => ("Sistema", "Usuarios y roles"),
+            "Usuarios" => esSupervisor ? ("Recursos", "Auxiliares") : ("Sistema", "Usuarios y roles"),
             "Auditoria" => ("Sistema", enConfiguracion ? "Configuración" : "Registro del sistema"),
             "Observaciones" => ("Sistema", "Observaciones"),
             "Account" => ("Cuenta", "Cambiar contraseña"),
@@ -60,7 +73,7 @@
 
                 <nav class="pf-topnav" id="pfTopnav" aria-label="Principal">
                     @* Cada opción solo se muestra a los roles que pueden usarla; el controlador también lo valida con [Authorize] *@
-                    <a class="pf-topnav-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(currentController == "Home")">
+                    <a class="pf-topnav-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(enInicio)">
                         <span class="pf-ico"><partial name="_Icono" model='"inicio"' /></span>Inicio
                     </a>
                     <a class="pf-topnav-link" asp-controller="Pedidos" asp-action="Index" aria-current="@Actual(currentController == "Pedidos")">
@@ -94,6 +107,13 @@
                                 <a class="pf-panel-opcion" asp-controller="Productos" asp-action="Index" aria-current="@Actual(currentController == "Productos")">
                                     <span class="pf-panel-ico"><partial name="_Icono" model='"productos"' /></span>
                                     <span class="pf-panel-texto"><b>Productos</b><span>Categorías y tiempos de manipulación</span></span>
+                                </a>
+                            }
+                            @if (esSupervisor)
+                            {
+                                <a class="pf-panel-opcion" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"usuarios"' /></span>
+                                    <span class="pf-panel-texto"><b>Auxiliares</b><span>Cuentas de los auxiliares de tu bodega</span></span>
                                 </a>
                             }
                         </div>
@@ -169,6 +189,26 @@
                                 <span class="pf-cuenta-rol">@userRole</span>
                             </span>
                         </div>
+                        @* Dato de solo lectura: en qué bodega trabaja; el resto del perfil está en "Ver perfil" *@
+                        <dl class="pf-cuenta-detalles">
+                            <div class="pf-cuenta-detalle pf-cuenta-detalle--bodega" title="@(bodegaPerfil != null ? $"{bodegaPerfil.Nombre} ({bodegaPerfil.Codigo})" : null)">
+                                <dt><partial name="_Icono" model='"bodegas"' /><span class="visually-hidden">Bodega</span></dt>
+                                <dd>
+                                    @if (bodegaPerfil != null)
+                                    {
+                                        @bodegaPerfil.Nombre <span class="pf-cuenta-codigo">@bodegaPerfil.Codigo</span>
+                                    }
+                                    else
+                                    {
+                                        @(esAdmin ? "Todas las bodegas" : "Sin bodega asignada")
+                                    }
+                                </dd>
+                            </div>
+                        </dl>
+                        <div class="dropdown-divider"></div>
+                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#pfModalPerfil">
+                            <partial name="_Icono" model='"perfil"' />Ver perfil
+                        </button>
                         <a class="dropdown-item" asp-controller="Account" asp-action="CambiarContrasena">
                             <partial name="_Icono" model='"llave"' />Cambiar contraseña
                         </a>
@@ -197,7 +237,7 @@
         <div class="pf-hoja-fondo" id="pfHojaFondo" aria-hidden="true"></div>
         <nav class="pf-hoja" id="pfHoja" aria-label="Principal">
             <div class="pf-hoja-grupo">Operación</div>
-            <a class="pf-hoja-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(currentController == "Home")">
+            <a class="pf-hoja-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(enInicio)">
                 <partial name="_Icono" model='"inicio"' /><span class="pf-hoja-texto">Inicio</span>
             </a>
             <a class="pf-hoja-link" asp-controller="Pedidos" asp-action="Index" aria-current="@Actual(currentController == "Pedidos" && !enCargarExcel)">
@@ -231,6 +271,12 @@
             {
                 <a class="pf-hoja-link" asp-controller="Productos" asp-action="Index" aria-current="@Actual(currentController == "Productos")">
                     <partial name="_Icono" model='"productos"' /><span class="pf-hoja-texto">Productos</span>
+                </a>
+            }
+            @if (esSupervisor)
+            {
+                <a class="pf-hoja-link" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                    <partial name="_Icono" model='"usuarios"' /><span class="pf-hoja-texto">Auxiliares</span>
                 </a>
             }
 
@@ -271,6 +317,64 @@
                 </div>
             </div>
         </div>
+
+        @if (perfil != null)
+        {
+            @* Ver perfil: todos los datos de la cuenta, solo para consultar (los cambia un Administrador desde Usuarios) *@
+            <div class="modal fade" id="pfModalPerfil" tabindex="-1" aria-labelledby="pfPerfilTitulo" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered pf-perfil-dialog">
+                    <div class="modal-content">
+                        <div class="pf-perfil-cab">
+                            <span class="pf-avatar pf-avatar--grande" aria-hidden="true">@displayName[0]</span>
+                            <h2 class="pf-perfil-nombre" id="pfPerfilTitulo">@perfil.NombreCompleto</h2>
+                            <span class="pf-perfil-rol">@perfil.NombreRol</span>
+                        </div>
+                        <dl class="pf-perfil-datos">
+                            <div>
+                                <dt>Correo</dt>
+                                <dd>@perfil.Correo</dd>
+                            </div>
+                            <div>
+                                <dt>Identificación</dt>
+                                <dd class="pf-num">@(string.IsNullOrWhiteSpace(perfil.Identificacion) ? "Sin registrar" : perfil.Identificacion)</dd>
+                            </div>
+                            <div>
+                                <dt>Bodega</dt>
+                                <dd>
+                                    @if (bodegaPerfil != null)
+                                    {
+                                        @bodegaPerfil.Nombre <span class="pf-cuenta-codigo">@bodegaPerfil.Codigo</span>
+                                    }
+                                    else
+                                    {
+                                        @(esAdmin ? "Todas las bodegas" : "Sin bodega asignada")
+                                    }
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Estado</dt>
+                                <dd>@perfil.Estado</dd>
+                            </div>
+                            <div>
+                                <dt>Miembro desde</dt>
+                                <dd class="pf-num">@perfil.FechaRegistro.ToString("dd/MM/yyyy")</dd>
+                            </div>
+                            @if (perfil.UltimoAcceso is DateTime ultimoAcceso)
+                            {
+                                <div>
+                                    <dt>Último inicio de sesión</dt>
+                                    <dd class="pf-num">@ultimoAcceso.ToString("dd/MM/yyyy HH:mm")</dd>
+                                </div>
+                            }
+                        </dl>
+                        <p class="pf-perfil-nota">@(esAdmin ? "Estos datos se cambian en Sistema · Usuarios y roles." : "Si algún dato no es correcto, pídele a un Administrador que lo corrija.")</p>
+                        <div class="pf-alert-actions">
+                            <button type="button" class="pf-alert-btn pf-alert-btn--secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
 
         <div class="pf-main-wrapper">
             <main class="pf-content">
