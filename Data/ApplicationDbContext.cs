@@ -27,6 +27,7 @@ namespace PickingApp.Data
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
         public DbSet<CategoriaProducto> CategoriasProducto { get; set; } = null!;
         public DbSet<ObservacionSolicitud> ObservacionesSolicitud { get; set; } = null!;
+        public DbSet<TrasladoPersonal> TrasladosPersonal { get; set; } = null!;
 
         // Columna ENUM de MySQL con los valores permitidos: la base rechaza cualquier otro texto
         private static string EnumMySql(IEnumerable<string> valores) =>
@@ -118,6 +119,17 @@ namespace PickingApp.Data
                 .HasForeignKey(u => u.RolId)
                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<Usuario>().Navigation(u => u.Rol).AutoInclude();
+
+            modelBuilder.Entity<TrasladoPersonal>()
+                .HasOne(t => t.BodegaOrigen)
+                .WithMany()
+                .HasForeignKey(t => t.BodegaOrigenId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<TrasladoPersonal>()
+                .HasOne(t => t.BodegaDestino)
+                .WithMany()
+                .HasForeignKey(t => t.BodegaDestinoId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Solicitud>()
                 .HasOne(s => s.TipoSolicitud)

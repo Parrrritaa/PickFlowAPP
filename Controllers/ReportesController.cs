@@ -35,7 +35,7 @@ namespace PickingApp.Controllers
             // Listas para los reportes individuales (incluye inactivos para consultar su historial)
             return View(new ReportesIndexViewModel
             {
-                Empleados = await _context.Empleados.DelAlcance(User).OrderBy(e => e.NombreCompleto).ToListAsync(),
+                Empleados = await _context.Empleados.ConPasoPorBodega(User).OrderBy(e => e.NombreCompleto).ToListAsync(),
                 Bodegas = await _context.Bodegas.DelAlcance(User).OrderBy(b => b.Codigo).ToListAsync()
             });
         }
@@ -50,7 +50,7 @@ namespace PickingApp.Controllers
 
             if (empleadoId.HasValue)
             {
-                var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(e => e.Id == empleadoId.Value);
+                var empleado = await _context.Empleados.ConPasoPorBodega(User).FirstOrDefaultAsync(e => e.Id == empleadoId.Value);
                 if (empleado == null) return FiltroInvalido("El empleado seleccionado no existe.");
 
                 var pedidosEmpleado = await query

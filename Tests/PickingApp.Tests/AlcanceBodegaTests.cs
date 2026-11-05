@@ -113,6 +113,23 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public async Task SupervisorYAuxiliarEntranDirectoASuBodegaYElAdministradorVeLaLista()
+        {
+            using var e = new Escenario();
+            var principal = Principal(e);
+
+            foreach (var rol in new[] { Roles.IdSupervisor, Roles.IdAuxiliar })
+            {
+                var redireccion = Assert.IsType<RedirectToActionResult>(
+                    await Como(new BodegasController(e.Db, new SinAuditoria()), Usuario(e, rol, principal)).Index(null, null));
+                Assert.Equal(nameof(BodegasController.Detalle), redireccion.ActionName);
+                Assert.Equal(principal.Id, redireccion.RouteValues!["id"]);
+            }
+
+            Assert.IsType<ViewResult>(await Como(new BodegasController(e.Db, new SinAuditoria()), Usuario(e, Roles.IdAdministrador, null)).Index(null, null));
+        }
+
+        [Fact]
         public async Task LaSolicitudQuedaEnLaBodegaDeQuienLaCrea()
         {
             using var e = new Escenario();

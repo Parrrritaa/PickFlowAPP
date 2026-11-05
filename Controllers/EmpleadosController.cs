@@ -51,6 +51,10 @@ namespace PickingApp.Controllers
             return View(new EmpleadosIndexViewModel
             {
                 Empleados = empleados,
+                // Quienes dejaron la bodega que se está viendo: siguen en la lista como trasladados
+                Trasladados = (User.BodegaVisible() ?? bodegaId) is int vista
+                    ? await Traslados.EmpleadosQueSalieronAsync(_context, vista)
+                    : new List<TrasladoPersonal>(),
                 Bodegas = bodegas,
                 EmpleadosPorBodega = porBodega,
                 FiltroBodegaId = bodegaId,
@@ -73,10 +77,11 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         public async Task<IActionResult> Historial(int id, int? pagina)
         {
-            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
+            var empleado = await _context.Empleados.ConPasoPorBodega(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
-            var completados = await _context.Pedidos
+            // Cada Supervisor ve lo que el empleado hizo en su bodega; el Administrador, todo
+            var completados = await _context.Pedidos.DelAlcance(User)
                 .Where(p => p.EmpleadoId == id && p.Estado == PedidoEstados.Completado && p.TiempoProcesamientoMinutos != null)
                 .OrderBy(p => p.FechaFinalizacion).ThenBy(p => p.Id)
                 .Select(p => new
@@ -111,10 +116,16 @@ namespace PickingApp.Controllers
             var cuentan = filas.Where(f => f.CuentaParaRendimiento).ToList();
             var conEstimado = filas.Where(f => f.Estimado > 0).ToList();
             var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, "historial"), filas.Count);
+            var traslados = await Traslados.DeEmpleadoAsync(_context, id);
+            var bodegaVista = User.BodegaVisible();
 
             return View(new EmpleadoHistorialViewModel
             {
                 Empleado = empleado,
+                Periodos = Traslados.Periodos(traslados, empleado.FechaIngreso),
+                SalidaDeEstaBodega = bodegaVista != null && empleado.BodegaId != bodegaVista
+                    ? traslados.LastOrDefault(t => t.BodegaOrigenId == bodegaVista)
+                    : null,
                 Ocupado = await _context.Pedidos.AnyAsync(p => p.EmpleadoId == id && PedidoEstados.EnCurso.Contains(p.Estado)),
                 Rendimiento = (await _pickingEngine.CalcularRendimientosAsync(new[] { id }))[id],
                 Tendencia = TendenciaRendimiento.Calcular(cuentan.Select(f => (f.Real, f.Estandar)).ToList()),
@@ -262,7 +273,7 @@ namespace PickingApp.Controllers
                     }
                 }
 
-                empleadoExistente.BodegaId = model.BodegaId;
+                await Traslados.CambiarBodegaAsync(_context, empleadoExistente, model.BodegaId);
                 empleadoExistente.NombreCompleto = model.NombreCompleto;
                 empleadoExistente.Correo = model.Correo;
                 empleadoExistente.HorarioEntrada = model.HorarioEntrada;

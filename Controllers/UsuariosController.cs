@@ -63,6 +63,10 @@ namespace PickingApp.Controllers
                 .ThenBy(u => u.NombreCompleto)
                 .ToListAsync();
 
+            if (!EsAdministrador)
+            {
+                ViewData["Trasladados"] = await Traslados.AuxiliaresQueSalieronAsync(_context, User.BodegaVisible()!.Value);
+            }
             return View(usuarios);
         }
 
@@ -185,6 +189,7 @@ namespace PickingApp.Controllers
             var usuario = await DelAlcance().FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return NotFound();
 
+            ViewData["Periodos"] = Traslados.Periodos(await Traslados.DeUsuarioAsync(_context, id), usuario.FechaRegistro);
             return View(usuario);
         }
 
@@ -250,7 +255,7 @@ namespace PickingApp.Controllers
             usuario.Identificacion = identificacion;
             usuario.RolId = rolId;
             usuario.Estado = estado;
-            usuario.BodegaId = bodegaId;
+            Traslados.CambiarBodega(_context, usuario, bodegaId);
 
             if (estado == EstadosUsuario.Activo)
             {

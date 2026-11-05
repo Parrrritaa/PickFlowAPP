@@ -29,18 +29,34 @@
     <div>
         <h1 class="pf-page-title">@empleado.NombreCompleto</h1>
         <p class="pf-dash-sub">
-            @PickingApp.Models.Empleado.DescribirEstado(empleado.Activo, Model.Ocupado) · Turno @empleado.JornadaLaboral · @empleado.MesesExperiencia meses de experiencia
+            @if (Model.SalidaDeEstaBodega is { } salida)
+            {
+                @($"Inactivo en esta bodega · Trasladado a {salida.BodegaDestino!.Nombre} el {salida.Fecha:dd/MM/yyyy}")
+            }
+            else
+            {
+                @($"{PickingApp.Models.Empleado.DescribirEstado(empleado.Activo, Model.Ocupado)} · Turno {empleado.JornadaLaboral} · {empleado.MesesExperiencia} meses de experiencia")
+            }
         </p>
     </div>
 </div>
+
+<partial name="_PasoPorBodegas" model="Model.Periodos" />
 
 @if (Model.TotalCompletados == 0)
 {
     <div class="pf-card pf-notif-empty pf-historial-vacio pf-appear">
         <div class="pf-notif-empty-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></div>
         <div class="pf-notif-empty-title">Aún no hay pedidos completados</div>
-        <div class="pf-notif-empty-text">Cuando @empleado.NombreCompleto complete su primer pedido, aquí verá su tiempo real frente al estimado.</div>
-        <a asp-controller="Pedidos" asp-action="Index" asp-route-estado="@PickingApp.Models.PedidoEstados.Pendiente" class="btn-pf-blue mt-3">Ver pedidos pendientes</a>
+        @if (Model.SalidaDeEstaBodega == null)
+        {
+            <div class="pf-notif-empty-text">Cuando @empleado.NombreCompleto complete su primer pedido, aquí verá su tiempo real frente al estimado.</div>
+            <a asp-controller="Pedidos" asp-action="Index" asp-route-estado="@PickingApp.Models.PedidoEstados.Pendiente" class="btn-pf-blue mt-3">Ver pedidos pendientes</a>
+        }
+        else
+        {
+            <div class="pf-notif-empty-text">@empleado.NombreCompleto no completó pedidos en esta bodega.</div>
+        }
     </div>
 }
 else

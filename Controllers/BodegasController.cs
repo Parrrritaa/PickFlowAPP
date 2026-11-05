@@ -25,6 +25,12 @@ namespace PickingApp.Controllers
         // CU-22: Consultar bodegas y ubicaciones
         public async Task<IActionResult> Index(string? estado, string? busquedaProducto)
         {
+            // Supervisor y Auxiliar solo tienen una bodega: no hay lista que mostrar
+            if (User.BodegaVisible() is int propia)
+            {
+                return RedirectToAction(nameof(Detalle), new { id = propia });
+            }
+
             var query = _context.Bodegas.DelAlcance(User);
 
             if (estado == "Activa")
@@ -216,9 +222,10 @@ namespace PickingApp.Controllers
             if (bodega == null) return NotFound();
 
             // Se valida antes de borrar: la relación es Restrict y MySQL rechazaría el DELETE
-            if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == id) || await _context.Pedidos.AnyAsync(p => p.BodegaId == id))
+            if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == id) || await _context.Pedidos.AnyAsync(p => p.BodegaId == id)
+                || await _context.TrasladosPersonal.AnyAsync(t => t.BodegaOrigenId == id || t.BodegaDestinoId == id))
             {
-                TempData["ErrorMessage"] = $"No se puede eliminar la bodega '{bodega.Nombre}' porque tiene ubicaciones y/o pedidos asociados.";
+                TempData["ErrorMessage"] = $"No se puede eliminar la bodega '{bodega.Nombre}' porque tiene ubicaciones, pedidos o traslados de personal asociados.";
                 return RedirectToAction(nameof(Index));
             }
 

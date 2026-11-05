@@ -578,6 +578,38 @@ namespace PickingApp.Migrations
                             Decision = "Aprobar",
                             Texto = "Eliminación verificada",
                             TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 1001,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Motivo insuficiente",
+                            TipoSolicitudId = 6
+                        },
+                        new
+                        {
+                            Id = 1002,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "La bodega de destino no requiere personal",
+                            TipoSolicitudId = 6
+                        },
+                        new
+                        {
+                            Id = 1003,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Se necesita en la bodega actual",
+                            TipoSolicitudId = 6
+                        },
+                        new
+                        {
+                            Id = 1004,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Traslado autorizado",
+                            TipoSolicitudId = 6
                         });
                 });
 
@@ -836,7 +868,48 @@ namespace PickingApp.Migrations
                         {
                             Id = 5,
                             Nombre = "Eliminar ubicación"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Nombre = "Trasladar de bodega"
                         });
+                });
+
+            modelBuilder.Entity("PickingApp.Models.TrasladoPersonal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BodegaDestinoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BodegaOrigenId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("EmpleadoId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BodegaDestinoId");
+
+                    b.HasIndex("BodegaOrigenId");
+
+                    b.HasIndex("EmpleadoId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("TrasladosPersonal");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Ubicacion", b =>
@@ -1128,6 +1201,37 @@ namespace PickingApp.Migrations
                     b.Navigation("UsuarioSolicitante");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.TrasladoPersonal", b =>
+                {
+                    b.HasOne("PickingApp.Models.Bodega", "BodegaDestino")
+                        .WithMany()
+                        .HasForeignKey("BodegaDestinoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PickingApp.Models.Bodega", "BodegaOrigen")
+                        .WithMany()
+                        .HasForeignKey("BodegaOrigenId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PickingApp.Models.Empleado", "Empleado")
+                        .WithMany("Traslados")
+                        .HasForeignKey("EmpleadoId");
+
+                    b.HasOne("PickingApp.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId");
+
+                    b.Navigation("BodegaDestino");
+
+                    b.Navigation("BodegaOrigen");
+
+                    b.Navigation("Empleado");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("PickingApp.Models.Ubicacion", b =>
                 {
                     b.HasOne("PickingApp.Models.Bodega", "Bodega")
@@ -1179,6 +1283,8 @@ namespace PickingApp.Migrations
             modelBuilder.Entity("PickingApp.Models.Empleado", b =>
                 {
                     b.Navigation("PedidosAsignados");
+
+                    b.Navigation("Traslados");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>

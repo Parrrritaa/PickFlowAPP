@@ -4,6 +4,8 @@
     var esAdmin = User.IsInRole(Roles.Administrador);
     ViewData["Title"] = esAdmin ? "Usuarios y roles" : "Auxiliares de tu bodega";
     var columnas = esAdmin ? 6 : 4;
+    // Solo el Supervisor: auxiliares que dejaron su bodega
+    var trasladados = ViewData["Trasladados"] as List<TrasladoPersonal> ?? new();
 }
 
 <h1 class="pf-page-title">@ViewData["Title"]</h1>
@@ -40,7 +42,7 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model != null && Model.Any())
+                @if (Model != null && (Model.Any() || trasladados.Any()))
                 {
                     @foreach (var u in Model)
                     {
@@ -66,8 +68,25 @@
                                             <button type="submit" class="btn btn-sm btn-outline-danger">Desbloquear</button>
                                         </form>
                                     }
+                                    @if (!esAdmin)
+                                    {
+                                        <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                                data-bs-toggle="modal" data-bs-target="#modalTraslado"
+                                                data-pf-id="@u.Id" data-pf-texto="@u.NombreCompleto">
+                                            Solicitar traslado
+                                        </button>
+                                    }
                                 </div>
                             </td>
+                        </tr>
+                    }
+                    @foreach (var salida in trasladados)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@salida.Usuario!.Correo</td>
+                            <td>@salida.Usuario.NombreCompleto</td>
+                            <td>Inactivo · Trasladado a @salida.BodegaDestino!.Nombre el @salida.Fecha.ToString("dd/MM/yyyy")</td>
+                            <td class="text-center">-</td>
                         </tr>
                     }
                 }
@@ -84,3 +103,8 @@
         </table>
     </div>
 </div>
+
+@if (!esAdmin)
+{
+    <partial name="_ModalTraslado" model="false" />
+}
