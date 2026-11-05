@@ -16,9 +16,6 @@
         .ThenBy(d => d.Ubicacion?.CodigoUbicacion)
         .ToList();
     var unidades = lineas.Sum(d => d.Cantidad);
-    var ubicaciones = lineas.Where(d => d.Ubicacion != null).Select(d => d.UbicacionId).Distinct().Count();
-    var pasillos = lineas.Where(d => d.Ubicacion != null).Select(d => d.Ubicacion!.Pasillo).Distinct()
-        .OrderBy(Numero).ToList();
     var noDisponibles = pedido.Novedades.Where(n => n.TipoNovedad == TiposNovedad.NoDisponible).OrderBy(n => n.FechaRegistro).ToList();
     var otrasNovedades = pedido.Novedades.Where(n => n.TipoNovedad != TiposNovedad.NoDisponible).OrderBy(n => n.FechaRegistro).ToList();
 
@@ -280,11 +277,6 @@
         <div class="resumen">
             <span><strong>@lineas.Count</strong> producto@(lineas.Count == 1 ? "" : "s")</span>
             <span><strong>@unidades</strong> unidades</span>
-            <span><strong>@ubicaciones</strong> ubicaci@(ubicaciones == 1 ? "ón" : "ones")</span>
-            @if (pasillos.Any())
-            {
-                <span>Pasillo@(pasillos.Count == 1 ? "" : "s") <strong>@string.Join(", ", pasillos)</strong></span>
-            }
         </div>
 
         <h2>Productos por recoger, en orden de recorrido</h2>
@@ -377,7 +369,7 @@
         <div class="firmas">
             <div>Empleado que recogió</div>
             <div>Quien recibe</div>
-            <div>Fecha y hora de entrega</div>
+            <div>Número de estibas</div>
         </div>
 
         <p class="pie">PickFlow · Orden de picking @pedido.CodigoPedido · @(pedido.Bodega?.Codigo)</p>
