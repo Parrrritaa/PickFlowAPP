@@ -262,6 +262,10 @@ namespace PickingApp.Data
                 .WithMany()
                 .HasForeignKey(l => l.UsuarioId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Auditoría lista y exporta el LOG por fecha: sin índice, cada página recorre toda la tabla
+            modelBuilder.Entity<LogSistema>()
+                .HasIndex(l => l.FechaHora);
         }
     }
 }

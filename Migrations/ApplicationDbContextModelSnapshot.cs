@@ -279,6 +279,8 @@ namespace PickingApp.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FechaHora");
+
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("LogsSistema");
