@@ -146,7 +146,7 @@ namespace PickingApp.Controllers
             {
                 var codigosExistentes = await _context.Bodegas.AsNoTracking().Select(b => b.Codigo).ToListAsync();
                 var maxNumero = codigosExistentes
-                    .Select(c => System.Text.RegularExpressions.Regex.Match(c, @"BOD-(\d+)$"))
+                    .Select(c => System.Text.RegularExpressions.Regex.Match(c, @"BOD-(\d+)$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
                     .Where(m => m.Success)
                     .Select(m => int.Parse(m.Groups[1].Value))
                     .DefaultIfEmpty(0)
@@ -573,7 +573,7 @@ namespace PickingApp.Controllers
             var nombre = (seleccion.NombreProducto ?? string.Empty).Trim();
             var valido = true;
 
-            if (!System.Text.RegularExpressions.Regex.IsMatch(numero, @"^\d+$") || !int.TryParse(numero, out var numeroValor))
+            if (!System.Text.RegularExpressions.Regex.IsMatch(numero, @"^\d+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)) || !int.TryParse(numero, out var numeroValor))
             {
                 ModelState.AddModelError(string.Empty, "El número de producto es obligatorio y solo debe contener números (máximo 10 dígitos).");
                 numeroValor = 0;
