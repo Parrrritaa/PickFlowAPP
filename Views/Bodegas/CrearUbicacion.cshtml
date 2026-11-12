@@ -1,6 +1,5 @@
 ﻿@model PickingApp.Models.ViewModels.UbicacionFormViewModel
 @{
-    var bodega = Model.Bodega;
     ViewData["Title"] = "Crear ubicación";
 }
 
@@ -23,48 +22,7 @@
 
     <form asp-action="CrearUbicacion" method="post">
         @Html.AntiForgeryToken()
-        <input type="hidden" asp-for="Ubicacion.BodegaId" />
-
-        <div class="row mb-3">
-            <div class="col-md-12 pf-form-group">
-                <label for="bodegaNombre" class="pf-label">Bodega</label>
-                <input id="bodegaNombre" type="text" class="pf-input" value="@bodega.Nombre" disabled style="background-color: var(--pf-hover) !important;" />
-            </div>
-        </div>
-
-        <div class="row mb-3">
-            <div class="col-md-4 pf-form-group">
-                <label for="Ubicacion_Pasillo" class="pf-label">Pasillo <span class="text-danger">*</span></label>
-                <input id="Ubicacion_Pasillo" asp-for="Ubicacion.Pasillo" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
-                <span asp-validation-for="Ubicacion.Pasillo" class="text-danger small"></span>
-            </div>
-            <div class="col-md-4 pf-form-group">
-                <label for="Ubicacion_Estante" class="pf-label">Estante <span class="text-danger">*</span></label>
-                <input id="Ubicacion_Estante" asp-for="Ubicacion.Estante" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
-                <span asp-validation-for="Ubicacion.Estante" class="text-danger small"></span>
-            </div>
-            <div class="col-md-4 pf-form-group">
-                <label for="Ubicacion_Nivel" class="pf-label">Nivel <span class="text-danger">*</span></label>
-                <input id="Ubicacion_Nivel" asp-for="Ubicacion.Nivel" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
-                <span asp-validation-for="Ubicacion.Nivel" class="text-danger small"></span>
-            </div>
-        </div>
-
-        <div class="pf-info-banner mb-3" style="font-size: 13px;">
-            El código de la ubicación se genera automáticamente a partir de estos datos (ej: <strong>PAS01-EST02-NIV03</strong>).
-        </div>
-
-        <partial name="_SeleccionProducto" model="Model.Seleccion" />
-
-        <div class="row mb-4">
-            <div class="col-md-6 pf-form-group">
-                <label for="Ubicacion_Activa" class="pf-label">Estado</label>
-                <select id="Ubicacion_Activa" asp-for="Ubicacion.Activa" class="pf-input">
-                    <option value="true">Activa</option>
-                    <option value="false">Inactiva</option>
-                </select>
-            </div>
-        </div>
+        <partial name="_CamposUbicacion" model="Model" />
 
         <div class="d-flex justify-content-end gap-3 pt-2">
             <a asp-action="Detalle" asp-route-id="@Model.Ubicacion.BodegaId" class="btn-pf-gray" data-pf-volver="ultima">
