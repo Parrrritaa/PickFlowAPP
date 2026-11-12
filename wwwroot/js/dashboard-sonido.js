@@ -13,7 +13,7 @@
         sonido.currentTime = 0;
         // play() devuelve una promesa que falla si el navegador bloquea el audio: el easter egg no muestra errores
         var reproduccion = sonido.play();
-        if (reproduccion) reproduccion.catch(function () { });
+        reproduccion?.catch(function () { });
 
         // Apretón visual; se reinicia si se toca varias veces seguidas
         titulo.classList.remove('pf-boop');

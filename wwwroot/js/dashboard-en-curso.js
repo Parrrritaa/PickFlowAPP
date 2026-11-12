@@ -14,8 +14,8 @@
         var ahora = Date.now();
         filas.forEach(function (fila) {
             var inicio = new Date(fila.dataset.inicio).getTime();
-            var estimado = parseFloat(fila.dataset.estimado);
-            if (isNaN(inicio) || !(estimado > 0)) return;
+            var estimado = Number.parseFloat(fila.dataset.estimado);
+            if (Number.isNaN(inicio) || !(estimado > 0)) return;
             var transcurrido = Math.max(0, (ahora - inicio) / 60000);
             var avance = Math.min(1, transcurrido / estimado);
             var tarde = transcurrido > estimado;

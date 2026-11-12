@@ -169,7 +169,7 @@
     }
 
     function cambiarPartes(n) {
-        n = Math.max(2, Math.min(cfg.maxPartes, parseInt(n, 10) || 2));
+        n = Math.max(2, Math.min(cfg.maxPartes, Number.parseInt(n, 10) || 2));
         partes = n;
         campoPartes.value = n;
         document.getElementById('btnMenosPartes').disabled = n <= 2;
@@ -187,8 +187,8 @@
     document.getElementById('tablaReparto').addEventListener('input', function (e) {
         var input = e.target;
         if (!input.classList.contains('pf-input-cantidad')) return;
-        var valor = parseInt(input.value, 10);
-        reparto[+input.dataset.i][+input.dataset.k] = isNaN(valor) || valor < 0 ? 0 : valor;
+        var valor = Number.parseInt(input.value, 10);
+        reparto[+input.dataset.i][+input.dataset.k] = Number.isNaN(valor) || valor < 0 ? 0 : valor;
         actualizar();
     });
 

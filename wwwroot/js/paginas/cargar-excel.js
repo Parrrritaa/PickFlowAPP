@@ -228,14 +228,16 @@
                         { duration: 150, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', delay: idx * 12, fill: 'forwards' }
                     ).finished;
                 });
-                Promise.all(salidas).then(function () {
+                function ocultar() {
                     items.forEach(function (el) {
                         el.classList.add('d-none');
                         el.style.opacity = '';
                         el.style.transform = '';
                     });
                     btnToggle.disabled = false;
-                });
+                }
+                // Una animación cancelada rechaza .finished: se ocultan igual para no dejar el botón deshabilitado
+                Promise.all(salidas).then(ocultar, ocultar);
             });
             liToggle.appendChild(btnToggle);
             listaErrores.appendChild(liToggle);

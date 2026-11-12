@@ -68,11 +68,11 @@
         }
         // El tipo de gráfica no cambia los datos: se redibuja sin volver a pedirlos
         if (e.target.name === 'tipo' && datos) dibujar();
-        else cargar();
+        else void cargar();
     });
 
     // La vista previa se pide al abrir el diálogo, no al cargar la página
-    modal.addEventListener('shown.bs.modal', () => { if (!datos) cargar(); });
+    modal.addEventListener('shown.bs.modal', () => { if (!datos) void cargar(); });
 
     form.addEventListener('submit', async e => {
         e.preventDefault();
