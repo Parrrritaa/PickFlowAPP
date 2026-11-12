@@ -220,9 +220,9 @@ namespace PickingApp.Tests
             var usuario = Usuario(e, Roles.IdSupervisor);
             var controlador = new AccountController(e.Db, new SinAuditoria(), new SinCorreo(), new Antifalsificacion(valido: false))
             {
-                ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+                ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+                OrigenPeticion = "fetch" // el model binding lo llena desde el header X-Requested-With
             };
-            controlador.ControllerContext.HttpContext.Request.Headers["X-Requested-With"] = "fetch";
 
             var r = (JsonResult)await controlador.Login(new LoginViewModel { Correo = usuario.Correo, Password = "Incorrecta1" });
 

@@ -136,7 +136,7 @@ namespace PickingApp.Controllers
         }
 
         private static readonly System.Text.RegularExpressions.Regex RegexCorreo =
-            new(@"[\w.+-]+@[\w-]+(\.[\w-]+)+", System.Text.RegularExpressions.RegexOptions.Compiled);
+            new(@"[\w.+-]+@[\w-]+(\.[\w-]+)+", System.Text.RegularExpressions.RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
         // CU-39: Habilitar o deshabilitar registro de LOG y configurar parámetros
         [HttpGet]
