@@ -264,11 +264,13 @@ namespace PickingApp.Services
 
         public const string ColumnasEsperadas = "CodigoPedido, Bodega, CodigoProducto, NombreProducto, Cantidad y Prioridad";
 
+        private static readonly Regex Espacios = new(@"\s+", RegexOptions.None, TimeSpan.FromSeconds(1));
+
         // Mayúsculas, tildes y espacios repetidos no cuentan: "teclado  mecanico" es "Teclado Mecánico".
         // Una celda vacía tampoco es un nombre distinto: se usa el registrado.
         private static bool MismoNombre(string delExcel, string registrado) =>
             string.IsNullOrWhiteSpace(delExcel) ||
-            string.Compare(Regex.Replace(delExcel.Trim(), @"\s+", " "), Regex.Replace(registrado.Trim(), @"\s+", " "),
+            string.Compare(Espacios.Replace(delExcel.Trim(), " "), Espacios.Replace(registrado.Trim(), " "),
                 CultureInfo.InvariantCulture, CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) == 0;
 
         // Agrupa las filas con un nombre distinto al registrado y aplica la confirmación del usuario sobre cada grupo

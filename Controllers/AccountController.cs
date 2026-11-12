@@ -339,7 +339,10 @@ namespace PickingApp.Controllers
 
         // El formulario de inicio de sesión se envía con fetch (wwwroot/js/paginas/login.js) para mostrar el error
         // sin recargar la página. Sin JavaScript llega como un envío normal y se responde con la vista completa.
-        private bool EsEnvioConFetch => Request.Headers["X-Requested-With"] == "fetch";
+        [FromHeader(Name = "X-Requested-With")]
+        public string? OrigenPeticion { get; set; }
+
+        private bool EsEnvioConFetch => OrigenPeticion == "fetch";
 
         // Errores del ModelState por campo ("" = mensaje general, "Correo", "Password").
         // Con fetch la página no se recarga, así que también viaja un token antifalsificación vigente: si el que

@@ -113,7 +113,7 @@ namespace PickingApp.Controllers
             {
                 ModelState.AddModelError(string.Empty, "La contraseña debe tener al menos 6 caracteres.");
             }
-            else if (!System.Text.RegularExpressions.Regex.IsMatch(password, @"^(?=.*[A-Za-z])(?=.*\d).+$"))
+            else if (!System.Text.RegularExpressions.Regex.IsMatch(password, @"^(?=.*[A-Za-z])(?=.*\d).+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
             {
                 ModelState.AddModelError(string.Empty, "La contraseña debe contener al menos una letra y un número.");
             }

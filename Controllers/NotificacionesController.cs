@@ -34,7 +34,7 @@ namespace PickingApp.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> MarcarLeida(int id)
+        public async Task<IActionResult> MarcarLeida(int id, [FromHeader(Name = "X-Requested-With")] string? origen = null)
         {
             // Solo las propias: el Id de otra persona no encuentra nada (evita IDOR)
             var userId = User.IdUsuario();
@@ -48,7 +48,7 @@ namespace PickingApp.Controllers
             }
 
             // Petición desde la página (sin recarga): responde con el resultado para animar el descarte
-            if (Request.Headers["X-Requested-With"] == "fetch")
+            if (origen == "fetch")
             {
                 return esDelUsuario ? NoContent() : NotFound();
             }
