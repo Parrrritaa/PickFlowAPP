@@ -72,8 +72,8 @@
                                             Ubicación <i class="bi @(activoUbicacion ? "bi-funnel-fill" : "bi-funnel")"></i>
                                         </button>
                                         <div class="dropdown-menu th-filtro-menu">
-                                            <label class="form-label small fw-semibold mb-1">Buscar ubicación</label>
-                                            <input type="text" name="filtroUbicacion" value="@filtroUbicacion" class="form-control form-control-sm" placeholder="Código de ubicación..." />
+                                            <label for="filtroUbicacion" class="form-label small fw-semibold mb-1">Buscar ubicación</label>
+                                            <input id="filtroUbicacion" type="text" name="filtroUbicacion" value="@filtroUbicacion" class="form-control form-control-sm" placeholder="Código de ubicación..." />
                                             <div class="th-filtro-acciones">
                                                 <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
                                                 <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
@@ -87,8 +87,8 @@
                                             Producto <i class="bi @(activoProducto ? "bi-funnel-fill" : "bi-funnel")"></i>
                                         </button>
                                         <div class="dropdown-menu th-filtro-menu">
-                                            <label class="form-label small fw-semibold mb-1">Buscar producto</label>
-                                            <input type="text" name="filtroProducto" value="@filtroProducto" class="form-control form-control-sm" placeholder="Código o nombre del producto..." />
+                                            <label for="filtroProducto" class="form-label small fw-semibold mb-1">Buscar producto</label>
+                                            <input id="filtroProducto" type="text" name="filtroProducto" value="@filtroProducto" class="form-control form-control-sm" placeholder="Código o nombre del producto..." />
                                             <div class="th-filtro-acciones">
                                                 <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
                                                 <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
@@ -185,8 +185,8 @@
                         }
                         else
                         {
-                            <label class="form-label fw-bold">Motivo (obligatorio):</label>
-                            <textarea name="motivo" class="form-control" rows="3" required placeholder="Especifique el motivo de la eliminación"></textarea>
+                            <label for="motivo" class="form-label fw-bold">Motivo (obligatorio):</label>
+                            <textarea id="motivo" name="motivo" class="form-control" rows="3" required placeholder="Especifique el motivo de la eliminación"></textarea>
                         }
                     </div>
                     <div class="modal-footer border-0">

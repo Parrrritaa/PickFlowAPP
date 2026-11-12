@@ -96,8 +96,8 @@
                                     ID <i class="bi @(activoBusqueda ? "bi-funnel-fill" : "bi-funnel")"></i>
                                 </button>
                                 <div class="dropdown-menu th-filtro-menu">
-                                    <label class="form-label small fw-semibold mb-1">Número de solicitud</label>
-                                    <input type="text" name="busqueda" value="@f.Busqueda" class="form-control form-control-sm" placeholder="SOL-12" inputmode="numeric" />
+                                    <label for="busqueda" class="form-label small fw-semibold mb-1">Número de solicitud</label>
+                                    <input id="busqueda" type="text" name="busqueda" value="@f.Busqueda" class="form-control form-control-sm" placeholder="SOL-12" inputmode="numeric" />
                                     <div class="th-filtro-acciones">
                                         <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
                                         <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
@@ -113,7 +113,8 @@
                                         Tipo <i class="bi @(activoTipo ? "bi-funnel-fill" : "bi-funnel")"></i>
                                     </button>
                                     <div class="dropdown-menu th-filtro-menu">
-                                        <select name="tipo" class="form-select form-select-sm filtro-auto">
+                                        <label class="visually-hidden" for="filtroTipo">Filtrar por tipo</label>
+                                        <select id="filtroTipo" name="tipo" class="form-select form-select-sm filtro-auto">
                                             <option value="">Todos</option>
                                             @foreach (var tipo in Model.Tipos)
                                             {
@@ -136,7 +137,8 @@
                                         Solicitante <i class="bi @(activoSolicitante ? "bi-funnel-fill" : "bi-funnel")"></i>
                                     </button>
                                     <div class="dropdown-menu th-filtro-menu">
-                                        <select name="solicitanteId" class="form-select form-select-sm filtro-auto">
+                                        <label class="visually-hidden" for="filtroSolicitante">Filtrar por solicitante</label>
+                                        <select id="filtroSolicitante" name="solicitanteId" class="form-select form-select-sm filtro-auto">
                                             <option value="">Todos</option>
                                             @foreach (var u in Model.Solicitantes)
                                             {
@@ -153,10 +155,10 @@
                                     Fecha <i class="bi @(activoFecha ? "bi-funnel-fill" : "bi-funnel")"></i>
                                 </button>
                                 <div class="dropdown-menu th-filtro-menu">
-                                    <label class="form-label small fw-semibold mb-1">Desde</label>
-                                    <input type="date" name="fechaDesde" value="@f.FechaDesde?.ToString("yyyy-MM-dd")" class="form-control form-control-sm mb-2" />
-                                    <label class="form-label small fw-semibold mb-1">Hasta</label>
-                                    <input type="date" name="fechaHasta" value="@f.FechaHasta?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                                    <label for="fechaDesde" class="form-label small fw-semibold mb-1">Desde</label>
+                                    <input id="fechaDesde" type="date" name="fechaDesde" value="@f.FechaDesde?.ToString("yyyy-MM-dd")" class="form-control form-control-sm mb-2" />
+                                    <label for="fechaHasta" class="form-label small fw-semibold mb-1">Hasta</label>
+                                    <input id="fechaHasta" type="date" name="fechaHasta" value="@f.FechaHasta?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
                                     <div class="th-filtro-acciones">
                                         <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
                                         <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>

@@ -17,19 +17,19 @@
 
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Correo electrónico <span class="text-danger">*</span></label>
-                <input type="text" class="pf-input" value="@Model.Correo" disabled style="background-color: var(--pf-hover) !important;" />
+                <label for="correoActual" class="pf-label">Correo electrónico <span class="text-danger">*</span></label>
+                <input id="correoActual" type="text" class="pf-input" value="@Model.Correo" disabled style="background-color: var(--pf-hover) !important;" />
             </div>
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Nombre completo <span class="text-danger">*</span></label>
-                <input type="text" name="nombreCompleto" class="pf-input" value="@Model.NombreCompleto" maxlength="100" required />
+                <label for="nombreCompleto" class="pf-label">Nombre completo <span class="text-danger">*</span></label>
+                <input id="nombreCompleto" type="text" name="nombreCompleto" class="pf-input" value="@Model.NombreCompleto" maxlength="100" required />
             </div>
         </div>
 
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Número de identificación <span class="text-danger">*</span></label>
-                <input type="text" name="identificacion" class="pf-input" value="@Model.Identificacion" maxlength="30" inputmode="numeric" pattern="\d*" title="Solo números" required />
+                <label for="identificacion" class="pf-label">Número de identificación <span class="text-danger">*</span></label>
+                <input id="identificacion" type="text" name="identificacion" class="pf-input" value="@Model.Identificacion" maxlength="30" inputmode="numeric" pattern="\d*" title="Solo números" required />
             </div>
         </div>
 
@@ -57,8 +57,8 @@
 
         <div class="row mb-4">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Estado <span class="text-danger">*</span></label>
-                <select name="estado" class="pf-input" required disabled="@esUnoMismo">
+                <label for="estado" class="pf-label">Estado <span class="text-danger">*</span></label>
+                <select id="estado" name="estado" class="pf-input" required disabled="@esUnoMismo">
                     @foreach (var estado in EstadosUsuario.Todos)
                     {
                         <option value="@estado" selected="@(Model.Estado == estado)">@estado</option>
