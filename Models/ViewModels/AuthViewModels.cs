@@ -2,6 +2,8 @@
 
 namespace PickingApp.Models.ViewModels
 {
+    // Los ViewModels transportan lo que escribe el usuario en un formulario; no son tablas.
+    // Sus atributos ([Required], [EmailAddress]...) generan los mensajes de validación de la vista.
     public class LoginViewModel
     {
         [Required(ErrorMessage = "El correo electrónico es obligatorio.")]
@@ -11,10 +13,9 @@ namespace PickingApp.Models.ViewModels
         [Required(ErrorMessage = "La contraseña es obligatoria.")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
-
-        public bool RememberMe { get; set; } = false;
     }
 
+    // [Compare] valida que ConfirmPassword sea igual a NewPassword
     public class ChangePasswordViewModel
     {
         [Required(ErrorMessage = "La contraseña actual es obligatoria.")]
@@ -32,7 +33,7 @@ namespace PickingApp.Models.ViewModels
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
-    // CU-03: paso 1 de recuperación — se pide el correo para enviar el código de verificación.
+    // CU-03: paso 1 de recuperación: se pide el correo para enviar el código de verificación.
     public class SolicitarCodigoViewModel
     {
         [Required(ErrorMessage = "El correo es obligatorio.")]
@@ -40,7 +41,17 @@ namespace PickingApp.Models.ViewModels
         public string Correo { get; set; } = string.Empty;
     }
 
-    // CU-03: paso 2 de recuperación — código de verificación + nueva contraseña.
+    // CU-03: paso 2 de recuperación: código de verificación + nueva contraseña.
+    // Primer inicio de sesión: el código que confirma que el correo es real. Correo solo se muestra; el servidor usa el de TempData
+    public class VerificarCorreoViewModel
+    {
+        public string Correo { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El código de verificación es obligatorio.")]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "El código debe tener 6 dígitos.")]
+        public string Codigo { get; set; } = string.Empty;
+    }
+
     public class VerificarCodigoRecuperacionViewModel
     {
         [Required]
@@ -62,7 +73,7 @@ namespace PickingApp.Models.ViewModels
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
-    // CU-42: paso 2 del cambio de contraseña estando logueado — confirmación por código de verificación.
+    // CU-42: paso 2 del cambio de contraseña estando logueado: confirmación por código de verificación.
     public class VerificarCodigoCambioViewModel
     {
         [Required(ErrorMessage = "El código de verificación es obligatorio.")]

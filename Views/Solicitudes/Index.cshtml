@@ -1,51 +1,273 @@
-@model IEnumerable<PickingApp.Models.Solicitud>
+@model PickingApp.Models.ViewModels.SolicitudesListaViewModel
 @{
     ViewData["Title"] = "Solicitudes";
+    // La bandeja (Index) y "Mis solicitudes" usan esta vista; los filtros vuelven a la misma acción
+    var accion = Model.EsBandeja ? "Index" : "MisSolicitudes";
+    var f = Model.Filtros;
+
+    var activoBusqueda = !string.IsNullOrWhiteSpace(f.Busqueda);
+    var activoTipo = f.Tipo.HasValue;
+    var activoSolicitante = f.SolicitanteId.HasValue;
+    var activoFecha = f.FechaDesde.HasValue || f.FechaHasta.HasValue;
+    var activoEstado = !string.IsNullOrEmpty(f.Estado);
+
+    // Pestañas de estado sobre la tabla (la primera, Todas, sin filtro); el punto lleva el color de cada estado
+    var pestanas = new (string? Estado, string Texto)[]
+    {
+        (null, "Todas"), (EstadosSolicitud.Pendiente, "Pendientes"), (EstadosSolicitud.Aprobada, "Aprobadas"), (EstadosSolicitud.Rechazada, "Rechazadas")
+    };
+    int ConteoPestana(string? estado) => estado == null ? Model.ConteoPorEstado.Values.Sum() : Model.ConteoPorEstado.GetValueOrDefault(estado);
+
+    // La URL actual con otro estado: conserva los demás filtros
+    string UrlPestana(string? estado)
+    {
+        var query = new Microsoft.AspNetCore.Http.Extensions.QueryBuilder(Context.Request.Query
+            .Where(q => q.Key is not ("estado" or "Estado" or "pagina") && !string.IsNullOrEmpty(q.Value))
+            .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string>(q.Key, v ?? ""))));
+        if (estado != null) query.Add("estado", estado);
+        return Context.Request.PathBase + Context.Request.Path + query.ToQueryString();
+    }
 }
 
 <h1 class="pf-page-title">Solicitudes</h1>
 
-<div class="mockup-card">
-    <div class="table-responsive">
-        <table class="mockup-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Tipo</th>
-                    <th>Solicitante</th>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th class="text-center">Acción</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model != null && Model.Any())
-                {
-                    @foreach (var s in Model)
-                    {
-                        var tipoDisplay = TiposSolicitud.Nombre(s.TipoSolicitud);
+@if (Model.MostrarPestanas)
+{
+    @* El Supervisor revisa registros de empleados y también envía sus propias solicitudes *@
+    <nav class="pf-vista-tabs mb-3" aria-label="Solicitudes">
+        <a asp-action="Index" class="@(Model.EsBandeja ? "activo" : "")" aria-current="@(Model.EsBandeja ? "page" : null)">
+            Por revisar
+            @if (Model.PendientesPorRevisar > 0)
+            {
+                <span class="pf-vista-tabs__contador" title="Solicitudes pendientes de revisar">@Model.PendientesPorRevisar</span>
+            }
+        </a>
+        <a asp-action="MisSolicitudes" class="@(Model.EsBandeja ? "" : "activo")" aria-current="@(Model.EsBandeja ? null : "page")">Mis solicitudes</a>
+    </nav>
+}
 
-                        <tr>
-                            <td class="fw-semibold">SOL-@s.Id</td>
-                            <td>@tipoDisplay</td>
-                            <td>@(s.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</td>
-                            <td>@s.FechaSolicitud.ToString("dd/MM/yyyy")</td>
-                            <td>@s.Estado</td>
-                            <td class="text-center">
-                                <a asp-action="Revisar" asp-route-id="@s.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
-                                    Revisar
+<div class="pf-card">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <span class="text-muted fw-semibold">
+                @($"{Model.Solicitudes.Count} solicitud(es){(f.HayFiltros ? " con los filtros aplicados" : "")}")
+            </span>
+            <p class="pf-seccion-desc small mb-0 mt-1">
+                @(Model.EsBandeja
+                    ? "Solicitudes de otros usuarios para aprobar o rechazar. Las pendientes aparecen primero."
+                    : "Solicitudes que usted envió y la respuesta que recibieron. Abra una para ver el detalle o el motivo de un rechazo.")
+            </p>
+        </div>
+        @if (Model.EsBandeja && Model.PendientesEnCadena > 0)
+        {
+            @* Abre la pendiente más antigua y, al decidir, pasa sola a la siguiente (respeta el filtro de tipo) *@
+            <a asp-action="RevisarPendientes" asp-route-tipo="@f.Tipo" class="btn-pf-blue">
+                Revisar pendientes (@Model.PendientesEnCadena)
+            </a>
+        }
+    </div>
+
+    @* Los filtros viajan por GET en la URL y llegan a SolicitudesController como FiltrosSolicitudes *@
+    <form method="get" asp-action="@accion" id="formFiltrosSolicitudes">
+        @* La pestaña elegida viaja con los filtros de las columnas *@
+        <input type="hidden" name="estado" value="@f.Estado" />
+
+        <div class="pf-estado-barra">
+            <nav class="pf-estado-tabs" aria-label="Estado de las solicitudes">
+                @foreach (var (estadoPestana, texto) in pestanas)
+                {
+                    var activa = (f.Estado ?? "") == (estadoPestana ?? "");
+                    <a href="@UrlPestana(estadoPestana)"
+                       class="@(activa ? "activo" : "") @(estadoPestana == null ? "" : "pf-estado-punto is-sol-" + estadoPestana.ToLowerInvariant())"
+                       aria-current="@(activa ? "page" : null)">
+                        @texto <span class="pf-estado-tabs__n">@ConteoPestana(estadoPestana)</span>
+                    </a>
+                }
+            </nav>
+        </div>
+
+        <div class="table-responsive">
+            <table class="pf-table" data-pf-paginar>
+                <thead>
+                    <tr>
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoBusqueda ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    ID <i class="bi @(activoBusqueda ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <label class="form-label small fw-semibold mb-1">Número de solicitud</label>
+                                    <input type="text" name="busqueda" value="@f.Busqueda" class="form-control form-control-sm" placeholder="SOL-12" inputmode="numeric" />
+                                    <div class="th-filtro-acciones">
+                                        <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </th>
+                        <th>
+                            @if (Model.Tipos.Count > 1 || activoTipo)
+                            {
+                                <div class="dropdown">
+                                    <button type="button" class="th-filtro-btn @(activoTipo ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                        Tipo <i class="bi @(activoTipo ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                    </button>
+                                    <div class="dropdown-menu th-filtro-menu">
+                                        <select name="tipo" class="form-select form-select-sm filtro-auto">
+                                            <option value="">Todos</option>
+                                            @foreach (var tipo in Model.Tipos)
+                                            {
+                                                <option value="@tipo.Id" selected="@(f.Tipo == tipo.Id)">@tipo.Nombre</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <span>Tipo</span>
+                            }
+                        </th>
+                        @if (Model.EsBandeja)
+                        {
+                            <th>
+                                <div class="dropdown">
+                                    <button type="button" class="th-filtro-btn @(activoSolicitante ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                        Solicitante <i class="bi @(activoSolicitante ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                    </button>
+                                    <div class="dropdown-menu th-filtro-menu">
+                                        <select name="solicitanteId" class="form-select form-select-sm filtro-auto">
+                                            <option value="">Todos</option>
+                                            @foreach (var u in Model.Solicitantes)
+                                            {
+                                                <option value="@u.Id" selected="@(f.SolicitanteId == u.Id)">@u.NombreCompleto</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                            </th>
+                        }
+                        <th>
+                            <div class="dropdown">
+                                <button type="button" class="th-filtro-btn @(activoFecha ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                    Fecha <i class="bi @(activoFecha ? "bi-funnel-fill" : "bi-funnel")"></i>
+                                </button>
+                                <div class="dropdown-menu th-filtro-menu">
+                                    <label class="form-label small fw-semibold mb-1">Desde</label>
+                                    <input type="date" name="fechaDesde" value="@f.FechaDesde?.ToString("yyyy-MM-dd")" class="form-control form-control-sm mb-2" />
+                                    <label class="form-label small fw-semibold mb-1">Hasta</label>
+                                    <input type="date" name="fechaHasta" value="@f.FechaHasta?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                                    <div class="th-filtro-acciones">
+                                        <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </th>
+                        @* El estado se elige en las pestañas de arriba *@
+                        <th>Estado</th>
+                        @if (!Model.EsBandeja)
+                        {
+                            <th>Respuesta</th>
+                        }
+                        <th class="text-center">
+                            Acción
+                            @if (f.HayFiltros)
+                            {
+                                <a asp-action="@accion" class="d-block small fw-semibold text-decoration-none mt-1">
+                                    <i class="bi bi-x-circle" aria-hidden="true"></i> Limpiar filtros
                                 </a>
+                            }
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Solicitudes.Any())
+                    {
+                        @foreach (var s in Model.Solicitudes)
+                        {
+                            var pendiente = s.Estado == EstadosSolicitud.Pendiente;
+                            <tr>
+                                <td class="fw-semibold">SOL-@s.Id</td>
+                                <td>@s.NombreTipo</td>
+                                @if (Model.EsBandeja)
+                                {
+                                    <td>@(s.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</td>
+                                }
+                                <td>
+                                    @s.FechaSolicitud.ToString("dd/MM/yyyy")
+                                    <div class="text-secondary small">@s.FechaSolicitud.ToString("HH:mm")</div>
+                                </td>
+                                <td><partial name="_EstadoSolicitud" model="s.Estado" /></td>
+                                @if (!Model.EsBandeja)
+                                {
+                                    <td class="pf-celda-respuesta">
+                                        @if (pendiente)
+                                        {
+                                            <span class="text-secondary">Esperando respuesta</span>
+                                        }
+                                        else
+                                        {
+                                            <div>@(s.UsuarioResponde?.NombreCompleto ?? "Sin registro") · @s.FechaRespuesta?.ToString("dd/MM/yyyy")</div>
+                                            @if (!string.IsNullOrWhiteSpace(s.TextoObservacion))
+                                            {
+                                                <div class="pf-motivo-corto small text-secondary" title="@s.TextoObservacion">Observación: @s.TextoObservacion</div>
+                                            }
+                                        }
+                                    </td>
+                                }
+                                <td class="text-center">
+                                    @if (Model.EsBandeja)
+                                    {
+                                        <a asp-action="Revisar" asp-route-id="@s.Id" class="btn-pf-blue" data-fila-abre style="padding: 4px 20px; font-size: 14px;">
+                                            @(pendiente ? "Revisar" : "Ver")
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <a asp-action="Detalle" asp-route-id="@s.Id" class="btn-pf-blue" data-fila-abre style="padding: 4px 20px; font-size: 14px;">Ver</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                @(f.HayFiltros ? "Ninguna solicitud coincide con los filtros aplicados."
+                                    : Model.EsBandeja ? "No hay solicitudes para revisar." : "Aún no ha enviado solicitudes.")
                             </td>
                         </tr>
                     }
-                }
-                else
-                {
-                    <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No hay solicitudes registradas.</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var form = document.getElementById('formFiltrosSolicitudes');
+
+            // Posicionamiento "fixed" para que el menú no quede recortado por el scroll horizontal de la tabla.
+            form.querySelectorAll('.th-filtro-btn').forEach(function (btn) {
+                new bootstrap.Dropdown(btn, { autoClose: 'outside', popperConfig: { strategy: 'fixed' } });
+            });
+
+            // Las listas aplican el filtro al elegir una opción.
+            form.querySelectorAll('.filtro-auto').forEach(function (el) {
+                el.addEventListener('change', function () { form.submit(); });
+            });
+
+            // "Quitar" limpia solo los campos de esa columna y vuelve a filtrar.
+            form.querySelectorAll('[data-limpiar-filtro]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    btn.closest('.th-filtro-menu').querySelectorAll('input').forEach(function (i) { i.value = ''; });
+                    form.submit();
+                });
+            });
+        })();
+    </script>
+}

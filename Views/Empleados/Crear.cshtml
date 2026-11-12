@@ -3,18 +3,22 @@
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var esAuxiliar = userRole == Roles.Auxiliar;
     ViewData["Title"] = esAuxiliar ? "Solicitar registro de empleado" : "Registrar empleado";
+    // Si el servidor rechaza el formulario, nombres y apellidos vuelven tal como se escribieron
+    var nombres = Context.Request.HasFormContentType ? Context.Request.Form["nombres"].ToString() : "";
+    var apellidos = Context.Request.HasFormContentType ? Context.Request.Form["apellidos"].ToString() : "";
 }
 
 <h1 class="pf-page-title">@(esAuxiliar ? "Solicitar registro de empleado" : "Registrar empleado")</h1>
 
-<div class="mockup-card">
-    <div class="mockup-info-banner">
-        Complete la información del nuevo empleado. Los campos marcados con * son obligatorios
+<div class="pf-card">
+    <div class="pf-info-banner">
+        Complete la información del nuevo empleado. Los campos marcados con * son obligatorios.
+        @(userRole == Roles.Administrador ? "" : "Quedará en tu bodega.")
     </div>
 
     @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
     {
-        <div class="mockup-alert-warning mb-4">
+        <div class="pf-alert-warning mb-4">
             @foreach (var error in ViewData.ModelState[string.Empty]!.Errors)
             {
                 <div>@error.ErrorMessage</div>
@@ -27,53 +31,63 @@
         <input type="hidden" asp-for="NombreCompleto" id="hiddenNombreCompleto" />
 
         <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Nombres <span class="text-danger">*</span></label>
-                <input type="text" id="inputNombres" class="mockup-input" placeholder="" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Nombres <span class="text-danger">*</span></label>
+                <input type="text" id="inputNombres" name="nombres" class="pf-input" value="@nombres" placeholder="" required />
             </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Apellidos <span class="text-danger">*</span></label>
-                <input type="text" id="inputApellidos" class="mockup-input" placeholder="" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Apellidos <span class="text-danger">*</span></label>
+                <input type="text" id="inputApellidos" name="apellidos" class="pf-input" value="@apellidos" placeholder="" required />
             </div>
         </div>
 
         <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Numero de documento <span class="text-danger">*</span></label>
-                <input asp-for="Identificacion" class="mockup-input" placeholder="" inputmode="numeric" pattern="\d*" title="Solo números" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Numero de documento <span class="text-danger">*</span></label>
+                <input asp-for="Identificacion" class="pf-input" placeholder="" inputmode="numeric" pattern="\d*" title="Solo números" required />
                 <span asp-validation-for="Identificacion" class="text-danger small"></span>
             </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Correo electronico <span class="text-danger">*</span></label>
-                <input asp-for="Correo" type="email" class="mockup-input" placeholder="" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Correo electronico <span class="text-danger">*</span></label>
+                <input asp-for="Correo" type="email" class="pf-input" placeholder="" required />
                 <span asp-validation-for="Correo" class="text-danger small"></span>
             </div>
         </div>
 
         <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Fecha de ingreso <span class="text-danger">*</span></label>
-                <input asp-for="FechaIngreso" type="date" class="mockup-input" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Fecha de ingreso <span class="text-danger">*</span></label>
+                <input asp-for="FechaIngreso" type="date" class="pf-input" required />
                 <span asp-validation-for="FechaIngreso" class="text-danger small"></span>
             </div>
+            @if (userRole == Roles.Administrador)
+            {
+                <div class="col-md-6 pf-form-group">
+                    <label class="pf-label" for="BodegaId">Bodega <span class="text-danger">*</span></label>
+                    <select asp-for="BodegaId" class="pf-input" required>
+                        @await Component.InvokeAsync("OpcionesBodega", new { seleccionada = Model?.BodegaId })
+                    </select>
+                    <span asp-validation-for="BodegaId" class="text-danger small"></span>
+                </div>
+            }
         </div>
 
         <div class="row mb-4">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Hora de entrada <span class="text-danger">*</span></label>
-                <input asp-for="HorarioEntrada" type="time" class="mockup-input" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Hora de entrada <span class="text-danger">*</span></label>
+                <input asp-for="HorarioEntrada" type="time" class="pf-input" required />
                 <span asp-validation-for="HorarioEntrada" class="text-danger small"></span>
             </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Hora de salida <span class="text-danger">*</span></label>
-                <input asp-for="HorarioSalida" type="time" class="mockup-input" required />
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Hora de salida <span class="text-danger">*</span></label>
+                <input asp-for="HorarioSalida" type="time" class="pf-input" required />
                 <span asp-validation-for="HorarioSalida" class="text-danger small"></span>
                 <div class="form-text small">La jornada no puede superar el máximo de horas configurado por el Administrador.</div>
             </div>
         </div>
 
         <div class="d-flex justify-content-end gap-3 pt-2">
-            <a asp-action="Index" class="btn-pf-gray">
+            <a asp-action="Index" class="btn-pf-gray" data-pf-volver="ultima">
                 Cancelar
             </a>
             <button type="submit" class="btn-pf-blue">

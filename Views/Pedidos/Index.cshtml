@@ -1,17 +1,18 @@
-@model IEnumerable<PickingApp.Models.Pedido>
+@model PickingApp.Models.ViewModels.PedidosIndexViewModel
 @{
-    ViewData["Title"] = "Gestión de pedidos";
-    var bodegas = ViewBag.Bodegas as IEnumerable<PickingApp.Models.Bodega> ?? Enumerable.Empty<PickingApp.Models.Bodega>();
-    var empleados = ViewBag.Empleados as IEnumerable<PickingApp.Models.Empleado> ?? Enumerable.Empty<PickingApp.Models.Empleado>();
-    var filtroEstado = ViewBag.FiltroEstado as string;
-    var filtroPrioridad = ViewBag.FiltroPrioridad as string;
-    var filtroBodegaId = ViewBag.FiltroBodegaId as int?;
-    var filtroEmpleadoId = ViewBag.FiltroEmpleadoId as int?;
-    var filtroFechaDesde = ViewBag.FiltroFechaDesde as string;
-    var filtroFechaHasta = ViewBag.FiltroFechaHasta as string;
-    var busqueda = ViewBag.Busqueda as string;
-    var verDivididos = (ViewBag.Vista as string) == "divididos";
-    var divididosEnCurso = ViewBag.DivididosEnCurso as int? ?? 0;
+    var pedidos = Model.Pedidos;
+    ViewData["Title"] = "Pedidos";
+    var bodegas = Model.Bodegas;
+    var empleados = Model.Empleados;
+    var filtroEstado = Model.FiltroEstado;
+    var filtroPrioridad = Model.FiltroPrioridad;
+    var filtroBodegaId = Model.FiltroBodegaId;
+    var filtroEmpleadoId = Model.FiltroEmpleadoId;
+    var filtroFechaDesde = Model.FiltroFechaDesde;
+    var filtroFechaHasta = Model.FiltroFechaHasta;
+    var busqueda = Model.Busqueda;
+    var verDivididos = Model.VerDivididos;
+    var divididosEnCurso = Model.DivididosEnCurso;
 
     var activoPedido = !string.IsNullOrWhiteSpace(busqueda);
     var activoFecha = !string.IsNullOrEmpty(filtroFechaDesde) || !string.IsNullOrEmpty(filtroFechaHasta);
@@ -19,16 +20,84 @@
     var activoBodega = (filtroBodegaId ?? 0) > 0;
     var activoEstado = !string.IsNullOrEmpty(filtroEstado);
     var activoEmpleado = (filtroEmpleadoId ?? 0) != 0;
-    var hayFiltros = activoPedido || activoFecha || activoPrioridad || activoBodega || activoEstado || activoEmpleado;
+    var filtroNovedad = Model.FiltroNovedad;
+    var activoNovedad = !string.IsNullOrEmpty(filtroNovedad);
+    var hayFiltros = activoPedido || activoFecha || activoPrioridad || activoBodega || activoEstado || activoEmpleado || activoNovedad;
+    var vistaRuta = verDivididos ? "divididos" : null;
+    var novedadesPorTipo = Model.NovedadesSinAtenderPorTipo;
+    var totalSinAtender = novedadesPorTipo.Values.Sum();
 
-    // En la vista de divididos se filtra por el estado del pedido original
-    var estados = verDivididos
-        ? new[] { (PedidoEstados.Dividido, "En curso (dividido)"), (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") }
-        : new[] { (PedidoEstados.Pendiente, "Pendiente"), (PedidoEstados.Asignado, "Asignado"), (PedidoEstados.Reasignado, "Reasignado"),
-                  (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") };
+    // Marca junto al código: ámbar con cuántas faltan por atender, o gris con ✓ si ya se atendieron todas
+    void MarcaNovedad(IEnumerable<PickingApp.Models.NovedadPedido> novedades)
+    {
+        var lista = novedades.ToList();
+        if (!lista.Any()) return;
+        var pendientes = lista.Where(n => !n.Atendida).ToList();
+        var texto = pendientes.Any()
+            ? $"{pendientes.Count} novedad(es) sin atender: {string.Join(", ", pendientes.Select(n => n.TipoNovedad).Distinct())}"
+            : $"{lista.Count} novedad(es), todas atendidas";
+        <span class="pf-marca-novedad @(pendientes.Any() ? "is-pendiente" : "is-atendida")" title="@texto">
+            <i class="bi @(pendientes.Any() ? "bi-exclamation-triangle-fill" : "bi-check2")" aria-hidden="true"></i>
+            @if (pendientes.Any())
+            {
+                @pendientes.Count
+            }
+            <span class="visually-hidden">@texto</span>
+        </span>
+    }
+
+    // Pestañas de estado sobre la tabla (la primera, Todos, sin filtro). En divididos cuenta el estado del pedido original.
+    var pestanas = verDivididos
+        ? new (string? Estado, string Texto)[] { (null, "Todos"), (PedidoEstados.Dividido, "En curso"), (PedidoEstados.Completado, "Completados"), (PedidoEstados.Cancelado, "Cancelados") }
+        : new (string? Estado, string Texto)[] { (null, "Todos"), (PedidoEstados.Pendiente, "Pendientes"), (PedidoEstados.Asignado, "Asignados"),
+                  (PedidoEstados.Reasignado, "Reasignados"), (PedidoEstados.Completado, "Completados"), (PedidoEstados.Cancelado, "Cancelados") };
+    int ConteoPestana(string? estado) => estado == null ? Model.ConteoPorEstado.Values.Sum() : Model.ConteoPorEstado.GetValueOrDefault(estado);
+
+    // La URL actual con otro estado: conserva la búsqueda y los demás filtros, y vuelve a la página 1
+    string UrlPestana(string? estado)
+    {
+        var query = new Microsoft.AspNetCore.Http.Extensions.QueryBuilder(Context.Request.Query
+            .Where(q => q.Key is not ("estado" or "pagina") && !string.IsNullOrEmpty(q.Value))
+            .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string>(q.Key, v ?? ""))));
+        if (estado != null) query.Add("estado", estado);
+        return Context.Request.PathBase + Context.Request.Path + query.ToQueryString();
+    }
+
+    // Punto de color de cada estado (el mismo de las cifras del Inicio) y color del texto de la prioridad
+    string ClaseEstado(string estado) => estado switch
+    {
+        PedidoEstados.Pendiente => "is-pendiente",
+        PedidoEstados.Asignado => "is-asignado",
+        PedidoEstados.Reasignado => "is-reasignado",
+        PedidoEstados.Completado => "is-completado",
+        PedidoEstados.Cancelado => "is-cancelado",
+        _ => "is-dividido"
+    };
+    string ClasePrioridad(string prioridad) => prioridad switch { "Alta" => "is-alta", "Baja" => "is-baja", _ => "is-media" };
 }
 
-<h1 class="pf-page-title">Gestión de pedidos</h1>
+<div class="pf-titulo-fila">
+    <div>
+        <h1 class="pf-page-title">Pedidos</h1>
+        <p class="pf-page-sub">
+            @if (verDivididos)
+            {
+                @($"{Model.Paginacion.TotalRegistros} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+            }
+            else
+            {
+                @($"{Model.Paginacion.TotalRegistros} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+            }
+        </p>
+    </div>
+    @* Junto al título y no sobre la tabla: así no le quita una fila a la paginación. form= lo une a los filtros *@
+    <div class="pf-pedidos-buscar">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <label class="visually-hidden" for="buscarPedido">Buscar pedidos</label>
+        <input type="search" id="buscarPedido" name="busqueda" value="@busqueda" form="formFiltrosPedidos" class="pf-search-input"
+               placeholder="Pedido, producto o empleado" autocomplete="off" />
+    </div>
+</div>
 
 <nav class="pf-vista-tabs mb-3" aria-label="Tipo de pedidos">
     <a asp-action="Index" class="@(verDivididos ? "" : "activo")" aria-current="@(verDivididos ? null : "page")">Pedidos</a>
@@ -41,25 +110,53 @@
     </a>
 </nav>
 
-<div class="mockup-card">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <span class="text-muted fw-semibold">
-            @if (verDivididos)
+@if (totalSinAtender > 0 || Model.HayNovedadesAtendidas || activoNovedad)
+{
+    @* Radar de novedades: cuántas faltan por atender y de qué tipo; cada chip filtra la lista con un clic *@
+    <section class="pf-radar @(totalSinAtender > 0 ? "pf-radar--alerta" : "")" aria-label="Novedades de los pedidos">
+        <div class="pf-radar__texto">
+            @if (totalSinAtender > 0)
             {
-                @($"{Model?.Count() ?? 0} pedido(s) dividido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                <span><strong>@totalSinAtender @(totalSinAtender == 1 ? "novedad sin atender" : "novedades sin atender")</strong>
+                    en @Model.PedidosConNovedadSinAtender @(Model.PedidosConNovedadSinAtender == 1 ? "pedido" : "pedidos")</span>
             }
             else
             {
-                @($"{Model?.Count() ?? 0} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
+                <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                <span>Todas las novedades están atendidas</span>
             }
-        </span>
-        <div>
-            <a asp-action="CargarExcel" class="btn-pf-blue">
-                + Cargar Excel
-            </a>
         </div>
-    </div>
+        <div class="pf-radar__chips">
+            @if (totalSinAtender > 0)
+            {
+                <a asp-action="Index" asp-route-vista="@vistaRuta" asp-route-novedad="@FiltrosNovedad.SinAtender"
+                   class="pf-radar-chip @(filtroNovedad == FiltrosNovedad.SinAtender ? "activo" : "")">
+                    Sin atender <span class="pf-radar-chip__n">@totalSinAtender</span>
+                </a>
+                @foreach (var tipo in TiposNovedad.Todos.Where(novedadesPorTipo.ContainsKey))
+                {
+                    <a asp-action="Index" asp-route-vista="@vistaRuta" asp-route-novedad="@tipo"
+                       class="pf-radar-chip @(filtroNovedad == tipo ? "activo" : "")">
+                        @tipo <span class="pf-radar-chip__n">@novedadesPorTipo[tipo]</span>
+                    </a>
+                }
+            }
+            <a asp-action="Index" asp-route-vista="@vistaRuta" asp-route-novedad="@FiltrosNovedad.Todas"
+               class="pf-radar-chip @(filtroNovedad == FiltrosNovedad.Todas ? "activo" : "")" title="Pedidos con alguna novedad, atendida o no">
+                Historial
+            </a>
+            @if (activoNovedad)
+            {
+                <a asp-action="Index" asp-route-vista="@vistaRuta" class="pf-radar-chip pf-radar-chip--quitar">
+                    <i class="bi bi-x" aria-hidden="true"></i> Ver todos los pedidos
+                </a>
+            }
+        </div>
+    </section>
+}
 
+<div class="pf-card pf-card-lista">
     @if (verDivididos)
     {
         <p class="pf-seccion-desc small mb-3">
@@ -67,30 +164,41 @@
         </p>
     }
 
+    @* Los filtros viajan por GET en la URL y llegan como parámetros a PedidosController.Index *@
     <form method="get" asp-action="Index" id="formFiltrosPedidos">
         @if (verDivididos)
         {
             <input type="hidden" name="vista" value="divididos" />
         }
+        @if (activoNovedad)
+        {
+            @* El filtro de la franja de novedades se conserva al usar los filtros de las columnas *@
+            <input type="hidden" name="novedad" value="@filtroNovedad" />
+        }
+        @* La pestaña elegida viaja con los filtros de las columnas y con la búsqueda *@
+        <input type="hidden" name="estado" value="@filtroEstado" id="filtroEstado" />
+
+        <div class="pf-estado-barra">
+            <nav class="pf-estado-tabs" id="pfEstadoTabs" aria-label="Estado de los pedidos">
+                @foreach (var (estadoPestana, texto) in pestanas)
+                {
+                    var activa = (filtroEstado ?? "") == (estadoPestana ?? "");
+                    @* El punto lleva el color del estado, el mismo de la columna Estado (pf-estado-punto) *@
+                    <a href="@UrlPestana(estadoPestana)" data-estado="@estadoPestana"
+                       class="@(activa ? "activo" : "") @(estadoPestana == null ? "" : "pf-estado-punto " + ClaseEstado(estadoPestana))"
+                       aria-current="@(activa ? "page" : null)">
+                        @texto <span class="pf-estado-tabs__n">@ConteoPestana(estadoPestana)</span>
+                    </a>
+                }
+            </nav>
+        </div>
+
         <div class="table-responsive">
-            <table class="mockup-table">
+            <table class="pf-table" data-pf-filas-servidor="@(verDivididos ? "divididos" : "pedidos")" data-pf-tamano="@Model.Paginacion.TamanoPagina">
                 <thead>
                     <tr>
-                        <th>
-                            <div class="dropdown">
-                                <button type="button" class="th-filtro-btn @(activoPedido ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                                    Pedido <i class="bi @(activoPedido ? "bi-funnel-fill" : "bi-funnel")"></i>
-                                </button>
-                                <div class="dropdown-menu th-filtro-menu">
-                                    <label class="form-label small fw-semibold mb-1">Buscar pedido o producto</label>
-                                    <input type="text" name="busqueda" value="@busqueda" class="form-control form-control-sm" placeholder="Código de pedido, producto..." />
-                                    <div class="th-filtro-acciones">
-                                        <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
-                                        <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </th>
+                        @* El pedido se busca en la barra de arriba y el estado se elige en las pestañas *@
+                        <th>Pedido</th>
                         <th>
                             <div class="dropdown">
                                 <button type="button" class="th-filtro-btn @(activoFecha ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
@@ -140,22 +248,7 @@
                                 </div>
                             </div>
                         </th>
-                        <th>
-                            <div class="dropdown">
-                                <button type="button" class="th-filtro-btn @(activoEstado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                                    Estado <i class="bi @(activoEstado ? "bi-funnel-fill" : "bi-funnel")"></i>
-                                </button>
-                                <div class="dropdown-menu th-filtro-menu">
-                                    <select name="estado" class="form-select form-select-sm filtro-auto">
-                                        <option value="">Todos</option>
-                                        @foreach (var (valor, texto) in estados)
-                                        {
-                                            <option value="@valor" selected="@(filtroEstado == valor)">@texto</option>
-                                        }
-                                    </select>
-                                </div>
-                            </div>
-                        </th>
+                        <th>Estado</th>
                         <th>
                             <div class="dropdown">
                                 <button type="button" class="th-filtro-btn @(activoEmpleado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
@@ -173,11 +266,11 @@
                                 </div>
                             </div>
                         </th>
-                        <th class="text-center">
-                            Acción
+                        <th class="text-end">
+                            <span class="visually-hidden">Abrir</span>
                             @if (hayFiltros)
                             {
-                                <a asp-action="Index" asp-route-vista="@(verDivididos ? "divididos" : null)" class="d-block small fw-semibold text-decoration-none mt-1">
+                                <a asp-action="Index" asp-route-vista="@(verDivididos ? "divididos" : null)" class="pf-link-btn">
                                     <i class="bi bi-x-circle"></i> Limpiar filtros
                                 </a>
                             }
@@ -185,15 +278,15 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (Model != null && Model.Any())
+                    @if (pedidos.Any())
                     {
-                        @foreach (var p in Model)
+                        @foreach (var p in pedidos)
                         {
                             var partesPedido = p.Partes.OrderBy(pa => pa.NumeroParte).ToList();
                             var finalizadas = partesPedido.Count(pa => PickingApp.Models.PedidoEstados.Finalizados.Contains(pa.Estado));
                             var tienePartes = verDivididos && partesPedido.Any();
                             <tr class="@(verDivididos ? "pf-fila-dividido" : "")">
-                                <td class="fw-semibold">
+                                <td>
                                     @if (tienePartes)
                                     {
                                         <button type="button" class="pf-btn-toggle-partes" data-target="partes-@p.Id"
@@ -202,14 +295,15 @@
                                             <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                         </button>
                                     }
-                                    @p.CodigoPedido
+                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="pf-codigo">@p.CodigoPedido</a>
+                                    @{ MarcaNovedad(p.Novedades.Concat(partesPedido.SelectMany(pa => pa.Novedades))); }
                                     @if (verDivididos)
                                     {
                                         <div class="text-secondary small fw-normal">@partesPedido.Count partes · @finalizadas finalizada(s)</div>
                                     }
                                 </td>
-                                <td>@p.FechaCarga.ToString("dd/MM/yyyy")</td>
-                                <td>@p.Prioridad</td>
+                                <td class="text-secondary pf-num" title="@p.FechaCarga.ToString("dd/MM/yyyy HH:mm")">@p.FechaCarga.ToString("dd/MM/yyyy")</td>
+                                <td><span class="pf-prioridad @ClasePrioridad(p.Prioridad)">@p.Prioridad</span></td>
                                 <td>
                                     @if (p.Bodega != null)
                                     {
@@ -218,14 +312,14 @@
                                     }
                                     else
                                     {
-                                        <span class="fst-italic" style="color: #4B5563;">Sin bodega</span>
+                                        <span class="fst-italic" style="color: var(--pf-ink2);">Sin bodega</span>
                                     }
                                 </td>
-                                <td>@p.Estado</td>
-                                <td>@(verDivididos ? "Por partes" : p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
-                                <td class="text-center">
-                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
-                                        Ver
+                                <td><span class="pf-estado-punto @ClaseEstado(p.Estado)">@(p.Estado == PedidoEstados.Dividido ? "En curso (dividido)" : p.Estado)</span></td>
+                                <td class="@(verDivididos || p.Empleado == null ? "text-secondary" : "")">@(verDivididos ? "Por partes" : p.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                <td class="text-end">
+                                    <a asp-action="Detalle" asp-route-id="@p.Id" class="pf-btn-abrir" data-fila-abre aria-label="Abrir @p.CodigoPedido" title="Abrir">
+                                        <partial name="_Icono" model='"derecha"' />
                                     </a>
                                 </td>
                             </tr>
@@ -243,18 +337,19 @@
                                     <td>
                                         <span class="pf-fila-parte__codigo">
                                             <i class="bi bi-arrow-return-right" aria-hidden="true"></i>
-                                            @pa.CodigoPedido
+                                            <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-codigo">@pa.CodigoPedido</a>
+                                            @{ MarcaNovedad(pa.Novedades); }
                                         </span>
                                         <div class="text-secondary small">@pa.Detalles.Sum(d => d.Cantidad) uds</div>
                                     </td>
                                     <td></td>
-                                    <td>@pa.Prioridad</td>
+                                    <td><span class="pf-prioridad @ClasePrioridad(pa.Prioridad)">@pa.Prioridad</span></td>
                                     <td></td>
-                                    <td>@pa.Estado</td>
-                                    <td>@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
-                                    <td class="text-center">
-                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-gray" style="padding: 4px 20px; font-size: 14px;">
-                                            Ver
+                                    <td><span class="pf-estado-punto @ClaseEstado(pa.Estado)">@pa.Estado</span></td>
+                                    <td class="@(pa.Empleado == null ? "text-secondary" : "")">@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                    <td class="text-end">
+                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-btn-abrir" data-fila-abre aria-label="Abrir @pa.CodigoPedido" title="Abrir">
+                                            <partial name="_Icono" model='"derecha"' />
                                         </a>
                                     </td>
                                 </tr>
@@ -272,7 +367,20 @@
                     {
                         <tr>
                             <td colspan="7" class="text-center text-muted py-4">
-                                @if (hayFiltros)
+                                @* Se llega aquí desde un enlace guardado o tras atender la última novedad *@
+                                @if (activoNovedad && filtroNovedad != FiltrosNovedad.Todas && totalSinAtender == 0)
+                                {
+                                    @("No quedan novedades sin atender.")
+                                }
+                                else if (activoPedido)
+                                {
+                                    @($"Ningún pedido coincide con «{busqueda!.Trim()}». Prueba con el código del pedido, un producto o el nombre de un empleado.")
+                                }
+                                else if (activoEstado && !(activoFecha || activoPrioridad || activoBodega || activoEmpleado || activoNovedad))
+                                {
+                                    @($"No hay pedidos {(pestanas.FirstOrDefault(t => t.Estado == filtroEstado).Texto ?? filtroEstado)!.ToLowerInvariant()}.")
+                                }
+                                else if (hayFiltros)
                                 {
                                     @("Ningún pedido coincide con los filtros aplicados.")
                                 }
@@ -291,6 +399,8 @@
             </table>
         </div>
     </form>
+
+    <partial name="_Paginacion" model="Model.Paginacion" />
 </div>
 
 @section Scripts {
@@ -314,6 +424,73 @@
                     btn.closest('.th-filtro-menu').querySelectorAll('input').forEach(function (i) { i.value = ''; });
                     form.submit();
                 });
+            });
+
+            // Búsqueda mientras se escribe y pestañas de estado sin recargar: se pide la página 1 con los filtros del
+            // formulario y se cambian solo las pestañas (sus números), las filas y la paginación. Si algo falla, se navega.
+            var buscar = document.getElementById('buscarPedido');
+            var campoEstado = document.getElementById('filtroEstado');
+            var tabla = form.querySelector('table.pf-table');
+            var espera, pedido;
+
+            // La píldora de las pestañas la pone site.js (.pf-estado-tabs); aquí solo se cambian sus números
+            var pestanas = document.getElementById('pfEstadoTabs');
+
+            function actualizar() {
+                var url = new URL(form.getAttribute('action'), location.href);
+                new FormData(form).forEach(function (valor, clave) { if (valor !== '') url.searchParams.append(clave, valor); });
+                if (pedido) pedido.abort();
+                pedido = new AbortController();
+                tabla.classList.add('pf-paginando');
+                fetch(url, { credentials: 'same-origin', signal: pedido.signal })
+                    .then(function (r) {
+                        if (!r.ok || r.redirected) throw new Error();
+                        return r.text();
+                    })
+                    .then(function (html) {
+                        var doc = new DOMParser().parseFromString(html, 'text/html');
+                        var tablaNueva = doc.querySelector('#formFiltrosPedidos table.pf-table');
+                        if (!tablaNueva) throw new Error();
+                        // Las pestañas se actualizan en su lugar (enlace y número), así la píldora no salta
+                        var nuevas = doc.querySelectorAll('#pfEstadoTabs a');
+                        pestanas.querySelectorAll('a').forEach(function (a, i) {
+                            if (!nuevas[i]) return;
+                            a.setAttribute('href', nuevas[i].getAttribute('href'));
+                            a.querySelector('.pf-estado-tabs__n').textContent = nuevas[i].querySelector('.pf-estado-tabs__n').textContent;
+                        });
+                        pestanas.dispatchEvent(new CustomEvent('pf:pildora')); // los números cambian el ancho
+                        document.querySelector('.pf-page-sub').replaceWith(doc.querySelector('.pf-page-sub'));
+                        tabla.tBodies[0].replaceWith(tablaNueva.tBodies[0]);
+                        // La última columna del encabezado trae "Limpiar filtros" cuando hay alguno
+                        tabla.tHead.rows[0].lastElementChild.innerHTML = tablaNueva.tHead.rows[0].lastElementChild.innerHTML;
+                        var nav = form.parentElement.querySelector('nav.pf-paginacion');
+                        var navNueva = doc.querySelector('#formFiltrosPedidos').parentElement.querySelector('nav.pf-paginacion');
+                        if (nav) nav.remove();
+                        if (navNueva) form.after(navNueva);
+                        history.replaceState(null, '', url);
+                    })
+                    .catch(function (e) { if (e.name !== 'AbortError') location.href = url; })
+                    .finally(function () { tabla.classList.remove('pf-paginando'); });
+            }
+
+            buscar.addEventListener('input', function () {
+                clearTimeout(espera);
+                espera = setTimeout(actualizar, 300);
+            });
+            buscar.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                clearTimeout(espera);
+                actualizar();
+            });
+
+            // La pestaña se atiende aquí sin recargar (site.js ya mueve la píldora al instante); Ctrl+clic abre otra pestaña
+            pestanas.addEventListener('click', function (e) {
+                var enlace = e.target.closest('a');
+                if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                campoEstado.value = enlace.dataset.estado || '';
+                actualizar();
             });
         })();
     </script>

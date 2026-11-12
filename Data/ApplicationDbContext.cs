@@ -3,13 +3,17 @@ using PickingApp.Models;
 
 namespace PickingApp.Data
 {
+    // Puente entre el código y MySQL: Entity Framework traduce las consultas LINQ sobre estos DbSet a SQL
     public class ApplicationDbContext : DbContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
         }
 
+        // Cada DbSet es una tabla de la base de datos; su nombre es el nombre de la tabla
         public DbSet<Usuario> Usuarios { get; set; } = null!;
+        public DbSet<Rol> RolesUsuario { get; set; } = null!;
+        public DbSet<TipoSolicitud> CatalogoTiposSolicitud { get; set; } = null!;
         public DbSet<Empleado> Empleados { get; set; } = null!;
         public DbSet<Bodega> Bodegas { get; set; } = null!;
         public DbSet<Ubicacion> Ubicaciones { get; set; } = null!;
@@ -22,14 +26,50 @@ namespace PickingApp.Data
         public DbSet<ConfiguracionSistema> ConfiguracionesSistema { get; set; } = null!;
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
         public DbSet<CategoriaProducto> CategoriasProducto { get; set; } = null!;
+        public DbSet<ObservacionSolicitud> ObservacionesSolicitud { get; set; } = null!;
+        public DbSet<TrasladoPersonal> TrasladosPersonal { get; set; } = null!;
 
+        // Columna ENUM de MySQL con los valores permitidos: la base rechaza cualquier otro texto
+        private static string EnumMySql(IEnumerable<string> valores) =>
+            "enum(" + string.Join(",", valores.Select(v => $"'{v}'")) + ")";
+
+        // Reglas del modelo que no caben en los atributos de las clases: índices, relaciones y datos iniciales.
+        // Cualquier cambio aquí necesita una migración nueva (dotnet ef migrations add ...).
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Índices únicos
+            // Catálogos: tablas de apoyo con Id fijo (ver Roles y TiposSolicitud en Models)
+            modelBuilder.Entity<Rol>().ToTable("Roles");
+            modelBuilder.Entity<Rol>().HasIndex(r => r.Nombre).IsUnique();
+            modelBuilder.Entity<Rol>().HasData(Roles.Catalogo);
+
+            modelBuilder.Entity<TipoSolicitud>().ToTable("TiposSolicitud");
+            modelBuilder.Entity<TipoSolicitud>().HasIndex(t => t.Nombre).IsUnique();
+            modelBuilder.Entity<TipoSolicitud>().HasData(TiposSolicitud.Catalogo);
+
+            // Observaciones para responder solicitudes: una misma frase no se repite en un tipo y decisión
+            modelBuilder.Entity<ObservacionSolicitud>().ToTable("ObservacionesSolicitud");
+            modelBuilder.Entity<ObservacionSolicitud>().HasIndex(o => new { o.TipoSolicitudId, o.Decision, o.Texto }).IsUnique();
+            modelBuilder.Entity<ObservacionSolicitud>().HasData(ObservacionesIniciales.Catalogo);
+
+            // Columnas con pocos valores posibles: ENUM de MySQL (el código sigue usando texto)
+            modelBuilder.Entity<Usuario>().Property(u => u.Estado).HasColumnType(EnumMySql(EstadosUsuario.Todos));
+            modelBuilder.Entity<Pedido>().Property(p => p.Estado).HasColumnType(EnumMySql(PedidoEstados.Todos));
+            modelBuilder.Entity<Pedido>().Property(p => p.Prioridad).HasColumnType(EnumMySql(Prioridades.Todas));
+            modelBuilder.Entity<Solicitud>().Property(s => s.Estado).HasColumnType(EnumMySql(EstadosSolicitud.Todos));
+            modelBuilder.Entity<ObservacionSolicitud>().Property(o => o.Decision).HasColumnType(EnumMySql(DecisionesSolicitud.Todas));
+            modelBuilder.Entity<NovedadPedido>().Property(n => n.TipoNovedad).HasColumnType(EnumMySql(TiposNovedad.Todos));
+            modelBuilder.Entity<Notificacion>().Property(n => n.Tipo).HasColumnType(EnumMySql(TiposNotificacion.Todos));
+
+            // Índices únicos: MySQL rechaza dos filas con el mismo valor (por ejemplo, dos usuarios con el mismo correo)
             modelBuilder.Entity<Usuario>()
                 .HasIndex(u => u.Correo)
+                .IsUnique();
+
+            // Varios NULL sí se permiten (usuarios antiguos sin identificación); dos iguales no
+            modelBuilder.Entity<Usuario>()
+                .HasIndex(u => u.Identificacion)
                 .IsUnique();
 
             modelBuilder.Entity<Empleado>()
@@ -40,8 +80,9 @@ namespace PickingApp.Data
                 .HasIndex(b => b.Codigo)
                 .IsUnique();
 
+            // El código lo pone el cliente: dos bodegas pueden recibir el mismo código
             modelBuilder.Entity<Pedido>()
-                .HasIndex(p => p.CodigoPedido)
+                .HasIndex(p => new { p.BodegaId, p.CodigoPedido })
                 .IsUnique();
 
             modelBuilder.Entity<ConfiguracionSistema>()
@@ -71,7 +112,49 @@ namespace PickingApp.Data
                 new CategoriaProducto { Id = 3, Nombre = "Grande", MinutosPorUnidad = 4, Descripcion = "Monitores, impresoras", EsPredeterminada = false },
                 new CategoriaProducto { Id = 4, Nombre = "Voluminoso / pesado", MinutosPorUnidad = 10, Descripcion = "Torres de PC, UPS", EsPredeterminada = false });
 
-            // Relaciones y eliminaciones en cascada/restringidas
+            // Un rol o un tipo de solicitud en uso no se puede borrar; siempre se cargan junto a su registro
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Rol)
+                .WithMany()
+                .HasForeignKey(u => u.RolId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Usuario>().Navigation(u => u.Rol).AutoInclude();
+
+            modelBuilder.Entity<TrasladoPersonal>()
+                .HasOne(t => t.BodegaOrigen)
+                .WithMany()
+                .HasForeignKey(t => t.BodegaOrigenId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<TrasladoPersonal>()
+                .HasOne(t => t.BodegaDestino)
+                .WithMany()
+                .HasForeignKey(t => t.BodegaDestinoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Solicitud>()
+                .HasOne(s => s.TipoSolicitud)
+                .WithMany()
+                .HasForeignKey(s => s.TipoSolicitudId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Solicitud>().Navigation(s => s.TipoSolicitud).AutoInclude();
+
+            modelBuilder.Entity<ObservacionSolicitud>()
+                .HasOne(o => o.TipoSolicitud)
+                .WithMany()
+                .HasForeignKey(o => o.TipoSolicitudId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<ObservacionSolicitud>().Navigation(o => o.TipoSolicitud).AutoInclude();
+
+            modelBuilder.Entity<Solicitud>()
+                .HasOne(s => s.Observacion)
+                .WithMany()
+                .HasForeignKey(s => s.ObservacionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Solicitud>().Navigation(s => s.Observacion).AutoInclude();
+
+            // Relaciones y qué pasa al borrar el registro principal:
+            // Restrict impide borrarlo si tiene hijos, Cascade borra también los hijos
+            // y SetNull deja la llave foránea de los hijos en null
             modelBuilder.Entity<Ubicacion>()
                 .HasOne(u => u.Bodega)
                 .WithMany(b => b.Ubicaciones)
@@ -90,10 +173,36 @@ namespace PickingApp.Data
                 .HasForeignKey(p => p.BodegaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Una bodega con personal asignado no se puede borrar
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Bodega)
+                .WithMany()
+                .HasForeignKey(u => u.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Empleado>()
+                .HasOne(e => e.Bodega)
+                .WithMany()
+                .HasForeignKey(e => e.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Solicitud>()
+                .HasOne(s => s.Bodega)
+                .WithMany()
+                .HasForeignKey(s => s.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<Pedido>()
                 .HasOne(p => p.Empleado)
                 .WithMany(e => e.PedidosAsignados)
                 .HasForeignKey(p => p.EmpleadoId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // SetNull: borrar al usuario que asignó no borra el pedido ni su historial
+            modelBuilder.Entity<Pedido>()
+                .HasOne(p => p.AsignadoPor)
+                .WithMany()
+                .HasForeignKey(p => p.AsignadoPorId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Partes de un pedido dividido: no se puede borrar el pedido original mientras tenga partes
@@ -133,7 +242,14 @@ namespace PickingApp.Data
                 .HasForeignKey(s => s.UsuarioRespondeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Cascade: con SetNull una notificación personal quedaría sin destino ni rol y se volvería visible para todos.
+            // SetNull: la novedad es historial del pedido; si se borra quien la registró, queda su nombre en texto
+            modelBuilder.Entity<NovedadPedido>()
+                .HasOne<Usuario>()
+                .WithMany()
+                .HasForeignKey(n => n.RegistradoPorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Cascade: una notificación no tiene sentido sin su destinatario.
             modelBuilder.Entity<Notificacion>()
                 .HasOne(n => n.UsuarioDestino)
                 .WithMany()
@@ -146,6 +262,10 @@ namespace PickingApp.Data
                 .WithMany()
                 .HasForeignKey(l => l.UsuarioId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Auditoría lista y exporta el LOG por fecha: sin índice, cada página recorre toda la tabla
+            modelBuilder.Entity<LogSistema>()
+                .HasIndex(l => l.FechaHora);
         }
     }
 }

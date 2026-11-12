@@ -2,6 +2,7 @@
 
 namespace PickingApp.Services
 {
+    // Contrato del registro de auditoría; la implementación está en AuditService.cs
     public interface IAuditService
     {
         Task RegistrarAsync(string accion, string modulo, string detalle);

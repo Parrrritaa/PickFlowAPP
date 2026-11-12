@@ -1,14 +1,15 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
-    // Categorías de manipulación y clasificación de productos (solo Administrador): definen el tiempo estándar de picking
+    // Productos y sus categorías de manipulación (solo Administrador): definen el tiempo estándar de picking.
+    // Aquí se edita qué es cada producto; en Bodegas solo se elige en qué ubicación está.
     [Authorize(Roles = Roles.Administrador)]
     public class ProductosController : Controller
     {
@@ -23,21 +24,22 @@ namespace PickingApp.Controllers
             _auditService = auditService;
         }
 
+        // Página de Productos: categorías arriba y tabla de productos con su categoría abajo
         public async Task<IActionResult> Index()
         {
-            ViewBag.Categorias = await _context.CategoriasProducto
-                .Include(c => c.Productos)
-                .OrderBy(c => c.MinutosPorUnidad)
-                .ToListAsync();
-            ViewBag.MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion);
-
-            var productos = await _context.Productos
-                .Include(p => p.Categoria)
-                .Include(p => p.Ubicaciones)
-                .OrderBy(p => p.Codigo)
-                .ToListAsync();
-
-            return View(productos);
+            return View(new ProductosIndexViewModel
+            {
+                Categorias = await _context.CategoriasProducto
+                    .Include(c => c.Productos)
+                    .OrderBy(c => c.MinutosPorUnidad)
+                    .ToListAsync(),
+                MinutosPorUbicacion = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MinutosPorUbicacion),
+                Productos = await _context.Productos
+                    .Include(p => p.Categoria)
+                    .Include(p => p.Ubicaciones)
+                    .OrderBy(p => p.Codigo)
+                    .ToListAsync()
+            });
         }
 
         // Crear (id = null) o editar una categoría
@@ -61,8 +63,8 @@ namespace PickingApp.Controllers
                 return Error($"Los minutos por unidad deben ser un número mayor que 0 y hasta {MaxMinutosPorUnidad:0}.");
             }
 
-            var nombreNormalizado = nombre.ToLower();
-            if (await _context.CategoriasProducto.AnyAsync(c => c.Nombre.ToLower() == nombreNormalizado && c.Id != id))
+            // Sin distinguir mayúsculas, igual que el índice único de MySQL
+            if (await _context.CategoriasProducto.AnyAsync(c => c.Nombre == nombre && c.Id != id))
             {
                 return Error($"Ya existe una categoría llamada '{nombre}'.");
             }
@@ -82,6 +84,7 @@ namespace PickingApp.Controllers
                 accion = $"Categoría '{nombre}' creada con {minutos:0.##} min/u";
             }
 
+            // Cambiar los minutos por unidad cambia el tiempo estándar de los pedidos que se asignen desde ahora
             categoria.Nombre = nombre;
             categoria.MinutosPorUnidad = Math.Round(minutos, 2);
             categoria.Descripcion = descripcion;
@@ -161,7 +164,44 @@ namespace PickingApp.Controllers
             }
 
             TempData["SuccessMessage"] = cambios == 1 ? "Se actualizó la categoría de 1 producto." : $"Se actualizó la categoría de {cambios} productos.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), null, null, "productos");
+        }
+
+        // Único lugar donde se cambia el nombre o la cantidad por caja de un producto: el cambio
+        // aplica en todas sus ubicaciones. Su código no cambia porque lo usan los pedidos y el Excel.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditarProducto(int id, string? nombre, string? unidadesPorCaja)
+        {
+            var producto = await _context.Productos.FindAsync(id);
+            if (producto == null) return Error("El producto ya no existe.");
+
+            nombre = (nombre ?? string.Empty).Trim();
+            if (nombre.Length == 0 || nombre.Length > 150)
+            {
+                return Error("El nombre del producto es obligatorio y admite hasta 150 caracteres.");
+            }
+            if (!int.TryParse(unidadesPorCaja, out var unidades) || unidades < 1 || unidades > Producto.MaxUnidadesPorCaja)
+            {
+                return Error($"La cantidad máxima por caja debe ser un número entero entre 1 y {Producto.MaxUnidadesPorCaja}.");
+            }
+
+            var cambios = new List<string>();
+            if (producto.Nombre != nombre) cambios.Add($"nombre '{producto.Nombre}' → '{nombre}'");
+            if (producto.UnidadesPorCaja != unidades) cambios.Add($"unidades por caja {producto.UnidadesPorCaja} → {unidades}");
+            if (cambios.Count == 0)
+            {
+                TempData["SuccessMessage"] = $"El producto '{producto.Codigo}' no tenía cambios.";
+                return RedirectToAction(nameof(Index), null, null, "productos");
+            }
+
+            producto.Nombre = nombre;
+            producto.UnidadesPorCaja = unidades;
+            await _context.SaveChangesAsync();
+
+            await RegistrarAsync("Editar Producto", $"Producto {producto.Codigo} actualizado: {string.Join(", ", cambios)}.");
+            TempData["SuccessMessage"] = $"Producto '{producto.Codigo}' actualizado.";
+            return RedirectToAction(nameof(Index), null, null, "productos");
         }
 
         private IActionResult Error(string mensaje)

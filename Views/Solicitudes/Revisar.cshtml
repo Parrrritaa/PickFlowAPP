@@ -1,176 +1,351 @@
-@model PickingApp.Models.Solicitud
+@model PickingApp.Models.ViewModels.SolicitudDetalleViewModel
 @{
-    ViewData["Title"] = "Revisar solicitud";
-    var tipoDisplay = TiposSolicitud.Nombre(Model.TipoSolicitud);
-
-    // Datos concretos del empleado/ubicación asociados a la solicitud (CU-08 / CU-11 / CU-14 / CU-21).
-    var datosEmpleado = new List<(string Etiqueta, string Valor)>();
-    var cambiosEmpleado = new List<CambioSolicitud>();
-    var motivo = "No especificado";
-    var esEdicion = Model.TipoSolicitud is TiposSolicitud.EdicionEmpleado or TiposSolicitud.EdicionUbicacion;
-
-    switch (Model.TipoSolicitud)
-    {
-        case TiposSolicitud.RegistroEmpleado:
-            var registro = Model.LeerDatos<DatosEmpleadoSolicitud>();
-            datosEmpleado.Add(("Número de documento", registro.Identificacion));
-            datosEmpleado.Add(("Nombre completo", registro.NombreCompleto));
-            if (registro.Correo != null) datosEmpleado.Add(("Correo electrónico", registro.Correo));
-            datosEmpleado.Add(("Fecha de ingreso", registro.FechaIngreso.ToString("dd/MM/yyyy")));
-            datosEmpleado.Add(("Hora de entrada", registro.HorarioEntrada.ToString(@"hh\:mm")));
-            datosEmpleado.Add(("Hora de salida", registro.HorarioSalida.ToString(@"hh\:mm")));
-            motivo = "Solicitud de registro de nuevo empleado.";
-            break;
-        case TiposSolicitud.EdicionEmpleado:
-            var edicionEmpleado = Model.LeerDatos<SolicitudEdicionEmpleado>();
-            cambiosEmpleado = edicionEmpleado.Cambios;
-            motivo = edicionEmpleado.Motivo;
-            break;
-        case TiposSolicitud.EdicionUbicacion:
-            var edicionUbicacion = Model.LeerDatos<SolicitudEdicionUbicacion>();
-            cambiosEmpleado = edicionUbicacion.Cambios;
-            motivo = edicionUbicacion.Motivo;
-            break;
-        case TiposSolicitud.InactivacionEmpleado:
-            var inactivacion = Model.LeerDatos<SolicitudInactivacionEmpleado>();
-            datosEmpleado.Add(("Número de documento", inactivacion.Identificacion));
-            datosEmpleado.Add(("Nombre completo", inactivacion.NombreCompleto));
-            motivo = inactivacion.Motivo;
-            break;
-        case TiposSolicitud.EliminacionUbicacion:
-            var eliminacion = Model.LeerDatos<SolicitudEliminacionUbicacion>();
-            datosEmpleado.Add(("Ubicación", eliminacion.CodigoUbicacion));
-            if (eliminacion.BodegaCodigo != null) datosEmpleado.Add(("Bodega", eliminacion.BodegaCodigo));
-            motivo = eliminacion.Motivo;
-            break;
-    }
-    if (string.IsNullOrWhiteSpace(motivo)) motivo = "No especificado";
+    // La arman SolicitudesController.Revisar (bandeja) y .Detalle (solicitud propia, solo consulta).
+    // Qué datos se muestran según el tipo se decide en ConstruirDetalleAsync.
+    var s = Model.Solicitud;
+    var esPropia = Model.AccionVolver == "MisSolicitudes";
+    var hayValoresCambiados = Model.Cambios.Any(c => c.Actual != null);
+    ViewData["Title"] = esPropia ? "Detalle de solicitud" : "Revisar solicitud";
+    // Panel lateral: el formulario de decisión (pendiente) o la respuesta que recibió (aprobada o rechazada)
+    var conPanel = Model.PuedeResponder || s.Estado != EstadosSolicitud.Pendiente;
 }
 
-<h1 class="pf-page-title">Revisar solicitud</h1>
-
-<div class="mockup-card">
-    <div class="mb-4">
-        <h4 class="fw-bold text-dark mb-1">Solicitud SOL-@Model.Id</h4>
-        <div class="text-secondary fw-medium">@tipoDisplay</div>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-md-6">
-            <div class="bg-white rounded-3 p-3 shadow-sm">
-                <div class="text-secondary small fw-medium">Solicitante</div>
-                <div class="fs-5 text-dark fw-normal mt-1">@(Model.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="bg-white rounded-3 p-3 shadow-sm">
-                <div class="text-secondary small fw-medium">Fecha de solicitud</div>
-                <div class="fs-5 text-dark fw-normal mt-1">@Model.FechaSolicitud.ToString("dd/MM/yyyy")</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-md-6">
-            <div class="bg-white rounded-3 p-3 shadow-sm">
-                <div class="text-secondary small fw-medium">Tipo de solicitud</div>
-                <div class="fs-5 text-dark fw-normal mt-1">@tipoDisplay</div>
-            </div>
-        </div>
-    </div>
-
-    @if (datosEmpleado.Any())
+@* El avance de la revisión en cadena va en la misma fila del título: no gasta una fila propia *@
+<div class="pf-sol-titulo">
+    <h1 class="pf-page-title">@ViewData["Title"]</h1>
+    @if (Model.EnCadena)
     {
-        <div class="mb-4">
-            <h5 class="fw-bold text-dark mb-2">Datos a registrar</h5>
-            <div class="row g-3">
-                @foreach (var dato in datosEmpleado)
-                {
-                    <div class="col-md-6">
-                        <div class="bg-white rounded-3 p-3 shadow-sm">
-                            <div class="text-secondary small fw-medium">@dato.Etiqueta</div>
-                            <div class="fs-5 text-dark fw-normal mt-1">@dato.Valor</div>
-                        </div>
-                    </div>
-                }
-            </div>
-        </div>
-    }
-
-    @if (cambiosEmpleado.Any())
-    {
-        <div class="mb-4">
-            <h5 class="fw-bold text-dark mb-2">Cambios solicitados</h5>
-            <div class="table-responsive">
-                <table class="mockup-table">
-                    <thead>
-                        <tr>
-                            <th>Campo</th>
-                            <th>Valor anterior</th>
-                            <th>Valor nuevo</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var c in cambiosEmpleado)
-                        {
-                            <tr>
-                                <td class="fw-semibold">@c.Campo</td>
-                                <td>@c.Anterior</td>
-                                <td>@c.Nuevo</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    }
-    else if (esEdicion)
-    {
-        <div class="mockup-info-banner mb-4">
-            No se detectaron cambios en los campos @(Model.TipoSolicitud == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
-        </div>
-    }
-
-    <div class="mb-4">
-        <h5 class="fw-bold text-dark mb-2">Motivo / descripción</h5>
-        <div class="mockup-info-banner mb-0">
-            @motivo
-        </div>
-    </div>
-
-    @if (Model.Estado == EstadosSolicitud.Pendiente)
-    {
-        <form id="formAccionSolicitud" method="post">
-            @Html.AntiForgeryToken()
-            <input type="hidden" name="id" value="@Model.Id" />
-
-            <div class="mb-4">
-                <h5 class="fw-bold text-dark mb-2">Comentario de revisión</h5>
-                <textarea name="motivoRechazo" id="txtComentario" class="mockup-input" style="height: 90px;"></textarea>
-            </div>
-
-            <div class="d-flex flex-wrap gap-3">
-                <button type="submit" formaction="@Url.Action("Aprobar")" class="btn-pf-blue" style="background-color: #84CC16;">
-                    Aprobar solicitud
-                </button>
-                <button type="submit" formaction="@Url.Action("Rechazar")" class="btn-pf-blue" style="background-color: #EF4444;">
-                    Rechazar solicitud
-                </button>
-                <a asp-action="Index" class="btn-pf-gray ms-auto">
-                    Volver
+        @* Revisión en cadena: cuántas quedan, saltar esta (vuelve al final) o salir a la bandeja *@
+        <div class="pf-cadena" role="status">
+            <span class="fw-semibold">
+                @(Model.PendientesEnCadena == 1 ? "Esta es la última pendiente" : $"Quedan {Model.PendientesEnCadena} pendientes, incluida esta")
+            </span>
+            @if (Model.SiguienteId.HasValue)
+            {
+                <a asp-action="Revisar" asp-route-id="@Model.SiguienteId" asp-route-cadena="true" asp-route-tipo="@Model.TipoCadena"
+                   class="btn-pf-gray" id="btnSaltarSolicitud" style="padding: 4px 14px; font-size: 14px;">
+                    Saltar <span class="pf-tecla">S</span>
                 </a>
-            </div>
-        </form>
-    }
-    else
-    {
-        <div class="mockup-alert-warning mb-4">
-            Esta solicitud ya fue atendida con estado: <strong>@Model.Estado</strong>
-        </div>
-        <div>
-            <a asp-action="Index" class="btn-pf-gray">
-                Volver
-            </a>
+            }
+            <a asp-action="Index" asp-route-tipo="@Model.TipoCadena" class="btn-pf-gray" style="padding: 4px 14px; font-size: 14px;">Salir</a>
         </div>
     }
 </div>
+
+@* Dos columnas: a la izquierda lo que se pide (datos, cambios, motivo); a la derecha la decisión, fija al desplazarse,
+   para revisar y decidir sin perder de vista los datos. Sin decisión ni respuesta, la solicitud ocupa todo el ancho. *@
+<div class="pf-sol @(conPanel ? "pf-sol--con-panel" : "")">
+    <article class="pf-card pf-sol-principal mb-0" aria-labelledby="tituloSolicitud">
+        <header class="pf-sol-cabecera">
+            <div>
+                <div class="pf-sol-id">SOL-@s.Id</div>
+                <h2 class="pf-sol-tipo" id="tituloSolicitud">@s.NombreTipo</h2>
+            </div>
+            <partial name="_EstadoSolicitud" model="s.Estado" />
+        </header>
+        <p class="pf-sol-meta">
+            <span><i class="bi bi-person" aria-hidden="true"></i> @(s.UsuarioSolicitante?.NombreCompleto ?? "Usuario no disponible")</span>
+            @* El Administrador ve solicitudes de todas las bodegas *@
+            @if (s.Bodega != null && User.IsInRole(Roles.Administrador))
+            {
+                <span><i class="bi bi-building" aria-hidden="true"></i> @s.Bodega.Nombre</span>
+            }
+            <span><i class="bi bi-clock" aria-hidden="true"></i> <time datetime="@s.FechaSolicitud.ToString("s")">@s.FechaSolicitud.ToString("dd/MM/yyyy · HH:mm")</time></span>
+        </p>
+
+        @if (Model.Aviso != null && s.Estado == EstadosSolicitud.Pendiente)
+        {
+            <div class="pf-alert-warning mt-0 mb-4" role="status">
+                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>@Model.Aviso
+            </div>
+        }
+
+        @if (Model.Datos.Any())
+        {
+            <section class="pf-sol-seccion" aria-labelledby="tituloDatos">
+                <h3 class="pf-sol-subtitulo" id="tituloDatos">@Model.TituloDatos</h3>
+                <dl class="pf-datos">
+                    @foreach (var dato in Model.Datos)
+                    {
+                        <div>
+                            <dt>@dato.Etiqueta</dt>
+                            <dd>@dato.Valor</dd>
+                        </div>
+                    }
+                </dl>
+            </section>
+        }
+
+        @if (Model.Cambios.Any())
+        {
+            <section class="pf-sol-seccion" aria-labelledby="tituloCambios">
+                <h3 class="pf-sol-subtitulo" id="tituloCambios">Cambios solicitados</h3>
+                @if (hayValoresCambiados)
+                {
+                    <p class="pf-sol-nota">
+                        Algunos valores cambiaron después de enviar la solicitud (se indica el valor de hoy).
+                        Al aprobarla se aplica el valor nuevo solo en los campos de esta lista.
+                    </p>
+                }
+                <div class="table-responsive">
+                    <table class="pf-table pf-sol-cambios">
+                        <thead>
+                            <tr>
+                                <th>Campo</th>
+                                <th>Antes</th>
+                                <th aria-hidden="true"></th>
+                                <th>Después</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in Model.Cambios)
+                            {
+                                <tr>
+                                    <td class="pf-sol-campo">@c.Campo</td>
+                                    <td>
+                                        @c.Anterior
+                                        @if (c.Actual != null)
+                                        {
+                                            <div class="pf-valor-actual small">Hoy: @c.Actual</div>
+                                        }
+                                    </td>
+                                    <td class="pf-sol-flecha" aria-hidden="true"><i class="bi bi-arrow-right"></i></td>
+                                    <td class="pf-sol-nuevo">@c.Nuevo</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+        else if (Model.EsEdicion)
+        {
+            <div class="pf-info-banner mb-4">
+                No se detectaron cambios en los campos @(s.TipoSolicitudId == TiposSolicitud.EdicionEmpleado ? "del empleado" : "de la ubicación").
+            </div>
+        }
+
+        @if (Model.Motivo != null)
+        {
+            <section class="pf-sol-seccion" aria-labelledby="tituloMotivo">
+                <h3 class="pf-sol-subtitulo" id="tituloMotivo">Motivo</h3>
+                <blockquote class="pf-sol-motivo">@Model.Motivo</blockquote>
+            </section>
+        }
+
+        @if (!conPanel)
+        {
+            <a asp-action="@Model.AccionVolver" class="btn-pf-gray" data-pf-volver>Volver</a>
+        }
+    </article>
+
+    @if (conPanel)
+    {
+        <aside class="pf-card pf-sol-panel mb-0" aria-labelledby="tituloPanel">
+            @if (s.Estado != EstadosSolicitud.Pendiente)
+            {
+                @* Respuesta del Administrador o Supervisor: quién, cuándo y su observación *@
+                <h3 class="pf-sol-subtitulo" id="tituloPanel">Respuesta</h3>
+                <dl class="pf-datos pf-datos--una">
+                    <div>
+                        <dt>Decisión</dt>
+                        <dd><partial name="_EstadoSolicitud" model="s.Estado" /></dd>
+                    </div>
+                    <div>
+                        <dt>Respondió</dt>
+                        <dd>@(s.UsuarioResponde?.NombreCompleto ?? "Usuario no disponible")</dd>
+                    </div>
+                    @if (s.FechaRespuesta.HasValue)
+                    {
+                        <div>
+                            <dt>Fecha</dt>
+                            <dd>@s.FechaRespuesta.Value.ToString("dd/MM/yyyy · HH:mm")</dd>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(s.TextoObservacion))
+                    {
+                        <div>
+                            <dt>Observación</dt>
+                            <dd>@s.TextoObservacion</dd>
+                        </div>
+                    }
+                </dl>
+                <a asp-action="@Model.AccionVolver" class="btn-pf-gray w-100 mt-3" data-pf-volver>Volver</a>
+            }
+            else
+            {
+                @* Primero la decisión: la lista solo ofrece las observaciones de este tipo de solicitud para esa decisión *@
+                <form id="formAccionSolicitud" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@s.Id" />
+                    @if (Model.EnCadena)
+                    {
+                        <input type="hidden" name="cadena" value="true" />
+                        <input type="hidden" name="tipo" value="@Model.TipoCadena" />
+                    }
+
+                    <fieldset class="mb-3">
+                        <legend class="pf-sol-subtitulo" id="tituloPanel">Decisión</legend>
+                        <div class="pf-segmented" role="radiogroup" aria-label="Decisión">
+                            <input type="radio" class="pf-seg-input" name="decision" id="decisionAprobar" value="@DecisionesSolicitud.Aprobar" checked />
+                            <label for="decisionAprobar">Aprobar</label>
+                            <input type="radio" class="pf-seg-input" name="decision" id="decisionRechazar" value="@DecisionesSolicitud.Rechazar" />
+                            <label for="decisionRechazar">Rechazar</label>
+                        </div>
+                    </fieldset>
+
+                    @foreach (var (decision, opciones, obligatoria) in new[]
+                    {
+                        (DecisionesSolicitud.Aprobar, Model.ObservacionesAprobar, false),
+                        (DecisionesSolicitud.Rechazar, Model.ObservacionesRechazar, true)
+                    })
+                    {
+                        var activa = decision == DecisionesSolicitud.Aprobar;
+                        <div class="mb-3" data-decision="@decision" hidden="@(!activa)">
+                            <label class="pf-label d-block mb-1" for="observacion@(decision)">Observación</label>
+                            <div class="form-text small mt-0 mb-2" id="ayudaObservacion@(decision)">
+                                @(obligatoria ? "Obligatoria. El solicitante la verá." : "Opcional. El solicitante la verá.")
+                            </div>
+                            <select name="observacion" id="observacion@(decision)" class="pf-input" aria-describedby="ayudaObservacion@(decision)"
+                                    required="@obligatoria" disabled="@(!activa)" data-lista-observacion>
+                                @* El número de cada opción es su atajo de teclado (1-9); 0 vuelve a "Sin observación" *@
+                                @if (obligatoria)
+                                {
+                                    <option value="" disabled selected>Elija una observación…</option>
+                                }
+                                else
+                                {
+                                    <option value="" selected>0 · Sin observación</option>
+                                }
+                                @for (var i = 0; i < opciones.Count; i++)
+                                {
+                                    <option value="@opciones[i].Id">@(i < 9 ? $"{i + 1} · " : "")@opciones[i].Texto</option>
+                                }
+                                <option value="@ObservacionSolicitud.ValorOtro">@(opciones.Count < 9 ? $"{opciones.Count + 1} · " : "")Otro (escribir la observación)</option>
+                            </select>
+                        </div>
+                    }
+
+                    <div class="mb-3" data-otro hidden>
+                        <label class="pf-label d-block mb-1" for="txtObservacion">Escriba la observación</label>
+                        <div class="form-text small mt-0 mb-2" id="ayudaObservacionOtro">Al menos @ObservacionSolicitud.MinimoTextoLibre caracteres, escrita con palabras.</div>
+                        <textarea name="observacionRespuesta" id="txtObservacion" class="pf-input" style="height: 90px;"
+                                  minlength="@ObservacionSolicitud.MinimoTextoLibre" maxlength="400" aria-describedby="ayudaObservacionOtro" disabled></textarea>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" formaction="@Url.Action("Aprobar")" class="btn-pf-green" data-boton="@DecisionesSolicitud.Aprobar">
+                            Aprobar solicitud
+                        </button>
+                        <button type="submit" formaction="@Url.Action("Rechazar")" class="btn-pf-red" data-boton="@DecisionesSolicitud.Rechazar" hidden>
+                            Rechazar solicitud
+                        </button>
+                        @if (!Model.EnCadena)
+                        {
+                            <a asp-action="@Model.AccionVolver" class="btn-pf-gray text-center" data-pf-volver>Volver</a>
+                        }
+                    </div>
+
+                    @* Los atajos solo eligen; enviar siempre pide Enter, así cada solicitud se confirma a propósito *@
+                    <dl class="pf-atajos">
+                        <div><dt><span class="pf-tecla">A</span> <span class="pf-tecla">R</span></dt><dd>Aprobar / rechazar</dd></div>
+                        <div><dt><span class="pf-tecla">0</span>–<span class="pf-tecla">9</span></dt><dd>Observación (su número)</dd></div>
+                        <div><dt><span class="pf-tecla">Enter</span></dt><dd>Confirmar</dd></div>
+                        @if (Model.EnCadena && Model.SiguienteId.HasValue)
+                        {
+                            <div><dt><span class="pf-tecla">S</span></dt><dd>Saltar</dd></div>
+                        }
+                    </dl>
+                </form>
+            }
+        </aside>
+    }
+</div>
+
+@section Scripts {
+    @if (Model.PuedeResponder)
+    {
+        <script>
+            (function () {
+                var form = document.getElementById('formAccionSolicitud');
+                var otro = form.querySelector('[data-otro]');
+                var texto = document.getElementById('txtObservacion');
+
+                // Solo la lista de la decisión elegida se envía: la otra queda oculta y deshabilitada
+                function listaActiva() {
+                    return form.querySelector('[data-decision]:not([hidden]) [data-lista-observacion]');
+                }
+
+                // "Otro" abre el cuadro de texto libre, que pasa a ser obligatorio
+                function revisarOtro() {
+                    var conOtro = listaActiva().value === '@ObservacionSolicitud.ValorOtro';
+                    otro.hidden = !conOtro;
+                    texto.disabled = !conOtro;
+                    texto.required = conOtro;
+                }
+
+                function elegirDecision(decision) {
+                    form.querySelectorAll('[data-decision]').forEach(function (bloque) {
+                        var activa = bloque.dataset.decision === decision;
+                        bloque.hidden = !activa;
+                        bloque.querySelector('[data-lista-observacion]').disabled = !activa;
+                    });
+                    form.querySelectorAll('[data-boton]').forEach(function (boton) {
+                        boton.hidden = boton.dataset.boton !== decision;
+                    });
+                    revisarOtro();
+                }
+
+                form.querySelectorAll('input[name="decision"]').forEach(function (radio) {
+                    radio.addEventListener('change', function () { elegirDecision(radio.value); });
+                });
+                form.querySelectorAll('[data-lista-observacion]').forEach(function (lista) {
+                    lista.addEventListener('change', revisarOtro);
+                });
+
+                // Atajos de teclado: A / R eligen la decisión, 1-9 la observación del catálogo, S salta (en cadena)
+                // y Enter confirma con el botón visible, pasando por la misma validación del formulario
+                document.addEventListener('keydown', function (e) {
+                    if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+                    if (document.querySelector('.modal.show')) return;
+                    // La lista de observaciones no cuenta como escribir: los números también la cambian con el foco en ella
+                    var escribiendo = e.target.matches('textarea, input:not([type=radio])');
+                    var tecla = e.key.toLowerCase();
+
+                    if (tecla === 'enter') {
+                        // Solo dentro del formulario (no en el buscador de la barra superior) y nunca en el texto libre
+                        if (e.target !== document.body && !form.contains(e.target)) return;
+                        if (e.target.matches('textarea, a, button')) return;
+                        e.preventDefault();
+                        form.requestSubmit(form.querySelector('[data-boton]:not([hidden])'));
+                        return;
+                    }
+                    if (escribiendo) return;
+
+                    if (tecla === 'a' || tecla === 'r') {
+                        var radio = document.getElementById(tecla === 'a' ? 'decisionAprobar' : 'decisionRechazar');
+                        radio.checked = true;
+                        elegirDecision(radio.value);
+                    } else if (/^[0-9]$/.test(tecla)) {
+                        var lista = listaActiva();
+                        // Mismo número que muestra la opción: 1-9 en orden (el último es "Otro"); 0 = "Sin observación",
+                        // que solo existe al aprobar (al rechazar el primero está deshabilitado)
+                        var opcion = tecla === '0'
+                            ? (lista.options[0].disabled ? null : lista.options[0])
+                            : Array.prototype.filter.call(lista.options, function (o) { return o.value; })[Number(tecla) - 1];
+                        if (!opcion) return;
+                        lista.value = opcion.value;
+                        revisarOtro();
+                        if (lista.value === '@ObservacionSolicitud.ValorOtro') texto.focus();
+                    } else if (tecla === 's') {
+                        var saltar = document.getElementById('btnSaltarSolicitud');
+                        if (saltar) saltar.click();
+                    } else {
+                        return;
+                    }
+                    e.preventDefault();
+                });
+            })();
+        </script>
+    }
+}

@@ -24,6 +24,8 @@ namespace PickingApp.Models
         // por "toma" (caja o fracción de caja) en lugar de por unidad suelta cuando es mayor que 1.
         public int UnidadesPorCaja { get; set; } = 1;
 
+        public const int MaxUnidadesPorCaja = 10000;
+
         public virtual ICollection<Ubicacion> Ubicaciones { get; set; } = new List<Ubicacion>();
     }
 }

@@ -1,27 +1,57 @@
-﻿@model IEnumerable<PickingApp.Models.Empleado>
+﻿@model PickingApp.Models.ViewModels.EmpleadosIndexViewModel
 @{
     ViewData["Title"] = "Gestión de empleados";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var esAdmin = userRole == Roles.Administrador;
     var esAuxiliar = userRole == Roles.Auxiliar;
+    var esSupervisor = userRole == Roles.Supervisor;
     // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
-    var ocupados = ViewBag.EmpleadosOcupados as HashSet<int> ?? new HashSet<int>();
-    var rendimientos = ViewBag.Rendimientos as Dictionary<int, PickingApp.Services.RendimientoEmpleado> ?? new Dictionary<int, PickingApp.Services.RendimientoEmpleado>();
+    var ocupados = Model.EmpleadosOcupados;
+    var rendimientos = Model.Rendimientos;
+    var bodegaElegida = Model.Bodegas.FirstOrDefault(b => b.Id == Model.FiltroBodegaId);
 }
 
 <h1 class="pf-page-title">Gestión de empleados</h1>
 
-<div class="mockup-card">
+<div class="pf-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <h4 class="fw-bold mb-0" style="color: #1F2937;">Empleados registrados</h4>
-        <a asp-action="Crear" class="btn-pf-blue">
-            @(esAuxiliar ? "+ Generar solicitud de registro" : "+ Registrar Empleado")
-        </a>
+        <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Empleados registrados</h4>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @if (Model.Empleados.Any())
+            {
+                @* Filtra la tabla al escribir (site.js, data-pf-buscar-en) *@
+                <label class="visually-hidden" for="buscarEmpleado">Buscar empleado</label>
+                <input type="search" id="buscarEmpleado" class="pf-search-input" placeholder="@(esAdmin ? "Buscar nombre, bodega, estado o turno..." : "Buscar nombre, estado o turno...")" data-pf-buscar-en="tablaEmpleados" autocomplete="off" />
+            }
+            <a asp-action="Crear" class="btn-pf-blue">
+                @(esAuxiliar ? "+ Generar solicitud de registro" : "+ Registrar Empleado")
+            </a>
+        </div>
     </div>
 
+    @if (Model.Bodegas.Count > 1)
+    {
+        @* Solo el Administrador ve varias bodegas: cada pestaña recarga con ?bodegaId (la píldora la pone site.js) *@
+        <div class="pf-estado-barra">
+            <nav class="pf-estado-tabs" aria-label="Bodega de los empleados">
+                <a asp-action="Index" class="@(bodegaElegida == null ? "activo" : "")" aria-current="@(bodegaElegida == null ? "page" : null)">
+                    Todas <span class="pf-estado-tabs__n">@Model.TotalEmpleados</span>
+                </a>
+                @foreach (var b in Model.Bodegas)
+                {
+                    var activa = b.Id == bodegaElegida?.Id;
+                    <a asp-action="Index" asp-route-bodegaId="@b.Id" class="@(activa ? "activo" : "")" aria-current="@(activa ? "page" : null)"
+                       title="@b.Codigo@(b.Activa ? "" : " · inactiva")">
+                        @b.Nombre <span class="pf-estado-tabs__n">@Model.EmpleadosPorBodega.GetValueOrDefault(b.Id)</span>
+                    </a>
+                }
+            </nav>
+        </div>
+    }
+
     <div class="table-responsive">
-        <table class="mockup-table">
+        <table class="pf-table" id="tablaEmpleados" data-pf-paginar>
             <thead>
                 <tr>
                     <th>Nombre</th>
@@ -36,13 +66,29 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model != null && Model.Any())
+                @if (Model.Empleados.Any() || Model.Trasladados.Any())
                 {
-                    @foreach (var emp in Model)
+                    @foreach (var emp in Model.Empleados)
                     {
                         var estadoText = PickingApp.Models.Empleado.DescribirEstado(emp.Activo, ocupados.Contains(emp.Id));
                         <tr class="@(emp.Id == destacadoId ? "pf-row-flash" : "")">
-                            <td class="fw-semibold">@emp.NombreCompleto</td>
+                            @* "Ver historial" va bajo el nombre y no en Rendimiento: así cada fila ocupa dos líneas y caben
+                               más por página, con la paginación a la vista *@
+                            <td>
+                                <div class="fw-semibold">@emp.NombreCompleto</div>
+                                @if (esAdmin)
+                                {
+                                    @* El Administrador ve a todas las bodegas; los demás solo la suya *@
+                                    <div class="text-secondary small">@(emp.Bodega?.Nombre ?? "Sin bodega asignada")</div>
+                                }
+                                @if (!esAuxiliar)
+                                {
+                                    <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
+                                        Ver historial<span class="visually-hidden"> de @emp.NombreCompleto</span>
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
+                                }
+                            </td>
                             <td>@estadoText</td>
                             @if (!esAuxiliar)
                             {
@@ -50,50 +96,87 @@
                                 <td>
                                     @if (rendimientos.TryGetValue(emp.Id, out var rendimiento))
                                     {
-                                        <span class="pf-rendimiento @ClaseRendimiento(rendimiento)">@rendimiento.Descripcion</span>
-                                        <div class="small text-muted">@rendimiento.Detalle</div>
+                                        <partial name="_Rendimiento" model="rendimiento" />
                                     }
                                 </td>
                             }
                             <td>@emp.JornadaLaboral</td>
-                            <td class="text-center d-flex gap-2 justify-content-center">
-                                <a asp-action="Editar" asp-route-id="@emp.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
-                                    Editar
-                                </a>
-                                @if (emp.Activo)
+                            <td class="text-center">
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <a asp-action="Editar" asp-route-id="@emp.Id" class="btn-pf-blue" style="padding: 4px 20px; font-size: 14px;">
+                                        Editar
+                                    </a>
+                                    @if (emp.Activo)
+                                    {
+                                        <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                                data-bs-toggle="modal" data-bs-target="#modalInactivar"
+                                                data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
+                                            @(esAdmin ? "Inactivar" : "Solicitar inactivación")
+                                        </button>
+                                    }
+                                    else if (esAdmin)
+                                    {
+                                        <form asp-action="Inactivar" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@emp.Id" />
+                                            <button type="submit" class="btn-pf-outline-green">Reactivar</button>
+                                        </form>
+                                    }
+                                    @if (esAdmin)
+                                    {
+                                        <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                                data-bs-toggle="modal" data-bs-target="#modalReiniciarPromedio"
+                                                data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
+                                            Reiniciar rendimiento
+                                        </button>
+                                    }
+                                    @if (esSupervisor)
+                                    {
+                                        <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                                data-bs-toggle="modal" data-bs-target="#modalTraslado"
+                                                data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
+                                            Solicitar traslado
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @* Ya no trabajan en esta bodega: solo se consulta lo que hicieron aquí *@
+                    @foreach (var salida in Model.Trasladados)
+                    {
+                        var emp = salida.Empleado!;
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@emp.NombreCompleto</div>
+                                @if (!esAuxiliar)
                                 {
-                                    <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
-                                            data-bs-toggle="modal" data-bs-target="#modalInactivar"
-                                            data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
-                                        @(esAdmin ? "Inactivar" : "Solicitar inactivación")
-                                    </button>
-                                }
-                                else if (esAdmin)
-                                {
-                                    <form asp-action="Inactivar" method="post" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@emp.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-success">Reactivar</button>
-                                    </form>
-                                }
-                                @if (esAdmin)
-                                {
-                                    <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
-                                            data-bs-toggle="modal" data-bs-target="#modalReiniciarPromedio"
-                                            data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
-                                        Reiniciar rendimiento
-                                    </button>
+                                    <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
+                                        Ver historial<span class="visually-hidden"> de @emp.NombreCompleto</span>
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
                                 }
                             </td>
+                            <td>Inactivo · Trasladado a @salida.BodegaDestino!.Nombre el @salida.Fecha.ToString("dd/MM/yyyy")</td>
+                            @if (!esAuxiliar)
+                            {
+                                <td>-</td>
+                                <td>-</td>
+                            }
+                            <td>-</td>
+                            <td class="text-center">-</td>
                         </tr>
                     }
                 }
                 else
                 {
                     <tr>
-                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">No hay empleados registrados.</td>
+                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">@(bodegaElegida != null ? $"{bodegaElegida.Nombre} no tiene empleados todavía." : esAdmin ? "No hay empleados registrados." : "Aún no hay empleados en tu bodega.")</td>
                     </tr>
                 }
+                <tr class="d-none" data-pf-sin-resultados>
+                    <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">Ningún empleado coincide con la búsqueda.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -121,12 +204,17 @@
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn-pf-blue" style="background-color: #DC2626;">Confirmar</button>
+                    <button type="submit" class="btn-pf-red">Confirmar</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+@if (esSupervisor)
+{
+    <partial name="_ModalTraslado" model="true" />
+}
 
 @if (esAdmin)
 {
@@ -142,7 +230,7 @@
                     </div>
                     <div class="modal-body">
                         <p>Empleado: <strong id="reiniciarPromedioNombre" data-pf-recibe="texto"></strong></p>
-                        <div class="mockup-alert-warning mb-0">
+                        <div class="pf-alert-warning mb-0">
                             Los pedidos completados hasta ahora se conservan en el historial, pero dejarán de contar para calcular su rendimiento. Hasta que complete de nuevo el mínimo de pedidos, sus estimaciones usarán el tiempo estándar.
                         </div>
                     </div>
@@ -154,13 +242,4 @@
             </div>
         </div>
     </div>
-}
-
-@functions {
-    // Verde si tarda menos que el estándar, ámbar si tarda más, neutro sin historial o al ritmo estándar
-    string ClaseRendimiento(PickingApp.Services.RendimientoEmpleado r)
-    {
-        if (!r.TieneHistorialSuficiente || Math.Abs(1 - r.Factor) < 0.05) return "pf-rendimiento--neutro";
-        return r.Factor < 1 ? "pf-rendimiento--rapido" : "pf-rendimiento--lento";
-    }
 }

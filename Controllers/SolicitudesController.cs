@@ -1,108 +1,526 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
+using PickingApp.Middleware;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // Flujo de aprobación: los cambios que un rol no puede hacer directamente quedan como Solicitud
+    // y aquí el Administrador (o el Supervisor, solo para registros de empleado) los aprueba o rechaza
     [Authorize]
     public class SolicitudesController : Controller
     {
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly ILogger<SolicitudesController> _logger;
 
-        public SolicitudesController(ApplicationDbContext context, IAuditService auditService)
+        public SolicitudesController(ApplicationDbContext context, IAuditService auditService, ILogger<SolicitudesController> logger)
         {
             _context = context;
             _auditService = auditService;
+            _logger = logger;
+        }
+
+        private const int TipoGestionableSupervisor = FlujoSolicitudes.TipoGestionableSupervisor;
+        private const string MensajeSinPermisoSupervisor = "Los Supervisores solo tienen permiso para gestionar solicitudes de registro de empleados.";
+
+        // Cabe en la notificación al solicitante (500 caracteres con el resto del mensaje) y en ObservacionRespuesta
+        private const int MaxObservacion = 400;
+
+        // Observación ya validada: del catálogo (Id) o texto libre de "Otro". Texto es lo que ve el solicitante.
+        private sealed record ObservacionElegida(int? Id, string? TextoLibre, string? Texto);
+
+        // Lee la opción elegida en la lista: el Id de una observación del catálogo, "otro" con texto libre, o nada.
+        // La observación del catálogo debe estar activa y corresponder al tipo de la solicitud y a la decisión.
+        private async Task<(ObservacionElegida? Elegida, string? Error)> LeerObservacionAsync(
+            Solicitud solicitud, string decision, string? observacion, string? observacionRespuesta)
+        {
+            if (observacion == ObservacionSolicitud.ValorOtro)
+            {
+                var texto = (observacionRespuesta ?? string.Empty).Trim();
+                if (texto.Length > MaxObservacion) return (null, $"La observación admite hasta {MaxObservacion} caracteres.");
+                if (!ObservacionSolicitud.TextoLibreValido(texto)) return (null, ObservacionSolicitud.MensajeTextoLibre);
+                return (new ObservacionElegida(null, texto, texto), null);
+            }
+
+            if (int.TryParse(observacion, out var observacionId))
+            {
+                var elegida = await _context.ObservacionesSolicitud.FirstOrDefaultAsync(o => o.Id == observacionId && o.Activa
+                    && o.TipoSolicitudId == solicitud.TipoSolicitudId && o.Decision == decision);
+                return elegida == null
+                    ? (null, "La observación elegida no corresponde a esta solicitud. Elija otra de la lista.")
+                    : (new ObservacionElegida(elegida.Id, null, elegida.Texto), null);
+            }
+
+            // Al aprobar la observación es opcional; al rechazar, el solicitante necesita saber por qué
+            return decision == DecisionesSolicitud.Rechazar
+                ? (null, "Para rechazar la solicitud elija una observación: el solicitante la verá.")
+                : (new ObservacionElegida(null, null, null), null);
+        }
+
+        private bool PuedeGestionar(Solicitud solicitud) =>
+            !User.IsInRole(Roles.Supervisor) || solicitud.TipoSolicitudId == TipoGestionableSupervisor;
+
+        private int UsuarioActualId => User.IdUsuario();
+
+        // Revisión en cadena: el revisor decide una solicitud y pasa a la siguiente sin volver a la bandeja.
+        // Sigue siendo una a una (cada solicitud se ve y se confirma por separado); solo se quita la ida y vuelta.
+        // Orden de llegada, la más antigua primero, para que ninguna se quede esperando.
+        private IQueryable<Solicitud> PendientesPorRevisar(int? tipo)
+        {
+            var query = _context.Solicitudes.DelAlcance(User).Where(s => s.Estado == EstadosSolicitud.Pendiente);
+            if (User.IsInRole(Roles.Supervisor)) query = query.Where(s => s.TipoSolicitudId == TipoGestionableSupervisor);
+            if (tipo.HasValue) query = query.Where(s => s.TipoSolicitudId == tipo.Value);
+            return query.OrderBy(s => s.FechaSolicitud).ThenBy(s => s.Id);
+        }
+
+        // La siguiente después de la actual; al llegar al final vuelve a las que se saltaron
+        private async Task<int?> SiguientePendienteAsync(Solicitud actual, int? tipo)
+        {
+            var otras = PendientesPorRevisar(tipo).Where(s => s.Id != actual.Id);
+            return await otras
+                       .Where(s => s.FechaSolicitud > actual.FechaSolicitud || (s.FechaSolicitud == actual.FechaSolicitud && s.Id > actual.Id))
+                       .Select(s => (int?)s.Id).FirstOrDefaultAsync()
+                   ?? await otras.Select(s => (int?)s.Id).FirstOrDefaultAsync();
+        }
+
+        private IActionResult IrARevisar(int id, bool cadena, int? tipo) =>
+            cadena ? RedirectToAction(nameof(Revisar), new { id, cadena, tipo }) : RedirectToAction(nameof(Revisar), new { id });
+
+        // Tras aprobar o rechazar: en cadena se abre la siguiente pendiente; si no, se vuelve a la bandeja
+        private async Task<IActionResult> DespuesDeDecidirAsync(Solicitud solicitud, bool cadena, int? tipo)
+        {
+            var siguiente = cadena ? await SiguientePendienteAsync(solicitud, tipo) : null;
+            if (siguiente.HasValue) return IrARevisar(siguiente.Value, cadena, tipo);
+            if (cadena) TempData["SuccessMessage"] = $"{TempData["SuccessMessage"]} No quedan solicitudes pendientes por revisar.".Trim();
+            return RedirectToAction(nameof(Index), new { tipo });
+        }
+
+        // Botón "Revisar pendientes" de la bandeja: abre la más antigua y empieza la cadena
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
+        [HttpGet]
+        public async Task<IActionResult> RevisarPendientes(int? tipo)
+        {
+            var primera = await PendientesPorRevisar(tipo).Select(s => (int?)s.Id).FirstOrDefaultAsync();
+            if (primera == null)
+            {
+                TempData["SuccessMessage"] = "No hay solicitudes pendientes por revisar.";
+                return RedirectToAction(nameof(Index), new { tipo });
+            }
+            return IrARevisar(primera.Value, cadena: true, tipo);
+        }
+
+        // El Supervisor pide trasladar a un empleado o auxiliar de su bodega; lo aprueba el Administrador
+        [Authorize(Roles = Roles.Supervisor)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SolicitarTraslado(bool esEmpleado, int id, int? bodegaDestinoId, string? motivo)
+        {
+            var origenId = User.BodegaVisible()!.Value;
+            string nombre;
+            string? identificacion;
+            Solicitud? pendiente;
+            string? pedidoEnCurso = null;
+
+            if (esEmpleado)
+            {
+                var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(e => e.Id == id);
+                if (empleado == null) return NotFound();
+                (nombre, identificacion) = (empleado.NombreCompleto, empleado.Identificacion);
+                pendiente = await SolicitudesPendientes.DeEmpleadoAsync(_context, id);
+                pedidoEnCurso = await FlujoSolicitudes.PedidoEnCursoAsync(_context, id);
+            }
+            else
+            {
+                var auxiliar = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id && u.RolId == Roles.IdAuxiliar && u.BodegaId == origenId);
+                if (auxiliar == null) return NotFound();
+                (nombre, identificacion) = (auxiliar.NombreCompleto, auxiliar.Identificacion);
+                pendiente = await SolicitudesPendientes.DeTrasladoDeUsuarioAsync(_context, id);
+            }
+
+            motivo = (motivo ?? string.Empty).Trim();
+            var origen = await _context.Bodegas.FindAsync(origenId);
+            var destino = await _context.Bodegas.FirstOrDefaultAsync(b => b.Id == bodegaDestinoId && b.Activa && b.Id != origenId);
+            var volver = RedirectToAction("Index", esEmpleado ? "Empleados" : "Usuarios");
+
+            var error = destino == null ? "Elige una bodega activa distinta a la tuya."
+                : motivo.Length == 0 ? "Debe indicar el motivo del traslado."
+                : pendiente != null ? SolicitudesPendientes.Mensaje(pendiente, $"'{nombre}'")
+                : pedidoEnCurso != null ? $"No se puede solicitar el traslado de '{nombre}' porque tiene el pedido {pedidoEnCurso} en curso. Reasigne, complete o cancele el pedido primero."
+                : null;
+            if (error != null)
+            {
+                TempData["ErrorMessage"] = error;
+                return volver;
+            }
+
+            await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.Traslado, new SolicitudTraslado
+            {
+                EsEmpleado = esEmpleado,
+                PersonaId = id,
+                NombreCompleto = nombre,
+                Identificacion = identificacion,
+                BodegaOrigenId = origenId,
+                BodegaOrigen = origen!.Nombre,
+                BodegaDestinoId = destino!.Id,
+                BodegaDestino = destino.Nombre,
+                Motivo = motivo
+            }, "Solicitud de Traslado", $"trasladar a {nombre} a la bodega {destino.Nombre}", TiposNotificacion.Info);
+
+            await _auditService.RegistrarAsync(AccionesLog.SolicitudTraslado, "Solicitudes",
+                $"Solicitud de traslado de {nombre} de {origen.Nombre} a {destino.Nombre}. Motivo: {motivo}");
+
+            TempData["SuccessMessage"] = $"Se ha generado la solicitud para trasladar a '{nombre}' a {destino.Nombre}. Requiere aprobación del Administrador.";
+            return volver;
         }
 
         // Bandeja de aprobación para Administrador y Supervisor
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
-        public async Task<IActionResult> Index(string? estado = null)
-        {
-            var userRole = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+        public Task<IActionResult> Index(FiltrosSolicitudes filtros) => ListarAsync(esBandeja: true, filtros);
 
-            var query = _context.Solicitudes
+        // CU-17: Consultar estado de solicitudes propias (Auxiliar y Supervisor)
+        public Task<IActionResult> MisSolicitudes(FiltrosSolicitudes filtros) => ListarAsync(esBandeja: false, filtros);
+
+        // Las dos listas usan la misma vista y los mismos filtros; cambia qué solicitudes entran
+        private async Task<IActionResult> ListarAsync(bool esBandeja, FiltrosSolicitudes filtros)
+        {
+            var esSupervisor = User.IsInRole(Roles.Supervisor);
+            var userId = UsuarioActualId;
+
+            // Cada solicitud queda en la bodega de quien la creó: también las propias se ven solo desde esa bodega
+            var baseQuery = _context.Solicitudes.DelAlcance(User);
+            if (!esBandeja)
+            {
+                baseQuery = baseQuery.Where(s => s.UsuarioSolicitanteId == userId);
+            }
+            else if (esSupervisor)
+            {
+                // Supervisor solo puede aprobar/rechazar solicitudes de Registro de Empleado (CU-08)
+                baseQuery = baseQuery.Where(s => s.TipoSolicitudId == TipoGestionableSupervisor);
+            }
+
+            // Opciones de los filtros: lo que existe en esta lista, antes de filtrar
+            var idsTipos = await baseQuery.Select(s => s.TipoSolicitudId).Distinct().ToListAsync();
+            var idsSolicitantes = esBandeja
+                ? await baseQuery.Select(s => s.UsuarioSolicitanteId).Distinct().ToListAsync()
+                : new List<int>();
+            var solicitantes = await _context.Usuarios
+                .Where(u => idsSolicitantes.Contains(u.Id))
+                .OrderBy(u => u.NombreCompleto)
+                .ToListAsync();
+
+            var query = baseQuery
                 .Include(s => s.UsuarioSolicitante)
                 .Include(s => s.UsuarioResponde)
                 .AsQueryable();
 
-            // Supervisor solo puede aprobar/rechazar solicitudes de Registro de Empleado (CU-08)
-            if (userRole == Roles.Supervisor)
+            // "SOL-12" o "12" buscan la solicitud número 12
+            var digitos = new string((filtros.Busqueda ?? string.Empty).Where(char.IsDigit).ToArray());
+            if (int.TryParse(digitos, out var numero))
             {
-                query = query.Where(s => s.TipoSolicitud == TipoGestionableSupervisor);
+                query = query.Where(s => s.Id == numero);
+            }
+            if (filtros.Tipo.HasValue)
+            {
+                query = query.Where(s => s.TipoSolicitudId == filtros.Tipo.Value);
+            }
+            if (esBandeja && filtros.SolicitanteId.HasValue)
+            {
+                query = query.Where(s => s.UsuarioSolicitanteId == filtros.SolicitanteId.Value);
+            }
+            if (filtros.FechaDesde.HasValue)
+            {
+                var desde = filtros.FechaDesde.Value.Date;
+                query = query.Where(s => s.FechaSolicitud >= desde);
+            }
+            if (filtros.FechaHasta.HasValue)
+            {
+                var hastaExclusivo = filtros.FechaHasta.Value.Date.AddDays(1);
+                query = query.Where(s => s.FechaSolicitud < hastaExclusivo);
             }
 
-            if (!string.IsNullOrEmpty(estado))
+            // El estado va al final: las pestañas cuentan sus solicitudes con todos los demás filtros
+            var conteoPorEstado = await query.GroupBy(s => s.Estado)
+                .Select(g => new { Estado = g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(g => g.Estado, g => g.Cantidad);
+            if (!string.IsNullOrEmpty(filtros.Estado))
             {
-                query = query.Where(s => s.Estado == estado);
-            }
-            else
-            {
-                // Por defecto mostrar pendientes primero
-                query = query.OrderByDescending(s => s.Estado == EstadosSolicitud.Pendiente)
-                             .ThenByDescending(s => s.FechaSolicitud);
+                query = query.Where(s => s.Estado == filtros.Estado);
             }
 
-            var solicitudes = await query.ToListAsync();
-            ViewBag.FiltroEstado = estado;
-            return View(solicitudes);
+            var modelo = new SolicitudesListaViewModel
+            {
+                ConteoPorEstado = conteoPorEstado,
+                // Pendientes primero; dentro de cada grupo, las más recientes
+                Solicitudes = await query
+                    .OrderByDescending(s => s.Estado == EstadosSolicitud.Pendiente)
+                    .ThenByDescending(s => s.FechaSolicitud)
+                    .ToListAsync(),
+                Filtros = filtros,
+                EsBandeja = esBandeja,
+                MostrarPestanas = esSupervisor,
+                PendientesPorRevisar = esSupervisor
+                    ? await _context.Solicitudes.DelAlcance(User).CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor)
+                    : 0,
+                PendientesEnCadena = esBandeja ? await PendientesPorRevisar(filtros.Tipo).CountAsync() : 0,
+                Tipos = await _context.CatalogoTiposSolicitud
+                    .Where(t => idsTipos.Contains(t.Id))
+                    .OrderBy(t => t.Nombre)
+                    .ToListAsync(),
+                Solicitantes = solicitantes
+            };
+            return View("Index", modelo);
         }
 
-        // CU-17: Consultar estado de solicitudes propias (Auxiliar y Supervisor)
-        public async Task<IActionResult> MisSolicitudes()
-        {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-            var misSolicitudes = await _context.Solicitudes
-                .Include(s => s.UsuarioSolicitante)
-                .Include(s => s.UsuarioResponde)
-                .Where(s => s.UsuarioSolicitanteId == userId)
-                .OrderByDescending(s => s.FechaSolicitud)
-                .ToListAsync();
-
-            return View(misSolicitudes);
-        }
-
-        // Slide 16 / CU-08: Revisar Solicitud
+        // CU-08: Revisar Solicitud
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
-        public async Task<IActionResult> Revisar(int id)
+        public async Task<IActionResult> Revisar(int id, bool cadena = false, int? tipo = null)
         {
-            var solicitud = await _context.Solicitudes
-                .Include(s => s.UsuarioSolicitante)
-                .Include(s => s.UsuarioResponde)
-                .FirstOrDefaultAsync(s => s.Id == id);
-
+            var solicitud = await BuscarAsync(id);
             if (solicitud == null) return NotFound();
+
+            // En cadena, si otro revisor ya la respondió, se pasa a la siguiente en vez de mostrarla
+            if (cadena && solicitud.Estado != EstadosSolicitud.Pendiente) return await DespuesDeDecidirAsync(solicitud, cadena, tipo);
 
             if (!PuedeGestionar(solicitud))
             {
+                // Una solicitud propia del Supervisor se ve en modo consulta
+                if (solicitud.UsuarioSolicitanteId == UsuarioActualId) return RedirectToAction(nameof(Detalle), new { id });
+
                 TempData["ErrorMessage"] = MensajeSinPermisoSupervisor;
                 return RedirectToAction(nameof(Index));
             }
 
-            return View(solicitud);
+            var modelo = await ConstruirDetalleAsync(solicitud);
+            modelo.PuedeResponder = solicitud.Estado == EstadosSolicitud.Pendiente;
+            if (modelo.PuedeResponder)
+            {
+                var opciones = await _context.ObservacionesSolicitud
+                    .Where(o => o.TipoSolicitudId == solicitud.TipoSolicitudId && o.Activa)
+                    .OrderBy(o => o.Texto)
+                    .ToListAsync();
+                modelo.ObservacionesAprobar = opciones.Where(o => o.Decision == DecisionesSolicitud.Aprobar).ToList();
+                modelo.ObservacionesRechazar = opciones.Where(o => o.Decision == DecisionesSolicitud.Rechazar).ToList();
+
+                if (cadena)
+                {
+                    modelo.EnCadena = true;
+                    modelo.TipoCadena = tipo;
+                    modelo.PendientesEnCadena = await PendientesPorRevisar(tipo).CountAsync();
+                    modelo.SiguienteId = await SiguientePendienteAsync(solicitud, tipo);
+                }
+            }
+            return View(modelo);
         }
 
-        // CU-08: el Supervisor solo revisa, aprueba o rechaza registros de empleados; el resto es del Administrador
-        private const string TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
-        private const string MensajeSinPermisoSupervisor = "Los Supervisores solo tienen permiso para gestionar solicitudes de registro de empleados.";
+        // Consulta de una solicitud propia (Auxiliar y Supervisor): datos, estado y, si la rechazaron, el motivo
+        [HttpGet]
+        public async Task<IActionResult> Detalle(int id)
+        {
+            var solicitud = await BuscarAsync(id);
+            if (solicitud == null) return NotFound();
 
-        private bool PuedeGestionar(Solicitud solicitud) =>
-            !User.IsInRole(Roles.Supervisor) || solicitud.TipoSolicitud == TipoGestionableSupervisor;
+            if (solicitud.UsuarioSolicitanteId != UsuarioActualId)
+            {
+                // Quien puede gestionarla la abre en la bandeja; los demás no ven solicitudes ajenas
+                if (User.IsInRole(Roles.Administrador) || (User.IsInRole(Roles.Supervisor) && PuedeGestionar(solicitud)))
+                {
+                    return RedirectToAction(nameof(Revisar), new { id });
+                }
+                return NotFound();
+            }
+
+            var modelo = await ConstruirDetalleAsync(solicitud);
+            modelo.AccionVolver = nameof(MisSolicitudes);
+            return View("Revisar", modelo);
+        }
+
+        private Task<Solicitud?> BuscarAsync(int id) => _context.Solicitudes.DelAlcance(User)
+            .Include(s => s.Bodega)
+            .Include(s => s.UsuarioSolicitante)
+            .Include(s => s.UsuarioResponde)
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        // Qué se muestra de cada tipo de solicitud. Los datos de hoy (empleado, ubicación, bodega, producto)
+        // se leen de la base de datos; si ya no existen, se usan los que se guardaron al crear la solicitud.
+        private async Task<SolicitudDetalleViewModel> ConstruirDetalleAsync(Solicitud solicitud)
+        {
+            var modelo = new SolicitudDetalleViewModel { Solicitud = solicitud };
+            var pendiente = solicitud.Estado == EstadosSolicitud.Pendiente;
+
+            switch (solicitud.TipoSolicitudId)
+            {
+                case TiposSolicitud.RegistroEmpleado:
+                {
+                    var registro = solicitud.LeerDatos<DatosEmpleadoSolicitud>();
+                    modelo.TituloDatos = "Empleado a registrar";
+                    modelo.Datos.Add(("Número de documento", registro.Identificacion));
+                    modelo.Datos.Add(("Nombre completo", registro.NombreCompleto));
+                    modelo.Datos.Add(("Correo electrónico", registro.Correo ?? "Sin correo"));
+                    modelo.Datos.Add(("Fecha de ingreso", registro.FechaIngreso.ToString("dd/MM/yyyy")));
+                    modelo.Datos.Add(("Horario", $"{Hora(registro.HorarioEntrada)} - {Hora(registro.HorarioSalida)}"));
+                    break;
+                }
+                case TiposSolicitud.EdicionEmpleado:
+                {
+                    var edicion = solicitud.LeerDatos<SolicitudEdicionEmpleado>();
+                    var empleado = await _context.Empleados.FindAsync(edicion.NuevosDatos.Id);
+                    // El nombre "de antes" está en los cambios si se pidió cambiarlo
+                    var nombre = empleado?.NombreCompleto
+                        ?? edicion.Cambios.FirstOrDefault(c => c.Campo == CamposEmpleado.Nombre)?.Anterior
+                        ?? edicion.NuevosDatos.NombreCompleto;
+                    modelo.TituloDatos = "Empleado";
+                    modelo.Datos.Add(("Nombre completo", nombre));
+                    modelo.Datos.Add(("Número de documento", empleado?.Identificacion ?? edicion.NuevosDatos.Identificacion));
+                    if (empleado != null) modelo.Datos.Add(("Estado", empleado.Activo ? "Activo" : "Inactivo"));
+                    else if (pendiente) modelo.Aviso = "El empleado ya no existe: no se puede aprobar. Rechace la solicitud.";
+
+                    modelo.EsEdicion = true;
+                    modelo.Motivo = edicion.Motivo;
+                    modelo.Cambios = edicion.Cambios.Select(c => Comparar(c, pendiente && empleado != null ? ValorActual(empleado, c.Campo) : null)).ToList();
+                    break;
+                }
+                case TiposSolicitud.InactivacionEmpleado:
+                {
+                    var inactivacion = solicitud.LeerDatos<SolicitudInactivacionEmpleado>();
+                    var empleado = await _context.Empleados.FindAsync(inactivacion.EmpleadoId);
+                    modelo.TituloDatos = "Empleado a inactivar";
+                    modelo.Datos.Add(("Nombre completo", empleado?.NombreCompleto ?? inactivacion.NombreCompleto));
+                    modelo.Datos.Add(("Número de documento", empleado?.Identificacion ?? inactivacion.Identificacion));
+                    if (empleado != null) modelo.Datos.Add(("Estado actual", empleado.Activo ? "Activo" : "Inactivo"));
+                    modelo.Motivo = inactivacion.Motivo;
+
+                    if (pendiente)
+                    {
+                        var pedidoEnCurso = empleado == null ? null : await _context.Pedidos
+                            .Where(p => p.EmpleadoId == empleado.Id && PedidoEstados.EnCurso.Contains(p.Estado))
+                            .Select(p => p.CodigoPedido)
+                            .FirstOrDefaultAsync();
+                        modelo.Aviso = empleado == null ? "El empleado ya no existe: no se puede aprobar. Rechace la solicitud."
+                            : !empleado.Activo ? "El empleado ya está inactivo."
+                            : pedidoEnCurso != null ? $"Tiene el pedido {pedidoEnCurso} en curso: no se podrá aprobar hasta que se reasigne, complete o cancele."
+                            : null;
+                    }
+                    break;
+                }
+                case TiposSolicitud.EdicionUbicacion:
+                {
+                    var edicion = solicitud.LeerDatos<SolicitudEdicionUbicacion>();
+                    var ubicacion = await UbicacionConDatosAsync(edicion.UbicacionId);
+                    modelo.TituloDatos = "Ubicación";
+                    AgregarDatosUbicacion(modelo, ubicacion,
+                        edicion.CodigoUbicacion ?? edicion.Cambios.FirstOrDefault(c => c.Campo == CamposUbicacion.Codigo)?.Anterior,
+                        edicion.BodegaCodigo, edicion.Producto ?? edicion.Cambios.FirstOrDefault(c => c.Campo == CamposUbicacion.Producto)?.Anterior);
+                    if (ubicacion == null && pendiente) modelo.Aviso = "La ubicación ya no existe: no se puede aprobar. Rechace la solicitud.";
+
+                    modelo.EsEdicion = true;
+                    modelo.Motivo = edicion.Motivo;
+                    modelo.Cambios = edicion.Cambios.Select(c => Comparar(c, pendiente && ubicacion != null ? ValorActual(ubicacion, c.Campo) : null)).ToList();
+                    break;
+                }
+                case TiposSolicitud.EliminacionUbicacion:
+                {
+                    var eliminacion = solicitud.LeerDatos<SolicitudEliminacionUbicacion>();
+                    var ubicacion = await UbicacionConDatosAsync(eliminacion.UbicacionId);
+                    modelo.TituloDatos = "Ubicación a eliminar";
+                    AgregarDatosUbicacion(modelo, ubicacion, eliminacion.CodigoUbicacion, eliminacion.BodegaCodigo, eliminacion.Producto);
+                    modelo.Motivo = eliminacion.Motivo;
+
+                    if (pendiente)
+                    {
+                        modelo.Aviso = ubicacion == null ? "La ubicación ya no existe: no se puede aprobar. Rechace la solicitud."
+                            : await _context.DetallesPedido.AnyAsync(d => d.UbicacionId == ubicacion.Id)
+                                ? "La ubicación tiene pedidos asociados: no se puede eliminar. Rechace la solicitud."
+                                : null;
+                    }
+                    break;
+                }
+                case TiposSolicitud.Traslado:
+                {
+                    var traslado = solicitud.LeerDatos<SolicitudTraslado>();
+                    modelo.TituloDatos = traslado.EsEmpleado ? "Empleado a trasladar" : "Auxiliar a trasladar";
+                    modelo.Datos.Add(("Nombre completo", traslado.NombreCompleto));
+                    modelo.Datos.Add(("Número de documento", traslado.Identificacion ?? "Sin registrar"));
+                    modelo.Datos.Add(("Bodega de origen", traslado.BodegaOrigen));
+                    modelo.Datos.Add(("Bodega de destino", traslado.BodegaDestino));
+                    modelo.Motivo = traslado.Motivo;
+
+                    if (pendiente && await FlujoSolicitudes.ImpedimentoTrasladoAsync(_context, traslado) is string impedimento)
+                    {
+                        modelo.Aviso = $"No se puede aprobar: {impedimento}";
+                    }
+                    break;
+                }
+                default:
+                    modelo.TituloDatos = "Datos";
+                    break;
+            }
+
+            if (string.IsNullOrWhiteSpace(modelo.Motivo) && solicitud.TipoSolicitudId != TiposSolicitud.RegistroEmpleado)
+            {
+                modelo.Motivo = "No especificado";
+            }
+            return modelo;
+        }
+
+        private Task<Ubicacion?> UbicacionConDatosAsync(int id) => _context.Ubicaciones
+            .Include(u => u.Bodega)
+            .Include(u => u.Producto)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        private static void AgregarDatosUbicacion(SolicitudDetalleViewModel modelo, Ubicacion? ubicacion,
+            string? codigoGuardado, string? bodegaGuardada, string? productoGuardado)
+        {
+            modelo.Datos.Add(("Código", ubicacion?.CodigoUbicacion ?? codigoGuardado ?? "No disponible"));
+            modelo.Datos.Add(("Bodega", ubicacion?.Bodega != null ? $"{ubicacion.Bodega.Codigo} · {ubicacion.Bodega.Nombre}" : bodegaGuardada ?? "No disponible"));
+            modelo.Datos.Add(("Producto", ubicacion != null ? TextoProducto(ubicacion.Producto) : productoGuardado ?? "No disponible"));
+            if (ubicacion != null) modelo.Datos.Add(("Estado", ubicacion.Activa ? "Activa" : "Inactiva"));
+        }
+
+        private static string TextoProducto(Producto? producto) =>
+            producto != null ? $"{producto.Codigo} · {producto.Nombre}" : "Sin producto";
+
+        private static string Hora(TimeSpan hora) => hora.ToString(@"hh\:mm");
+
+        // Valor de hoy con el mismo formato que usó quien creó la solicitud; null si el campo no se compara
+        private static string? ValorActual(Empleado empleado, string campo) => campo switch
+        {
+            CamposEmpleado.Nombre => empleado.NombreCompleto,
+            CamposEmpleado.Correo => empleado.Correo ?? "-",
+            CamposEmpleado.FechaIngreso => empleado.FechaIngreso.ToString("dd/MM/yyyy"),
+            CamposEmpleado.HoraEntrada => Hora(empleado.HorarioEntrada),
+            CamposEmpleado.HoraSalida => Hora(empleado.HorarioSalida),
+            _ => null
+        };
+
+        private static string? ValorActual(Ubicacion ubicacion, string campo) => campo switch
+        {
+            CamposUbicacion.Codigo => ubicacion.CodigoUbicacion,
+            CamposUbicacion.Estado => ubicacion.Activa ? "Activa" : "Inactiva",
+            CamposUbicacion.Producto => ubicacion.Producto != null ? TextoProducto(ubicacion.Producto) : "-",
+            _ => null
+        };
+
+        private static CambioDetalle Comparar(CambioSolicitud cambio, string? actual) => new()
+        {
+            Campo = cambio.Campo,
+            Anterior = cambio.Anterior,
+            Nuevo = cambio.Nuevo,
+            Actual = actual != null && actual != cambio.Anterior ? actual : null
+        };
 
         // Aprobar Solicitud (CU-08, CU-11, CU-14, CU-21, CU-41)
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Aprobar(int id)
+        public async Task<IActionResult> Aprobar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
-            var solicitud = await _context.Solicitudes
+            var solicitud = await _context.Solicitudes.DelAlcance(User)
                 .Include(s => s.UsuarioSolicitante)
                 .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -112,66 +530,71 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
             if (!PuedeGestionar(solicitud))
             {
                 TempData["ErrorMessage"] = MensajeSinPermisoSupervisor;
                 return RedirectToAction(nameof(Index));
             }
 
+            var (elegida, error) = await LeerObservacionAsync(solicitud, DecisionesSolicitud.Aprobar, observacion, observacionRespuesta);
+            if (elegida == null)
+            {
+                TempData["ErrorMessage"] = error;
+                return IrARevisar(id, cadena, tipo);
+            }
+            var conObservacion = elegida.Texto == null ? "" : $" Observación: {elegida.Texto}";
+
             try
             {
-                await AplicarAsync(solicitud);
+                // Aplica el cambio pedido (crear, editar o inactivar empleado; editar o eliminar ubicación)
+                await FlujoSolicitudes.AplicarAsync(_context, solicitud);
 
                 solicitud.Estado = EstadosSolicitud.Aprobada;
+                solicitud.ObservacionId = elegida.Id;
+                solicitud.ObservacionRespuesta = elegida.TextoLibre;
                 solicitud.FechaRespuesta = DateTime.Now;
-                solicitud.UsuarioRespondeId = userId;
+                solicitud.UsuarioRespondeId = UsuarioActualId;
 
-                // Notificar al usuario solicitante (CU-43)
-                _context.Notificaciones.Add(new Notificacion
-                {
-                    UsuarioDestinoId = solicitud.UsuarioSolicitanteId,
-                    Titulo = "Solicitud Aprobada",
-                    Mensaje = $"Tu solicitud \"{TiposSolicitud.Nombre(solicitud.TipoSolicitud)}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.",
-                    Tipo = "Success",
-                    FechaCreacion = DateTime.Now,
-                    Enlace = "/Solicitudes/MisSolicitudes"
-                });
+                // Notificar al usuario solicitante (CU-43); el enlace abre esta solicitud
+                Avisos.AlUsuario(_context, solicitud.UsuarioSolicitanteId,
+                    "Solicitud Aprobada",
+                    $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" ha sido aprobada por el {User.DescripcionParaNotificacion()}.{conObservacion}",
+                    TiposNotificacion.Success,
+                    $"/Solicitudes/Detalle/{solicitud.Id}");
 
+                // Un solo SaveChanges guarda el cambio aplicado, la solicitud aprobada y la notificación:
+                // si algo falla, no se guarda nada a medias
                 await _context.SaveChangesAsync();
 
-                await _auditService.RegistrarAsync("Aprobar Solicitud", "Solicitudes",
-                    $"Solicitud #{solicitud.Id} ({solicitud.TipoSolicitud}) aprobada.");
+                await _auditService.RegistrarAsync(AccionesLog.AprobarSolicitud, "Solicitudes",
+                    $"Solicitud #{solicitud.Id} ({solicitud.NombreTipo}) aprobada.{conObservacion}");
 
-                TempData["SuccessMessage"] = $"Solicitud #{solicitud.Id} aprobada correctamente.";
+                TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} aprobada correctamente.";
+                return await DespuesDeDecidirAsync(solicitud, cadena, tipo);
             }
             catch (ReglaNegocioException ex)
             {
                 // La solicitud queda Pendiente: se puede aprobar cuando se resuelva el impedimento, o rechazar.
                 TempData["ErrorMessage"] = ex.Message;
             }
-            catch (Exception ex)
+            // Los errores de base de datos siguen hasta ErrorBaseDatosMiddleware, que muestra el aviso comprensible
+            catch (Exception ex) when (!ErroresBaseDatos.EsErrorDeBaseDatos(ex))
             {
-                TempData["ErrorMessage"] = $"Error al procesar la aprobación: {ex.Message}";
+                _logger.LogError(ex, "Error inesperado al aprobar la solicitud {Id}.", id);
+                TempData["ErrorMessage"] = "No se pudo aprobar la solicitud por un error inesperado; no se guardó ningún cambio. Inténtelo de nuevo.";
             }
 
-            return RedirectToAction(nameof(Index));
+            // Si no se pudo aprobar, se vuelve a la misma solicitud para rechazarla o revisarla
+            return IrARevisar(id, cadena, tipo);
         }
 
         // Rechazar Solicitud (CU-08, CU-11, CU-14, CU-21, CU-41)
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Rechazar(int id, string motivoRechazo)
+        public async Task<IActionResult> Rechazar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
-            if (string.IsNullOrWhiteSpace(motivoRechazo))
-            {
-                TempData["ErrorMessage"] = "Debe indicar un motivo de rechazo obligatorio.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            var solicitud = await _context.Solicitudes.FindAsync(id);
+            var solicitud = await _context.Solicitudes.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (solicitud == null || solicitud.Estado != EstadosSolicitud.Pendiente)
             {
                 TempData["ErrorMessage"] = "La solicitud no se encuentra disponible para rechazo.";
@@ -184,173 +607,33 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var (elegida, error) = await LeerObservacionAsync(solicitud, DecisionesSolicitud.Rechazar, observacion, observacionRespuesta);
+            if (elegida == null)
+            {
+                TempData["ErrorMessage"] = error;
+                return IrARevisar(id, cadena, tipo);
+            }
 
             solicitud.Estado = EstadosSolicitud.Rechazada;
-            solicitud.MotivoRechazo = motivoRechazo.Trim();
+            solicitud.ObservacionId = elegida.Id;
+            solicitud.ObservacionRespuesta = elegida.TextoLibre;
             solicitud.FechaRespuesta = DateTime.Now;
-            solicitud.UsuarioRespondeId = userId;
+            solicitud.UsuarioRespondeId = UsuarioActualId;
 
-            // Notificar al usuario solicitante (CU-43)
-            _context.Notificaciones.Add(new Notificacion
-            {
-                UsuarioDestinoId = solicitud.UsuarioSolicitanteId,
-                Titulo = "Solicitud Rechazada",
-                Mensaje = $"Tu solicitud \"{TiposSolicitud.Nombre(solicitud.TipoSolicitud)}\" fue rechazada. Motivo: {motivoRechazo}",
-                Tipo = "Danger",
-                FechaCreacion = DateTime.Now,
-                Enlace = "/Solicitudes/MisSolicitudes"
-            });
+            // Notificar al usuario solicitante (CU-43); el enlace abre la solicitud con la observación
+            Avisos.AlUsuario(_context, solicitud.UsuarioSolicitanteId,
+                "Solicitud Rechazada",
+                $"Tu solicitud SOL-{solicitud.Id} \"{solicitud.NombreTipo}\" fue rechazada. Observación: {elegida.Texto}",
+                TiposNotificacion.Danger,
+                $"/Solicitudes/Detalle/{solicitud.Id}");
 
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Rechazar Solicitud", "Solicitudes", 
-                $"Solicitud #{solicitud.Id} rechazada. Motivo: {motivoRechazo}");
+            await _auditService.RegistrarAsync(AccionesLog.RechazarSolicitud, "Solicitudes",
+                $"Solicitud #{solicitud.Id} rechazada. Observación: {elegida.Texto}");
 
-            TempData["SuccessMessage"] = $"Solicitud #{solicitud.Id} rechazada.";
-            return RedirectToAction(nameof(Index));
-        }
-
-        // El empleado pudo tomar un pedido entre la creación de la solicitud y su aprobación.
-        private async Task ValidarSinPedidoEnCursoAsync(Empleado empleado, string accion)
-        {
-            var pedidoEnCurso = await _context.Pedidos
-                .Where(p => p.EmpleadoId == empleado.Id && PedidoEstados.EnCurso.Contains(p.Estado))
-                .Select(p => p.CodigoPedido)
-                .FirstOrDefaultAsync();
-
-            if (pedidoEnCurso != null)
-            {
-                throw new ReglaNegocioException($"No se puede aprobar: el empleado '{empleado.NombreCompleto}' tiene el pedido {pedidoEnCurso} en curso y no es posible {accion}. Reasigne, complete o cancele el pedido primero; la solicitud sigue pendiente.");
-            }
-        }
-
-        // Aplica los cambios de la solicitud. Las reglas se validan otra vez: entre la creación de la solicitud
-        // y su aprobación otro registro pudo tomar la identificación, el correo o el código, o cambiar la jornada máxima.
-        private Task AplicarAsync(Solicitud solicitud) => solicitud.TipoSolicitud switch
-        {
-            TiposSolicitud.RegistroEmpleado => RegistrarEmpleadoAsync(solicitud.LeerDatos<DatosEmpleadoSolicitud>()),
-            TiposSolicitud.EdicionEmpleado => EditarEmpleadoAsync(solicitud.LeerDatos<SolicitudEdicionEmpleado>().NuevosDatos),
-            TiposSolicitud.InactivacionEmpleado => InactivarEmpleadoAsync(solicitud.LeerDatos<SolicitudInactivacionEmpleado>()),
-            TiposSolicitud.EdicionUbicacion => EditarUbicacionAsync(solicitud.LeerDatos<SolicitudEdicionUbicacion>()),
-            TiposSolicitud.EliminacionUbicacion => EliminarUbicacionAsync(solicitud.LeerDatos<SolicitudEliminacionUbicacion>()),
-            _ => throw new ReglaNegocioException($"No se puede aprobar: tipo de solicitud desconocido ({solicitud.TipoSolicitud}).")
-        };
-
-        private async Task RegistrarEmpleadoAsync(DatosEmpleadoSolicitud datos)
-        {
-            var identificacion = datos.Identificacion.Trim();
-            var correo = ReglasEmpleado.NormalizarCorreo(datos.Correo);
-            await ValidarReglasEmpleadoAsync(identificacion, correo, datos.HorarioEntrada, datos.HorarioSalida, empleadoId: null);
-
-            _context.Empleados.Add(new Empleado
-            {
-                Identificacion = identificacion,
-                NombreCompleto = datos.NombreCompleto,
-                Correo = correo,
-                HorarioEntrada = datos.HorarioEntrada,
-                HorarioSalida = datos.HorarioSalida,
-                FechaIngreso = datos.FechaIngreso
-            });
-        }
-
-        private async Task EditarEmpleadoAsync(DatosEmpleadoSolicitud datos)
-        {
-            var empleado = await _context.Empleados.FindAsync(datos.Id)
-                ?? throw new ReglaNegocioException("No se puede aprobar: el empleado ya no existe. Rechace la solicitud.");
-
-            var correo = ReglasEmpleado.NormalizarCorreo(datos.Correo);
-            await ValidarReglasEmpleadoAsync(empleado.Identificacion, correo, datos.HorarioEntrada, datos.HorarioSalida, empleado.Id);
-
-            empleado.NombreCompleto = datos.NombreCompleto;
-            empleado.Correo = correo;
-            empleado.HorarioEntrada = datos.HorarioEntrada;
-            empleado.HorarioSalida = datos.HorarioSalida;
-            empleado.FechaIngreso = datos.FechaIngreso;
-        }
-
-        private async Task InactivarEmpleadoAsync(SolicitudInactivacionEmpleado datos)
-        {
-            var empleado = await _context.Empleados.FindAsync(datos.EmpleadoId)
-                ?? throw new ReglaNegocioException("No se puede aprobar: el empleado ya no existe. Rechace la solicitud.");
-
-            await ValidarSinPedidoEnCursoAsync(empleado, "inactivarlo");
-            empleado.Activo = false;
-        }
-
-        private async Task EditarUbicacionAsync(SolicitudEdicionUbicacion datos)
-        {
-            var ubicacion = await _context.Ubicaciones
-                .Include(u => u.Producto)
-                .FirstOrDefaultAsync(u => u.Id == datos.UbicacionId)
-                ?? throw new ReglaNegocioException("No se puede aprobar: la ubicación ya no existe. Rechace la solicitud.");
-
-            var nuevos = datos.NuevosDatos;
-            var duplicada = await _context.Ubicaciones.AnyAsync(u =>
-                u.BodegaId == ubicacion.BodegaId && u.CodigoUbicacion == nuevos.CodigoUbicacion && u.Id != ubicacion.Id);
-            if (duplicada)
-            {
-                throw new ReglaNegocioException($"No se puede aprobar: ya existe otra ubicación con el código '{nuevos.CodigoUbicacion}' en esta bodega. La solicitud sigue pendiente.");
-            }
-
-            var nombreProducto = nuevos.NombreProducto ?? nuevos.CodigoProducto;
-            var producto = await _context.Productos
-                .FirstOrDefaultAsync(p => p.Codigo.ToUpper() == nuevos.CodigoProducto.ToUpper());
-            if (producto == null)
-            {
-                producto = new Producto { Codigo = nuevos.CodigoProducto, Nombre = nombreProducto };
-                _context.Productos.Add(producto);
-            }
-            else
-            {
-                producto.Nombre = nombreProducto;
-            }
-
-            // Si la categoría fue eliminada mientras tanto, el producto queda sin clasificar
-            var categoriaId = nuevos.CategoriaProductoId;
-            if (categoriaId.HasValue && !await _context.CategoriasProducto.AnyAsync(c => c.Id == categoriaId.Value))
-            {
-                categoriaId = null;
-            }
-            producto.CategoriaProductoId = categoriaId;
-            if (nuevos.UnidadesPorCaja.HasValue)
-            {
-                producto.UnidadesPorCaja = Math.Max(1, nuevos.UnidadesPorCaja.Value);
-            }
-
-            ubicacion.Pasillo = nuevos.Pasillo;
-            ubicacion.Estante = nuevos.Estante;
-            ubicacion.Nivel = nuevos.Nivel;
-            ubicacion.CodigoUbicacion = nuevos.CodigoUbicacion;
-            ubicacion.Activa = nuevos.Activa;
-            ubicacion.Producto = producto;
-        }
-
-        private async Task EliminarUbicacionAsync(SolicitudEliminacionUbicacion datos)
-        {
-            var ubicacion = await _context.Ubicaciones.FindAsync(datos.UbicacionId)
-                ?? throw new ReglaNegocioException("No se puede aprobar: la ubicación ya no existe. Rechace la solicitud.");
-
-            // Pudo recibir pedidos después de creada la solicitud
-            if (await _context.DetallesPedido.AnyAsync(d => d.UbicacionId == ubicacion.Id))
-            {
-                throw new ReglaNegocioException($"No se puede aprobar: la ubicación '{ubicacion.CodigoUbicacion}' tiene pedidos asociados. Rechace la solicitud.");
-            }
-            _context.Ubicaciones.Remove(ubicacion);
-        }
-
-        private async Task ValidarReglasEmpleadoAsync(string identificacion, string? correo, TimeSpan entrada, TimeSpan salida, int? empleadoId)
-        {
-            var error = await ReglasEmpleado.ValidarAsync(_context, identificacion, correo, entrada, salida, empleadoId);
-            if (error != null)
-            {
-                throw new ReglaNegocioException($"No se puede aprobar: {error.Mensaje} La solicitud sigue pendiente.");
-            }
-        }
-
-        private sealed class ReglaNegocioException : Exception
-        {
-            public ReglaNegocioException(string message) : base(message) { }
+            TempData["SuccessMessage"] = $"Solicitud SOL-{solicitud.Id} rechazada.";
+            return await DespuesDeDecidirAsync(solicitud, cadena, tipo);
         }
     }
 }

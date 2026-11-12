@@ -17,8 +17,23 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Pomelo 8.0.2 trae EF Core Relational 8.0.2, pero Design ya usa la 8.0.11; se fija para que la app y las pruebas usen la misma -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.11" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
     <PackageReference Include="QuestPDF" Version="2026.9.0" />
+  </ItemGroup>
+
+  <!-- El proyecto de pruebas vive en Tests/ dentro de esta carpeta: no se compila ni se publica con la aplicación -->
+  <ItemGroup>
+    <Compile Remove="Tests\**" />
+    <Content Remove="Tests\**" />
+    <EmbeddedResource Remove="Tests\**" />
+    <None Remove="Tests\**" />
+  </ItemGroup>
+
+  <!-- Plantillas de correo: EmailService las lee desde la raíz de la app al enviar -->
+  <ItemGroup>
+    <None Update="Plantillas\**" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

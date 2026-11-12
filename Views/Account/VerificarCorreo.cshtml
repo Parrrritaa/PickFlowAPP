@@ -1,0 +1,40 @@
+@model PickingApp.Models.ViewModels.VerificarCorreoViewModel
+@{
+    ViewData["Title"] = "Verificar correo";
+    Layout = "_LayoutLogin";
+}
+
+<main class="pf-login-card">
+    <h1 class="pf-login-titulo">Verifica tu correo</h1>
+    <p class="pf-login-sub">
+        Es tu primer inicio de sesión. Te enviamos un código de 6 dígitos a <strong>@Model.Correo</strong>;
+        escríbelo para activar tu cuenta. Vence en 10 minutos.
+    </p>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success py-2 small mb-3" role="alert">@TempData["SuccessMessage"]</div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger py-2 small mb-3" role="alert">@TempData["ErrorMessage"]</div>
+    }
+
+    <form asp-action="VerificarCorreo" method="post">
+        @Html.AntiForgeryToken()
+
+        <label asp-for="Codigo" class="pf-login-etiqueta">Código de verificación</label>
+        <input asp-for="Codigo" class="pf-login-input mb-1" placeholder="000000" inputmode="numeric" pattern="\d*" maxlength="6" autocomplete="one-time-code" autofocus required />
+        <span asp-validation-for="Codigo" class="text-danger small d-block mb-2"></span>
+
+        <button type="submit" class="btn-pf-login">
+            Verificar y entrar
+        </button>
+    </form>
+
+    <form asp-action="ReenviarCodigoCorreo" method="post" class="pf-login-pie">
+        @Html.AntiForgeryToken()
+        ¿No te llegó o venció?
+        <button type="submit" class="btn btn-link p-0 align-baseline pf-login-link">Reenviar código</button>
+    </form>
+</main>

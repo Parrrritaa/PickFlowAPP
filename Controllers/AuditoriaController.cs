@@ -9,41 +9,51 @@ using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
+    // LOG del sistema, Configuración y limpieza de la base de datos (solo Administrador)
     [Authorize(Roles = Roles.Administrador)]
     public class AuditoriaController : Controller
     {
         private readonly ApplicationDbContext _context;
         private readonly IAuditService _auditService;
         private readonly IReportService _reportService;
+        private readonly DatosDemostracion _datosDemostracion;
 
-        public AuditoriaController(ApplicationDbContext context, IAuditService auditService, IReportService reportService)
+        public AuditoriaController(ApplicationDbContext context, IAuditService auditService, IReportService reportService,
+            DatosDemostracion datosDemostracion)
         {
             _context = context;
             _auditService = auditService;
             _reportService = reportService;
+            _datosDemostracion = datosDemostracion;
         }
 
-        private const int MaxRegistrosPantalla = 200;
+        // El LOG va fijo a 10 por página (pedido del profesor); el resto de listas se ajusta a la pantalla
+        private const int RegistrosPorPagina = 10;
 
         // CU-38: Consultar LOG del sistema
-        public async Task<IActionResult> Index(string? modulo, string? usuario, DateTime? fechaDesde, DateTime? fechaHasta)
+        public async Task<IActionResult> Index(string? modulo, string? usuario, DateTime? fechaDesde, DateTime? fechaHasta, int? pagina)
         {
             var query = FiltrarLogs(modulo, usuario, fechaDesde, fechaHasta);
 
-            ViewBag.TotalFiltrado = await query.CountAsync();
+            // Solo se trae la página pedida; el Id desempata registros del mismo instante para que no cambien de página
+            var paginacion = new Paginacion(pagina, RegistrosPorPagina, await query.CountAsync());
             var logs = await query
                 .OrderByDescending(l => l.FechaHora)
-                .Take(MaxRegistrosPantalla)
+                .ThenByDescending(l => l.Id)
+                .Skip(paginacion.Saltar)
+                .Take(paginacion.TamanoPagina)
                 .ToListAsync();
             await ReemplazarCorreosEnDetalleAsync(logs);
 
-            ViewBag.ModuloFiltro = modulo;
-            ViewBag.UsuarioFiltro = usuario;
-            ViewBag.FechaDesdeFiltro = fechaDesde?.ToString("yyyy-MM-dd");
-            ViewBag.FechaHastaFiltro = fechaHasta?.ToString("yyyy-MM-dd");
-            ViewBag.MaxRegistros = MaxRegistrosPantalla;
-
-            return View(logs);
+            return View(new AuditoriaIndexViewModel
+            {
+                Registros = logs,
+                Paginacion = paginacion,
+                ModuloFiltro = modulo,
+                UsuarioFiltro = usuario,
+                FechaDesdeFiltro = fechaDesde?.ToString("yyyy-MM-dd"),
+                FechaHastaFiltro = fechaHasta?.ToString("yyyy-MM-dd")
+            });
         }
 
         // Exportar LOG del sistema a PDF (CU-38 / CU-36): exige el rango de fechas a exportar
@@ -115,7 +125,7 @@ namespace PickingApp.Controllers
         private async Task ReemplazarCorreosEnDetalleAsync(List<LogSistema> logs)
         {
             var usuarios = await _context.Usuarios.AsNoTracking()
-                .Select(u => new { u.Correo, u.NombreCompleto, u.Rol })
+                .Select(u => new { u.Correo, u.NombreCompleto, Rol = u.Rol!.Nombre })
                 .ToListAsync();
             var nombresPorCorreo = usuarios.ToDictionary(u => u.Correo, u => $"{u.NombreCompleto} ({u.Rol})", StringComparer.OrdinalIgnoreCase);
 
@@ -135,7 +145,10 @@ namespace PickingApp.Controllers
             return View(new ConfiguracionViewModel
             {
                 LogHabilitado = await ParametrosSistema.LogHabilitadoAsync(_context),
-                Valores = await ParametrosSistema.ObtenerTodosAsync(_context)
+                Valores = await ParametrosSistema.ObtenerTodosAsync(_context),
+                TotalPedidos = await _context.Pedidos.CountAsync(),
+                PedidosEnCurso = await _context.Pedidos.CountAsync(p => PedidoEstados.EnCurso.Contains(p.Estado)),
+                MotivoSinDemostracion = await _datosDemostracion.MotivoNoDisponibleAsync()
             });
         }
 
@@ -171,6 +184,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Configuracion));
             }
 
+            // Actualiza la fila de cada parámetro, o la crea si todavía no existe
             foreach (var kvp in valores)
             {
                 var cfg = await _context.ConfiguracionesSistema.FirstOrDefaultAsync(c => c.Clave == kvp.Key);
@@ -193,6 +207,69 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Configuracion));
         }
 
+        // Borra todos los pedidos (con sus productos y novedades) para repetir pruebas de carga y asignación.
+        // No toca usuarios, empleados, bodegas, ubicaciones, productos, solicitudes ni el LOG.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarHistorialPedidos()
+        {
+            var total = await _context.Pedidos.CountAsync();
+            if (total == 0)
+            {
+                TempData["ErrorMessage"] = "No hay pedidos para borrar.";
+                return RedirectToAction(nameof(Configuracion));
+            }
+
+            // ExecuteDeleteAsync lanza un DELETE directo en MySQL sin cargar las filas en memoria.
+            // Primero van las tablas hijas y las partes de los pedidos divididos: las claves foráneas no dejan
+            // borrar un pedido mientras algo lo referencie. La transacción hace que se borre todo o nada.
+            await using (var transaccion = await _context.Database.BeginTransactionAsync())
+            {
+                await _context.NovedadesPedido.ExecuteDeleteAsync();
+                await _context.DetallesPedido.ExecuteDeleteAsync();
+                await _context.Pedidos.Where(p => p.PedidoPadreId != null).ExecuteDeleteAsync();
+                await _context.Pedidos.ExecuteDeleteAsync();
+                // Avisos de la campana que abrirían un pedido que ya no existe
+                await _context.Notificaciones.Where(n => n.Enlace != null && n.Enlace.StartsWith("/Pedidos/Detalle/")).ExecuteDeleteAsync();
+                await transaccion.CommitAsync();
+            }
+
+            // Fuera de la transacción: en MySQL, ALTER TABLE confirma cualquier transacción abierta
+            await ReiniciarAutoincrementoAsync("NovedadesPedido", "DetallesPedido", "Pedidos");
+
+            await _auditService.RegistrarAsync("Eliminar Historial de Pedidos", "Mantenimiento",
+                $"Se eliminaron los {total} pedidos del sistema con sus productos y novedades. Los autoincrementos de esas tablas se reiniciaron.");
+
+            TempData["SuccessMessage"] = $"Se borraron {total} pedidos. Los próximos pedidos empiezan de nuevo desde el número 1.";
+            return RedirectToAction(nameof(Configuracion));
+        }
+
+        // Simula unos días de uso (Services/DatosDemostracion.cs) para mostrar el sistema con datos.
+        // Solo con el historial de pedidos vacío, para no mezclar la demostración con pedidos reales.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CargarDatosDemostracion()
+        {
+            var motivo = await _datosDemostracion.MotivoNoDisponibleAsync();
+            if (motivo != null)
+            {
+                TempData["ErrorMessage"] = motivo;
+                return RedirectToAction(nameof(Configuracion));
+            }
+
+            var r = await _datosDemostracion.GenerarAsync(User.IdUsuario());
+
+            await _auditService.RegistrarAsync("Cargar Datos de Demostración", "Mantenimiento",
+                $"Se simularon {DatosDemostracion.DiasSimulados} días de uso: {r.Pedidos} pedidos ({r.Completados} completados, {r.Cancelados} cancelados, " +
+                $"{r.EnCurso} en curso, {r.Pendientes} pendientes) en {string.Join(", ", r.Bodegas)}, {r.Novedades} novedades y {r.Solicitudes} solicitudes.");
+
+            TempData["SuccessMessage"] = $"Se cargaron {DatosDemostracion.DiasSimulados} días de uso: {r.Pedidos} pedidos " +
+                $"({r.Completados} completados, {r.EnCurso} en curso, {r.Pendientes} pendientes y {r.Cancelados} cancelados) " +
+                $"repartidos en {(r.Bodegas.Count == 1 ? "la bodega" : $"{r.Bodegas.Count} bodegas:")} {string.Join(", ", r.Bodegas)}; " +
+                $"{r.Novedades} novedades y {r.Solicitudes} solicitudes.";
+            return RedirectToAction(nameof(Configuracion));
+        }
+
         // CU-40: Eliminar registros del LOG
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -211,14 +288,12 @@ namespace PickingApp.Controllers
                 query = query.Where(l => l.FechaHora <= f);
             }
 
-            var registrosAEliminar = await query.ToListAsync();
-            _context.LogsSistema.RemoveRange(registrosAEliminar);
-            await _context.SaveChangesAsync();
+            var eliminados = await query.ExecuteDeleteAsync();
 
-            await _auditService.RegistrarAsync("Depuración de LOGs", "Auditoría", 
-                $"Se eliminaron {registrosAEliminar.Count} registros del historial de LOG.");
+            await _auditService.RegistrarAsync("Depuración de LOGs", "Auditoría",
+                $"Se eliminaron {eliminados} registros del historial de LOG.");
 
-            TempData["SuccessMessage"] = $"Se han depurado {registrosAEliminar.Count} registros del LOG del sistema. Los registros de seguridad, autenticación y mantenimiento se conservaron.";
+            TempData["SuccessMessage"] = $"Se han depurado {eliminados} registros del LOG del sistema. Los registros de seguridad, autenticación y mantenimiento se conservaron.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -239,37 +314,35 @@ namespace PickingApp.Controllers
                 return View("LimpiarBaseDatos");
             }
 
-            // Eliminar dependientes: Novedades, DetallesPedido, Pedidos, Solicitudes, Notificaciones
-            _context.NovedadesPedido.RemoveRange(_context.NovedadesPedido);
-            _context.DetallesPedido.RemoveRange(_context.DetallesPedido);
-            _context.Pedidos.RemoveRange(_context.Pedidos);
-            _context.Solicitudes.RemoveRange(_context.Solicitudes);
-            _context.Notificaciones.RemoveRange(_context.Notificaciones);
-
-            // Opcional: vaciar el LOG. El registro de esta limpieza se escribe después, así queda como primer registro.
+            // Igual que EliminarHistorialPedidos: DELETE directo sin cargar las filas, primero las tablas hijas y las
+            // partes de los pedidos divididos, todo en una transacción
             var logsEliminados = 0;
-            if (limpiarLog)
+            await using (var transaccion = await _context.Database.BeginTransactionAsync())
             {
-                logsEliminados = await _context.LogsSistema.CountAsync();
-                _context.LogsSistema.RemoveRange(_context.LogsSistema);
+                await _context.NovedadesPedido.ExecuteDeleteAsync();
+                await _context.DetallesPedido.ExecuteDeleteAsync();
+                await _context.Pedidos.Where(p => p.PedidoPadreId != null).ExecuteDeleteAsync();
+                await _context.Pedidos.ExecuteDeleteAsync();
+                await _context.Solicitudes.ExecuteDeleteAsync();
+                await _context.Notificaciones.ExecuteDeleteAsync();
+                await _context.TrasladosPersonal.ExecuteDeleteAsync();
+
+                // Opcional: vaciar el LOG. El registro de esta limpieza se escribe después, así queda como primer registro.
+                if (limpiarLog)
+                {
+                    logsEliminados = await _context.LogsSistema.ExecuteDeleteAsync();
+                }
+                await transaccion.CommitAsync();
             }
 
-            await _context.SaveChangesAsync();
+            // Fuera de la transacción: en MySQL, ALTER TABLE confirma cualquier transacción abierta
 
-            // Con las tablas ya vacías, se reinicia el autoincremento para que los próximos
-            // registros vuelvan a empezar en 1 (evita IDs de pedidos con números muy altos).
-            var tablasAReiniciar = new List<string> { "NovedadesPedido", "DetallesPedido", "Pedidos", "Solicitudes", "Notificaciones" };
+            var tablasAReiniciar = new List<string> { "NovedadesPedido", "DetallesPedido", "Pedidos", "Solicitudes", "Notificaciones", "TrasladosPersonal" };
             if (limpiarLog)
             {
                 tablasAReiniciar.Add("LogsSistema");
             }
-            foreach (var tabla in tablasAReiniciar)
-            {
-                // Los nombres de tabla vienen de la lista fija de arriba, no de entrada del usuario.
-#pragma warning disable EF1002
-                await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tabla}` AUTO_INCREMENT = 1");
-#pragma warning restore EF1002
-            }
+            await ReiniciarAutoincrementoAsync(tablasAReiniciar.ToArray());
 
             await _auditService.RegistrarAsync("Limpieza de Base de Datos", "Mantenimiento",
                 "Se ejecutó una limpieza completa de datos operativos (pedidos, novedades y solicitudes)"
@@ -280,6 +353,29 @@ namespace PickingApp.Controllers
                 ? "La base de datos operativa y el LOG del sistema fueron limpiados con éxito. Los usuarios y maestros se mantuvieron protegidos."
                 : "La base de datos operativa ha sido limpiada con éxito para pruebas. Los usuarios y maestros se mantuvieron protegidos.";
             return RedirectToAction("Index", "Home");
+        }
+
+        // Con las tablas ya vacías, se reinicia el autoincremento para que los próximos
+        // registros vuelvan a empezar en 1 (evita IDs de pedidos con números muy altos).
+        private async Task ReiniciarAutoincrementoAsync(params string[] tablas)
+        {
+            // Un nombre de tabla no puede ir como parámetro en SQL, así que se compara contra las tablas
+            // reales del modelo de EF antes de armar la sentencia: aunque mañana el nombre llegara de otro
+            // lado, nada que no sea una tabla de PickFlow puede terminar dentro del ALTER TABLE.
+            var tablasDelModelo = _context.Model.GetEntityTypes()
+                .Select(t => t.GetTableName())
+                .Where(n => n != null)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (var tabla in tablas)
+            {
+                if (!tablasDelModelo.Contains(tabla))
+                    throw new InvalidOperationException($"'{tabla}' no es una tabla del modelo de PickFlow.");
+
+#pragma warning disable EF1002
+                await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tabla}` AUTO_INCREMENT = 1");
+#pragma warning restore EF1002
+            }
         }
     }
 }

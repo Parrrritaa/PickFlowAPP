@@ -1,142 +1,307 @@
-﻿<!DOCTYPE html>
+@* Plantilla común de todas las páginas con sesión: barra superior de navegación y mensajes.
+   Cada vista se inserta donde está @RenderBody(). *@
+@using Microsoft.EntityFrameworkCore
+@using PickingApp.Services
+@inject PickingApp.Data.ApplicationDbContext Db
+<!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - PickFlow</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <script>
-        // Aplica el estado guardado del menú antes de pintar, sin animación, para evitar un salto al cargar.
-        (function () {
-            var root = document.documentElement;
-            root.classList.add('pf-sin-transicion');
-            try {
-                if (localStorage.getItem('pf-menu') === 'oculto') root.classList.add('pf-sidebar-collapsed');
-            } catch (e) { }
-        })();
-    </script>
+    <partial name="_Cabecera" />
 </head>
 <body class="@(TempData["JustLoggedIn"] != null ? "pf-just-logged-in" : "")">
     @if (User.Identity != null && User.Identity.IsAuthenticated)
     {
+        @* Controlador y acción actuales: sirven para marcar la opción activa de la navegación *@
         var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
         var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
         var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
         var userName = User.Identity.Name ?? "Usuario";
-        // Get first name or display name
+        // Nombre para mostrar: si fuera un correo se toma lo que va antes de la @; primera letra en mayúscula
         var displayName = userName.Contains("@") ? userName.Split('@')[0] : userName;
         displayName = char.ToUpper(displayName[0]) + displayName.Substring(1);
+        var esAdmin = userRole == Roles.Administrador;
+        var esSupervisor = userRole == Roles.Supervisor;
+        var puedeCargar = esAdmin || esSupervisor;
 
-        <aside class="pf-sidebar" id="pfSidebar" aria-label="Menú principal">
-            <div>
-                <div class="pf-sidebar-top">
-                    <a class="pf-sidebar-brand" asp-controller="Home" asp-action="Index">
-                        <span class="brand-pick">Pick</span><span class="brand-flow">Flow</span>
+        // Datos del perfil (menú de la cuenta y diálogo "Ver perfil"). Se leen de la base, no de la cookie, para mostrar
+        // lo actual si el Administrador los cambia; el Administrador no tiene bodega: ve todas.
+        var idPerfil = User.IdUsuario();
+        var perfil = await Db.Usuarios.AsNoTracking().Include(u => u.Rol).Include(u => u.Bodega).FirstOrDefaultAsync(u => u.Id == idPerfil);
+        var bodegaPerfil = perfil?.Bodega;
+
+        // Apartado actual para la ruta sobre el título: grupo de la navegación y nombre de la opción
+        var enCargarExcel = currentController == "Pedidos" && currentAction == "CargarExcel";
+        var enConfiguracion = currentController == "Auditoria" && currentAction == "Configuracion";
+        // Pantalla de error (Home/Estado): no es Inicio, así que no marca esa opción ni la pone en la ruta
+        var enInicio = currentController == "Home" && currentAction != "Estado";
+        // El Supervisor entra a Usuarios solo para los auxiliares de su bodega: para él es un recurso, no el sistema
+        var enRecursos = currentController is "Empleados" or "Bodegas" or "Productos" || (esSupervisor && currentController == "Usuarios");
+        var enSistema = currentController is "Auditoria" or "Observaciones" || (esAdmin && currentController == "Usuarios");
+        var (grupoActual, apartadoActual) = currentController switch
+        {
+            "Home" when enInicio => ("Operación", "Inicio"),
+            "Pedidos" => ("Operación", enCargarExcel ? "Cargar Excel" : "Pedidos"),
+            "Solicitudes" => ("Operación", "Solicitudes"),
+            "Notificaciones" => ("Operación", "Notificaciones"),
+            "Empleados" => ("Recursos", "Empleados"),
+            "Bodegas" => ("Recursos", "Bodegas"),
+            "Productos" => ("Recursos", "Productos"),
+            "Reportes" => ("Análisis", "Reportes"),
+            "Usuarios" => esSupervisor ? ("Recursos", "Auxiliares") : ("Sistema", "Usuarios y roles"),
+            "Auditoria" => ("Sistema", enConfiguracion ? "Configuración" : "Registro del sistema"),
+            "Observaciones" => ("Sistema", "Observaciones"),
+            "Account" => ("Cuenta", "Cambiar contraseña"),
+            _ => ("PickFlow", ViewData["Title"]?.ToString() ?? "")
+        };
+        // En las pantallas internas (detalle, editar, crear...) el título de la página se agrega como tercer nivel
+        var tituloPagina = ViewData["Title"]?.ToString();
+        var subpagina = currentAction != "Index" && !enCargarExcel && !enConfiguracion && currentController != "Account"
+                        && !string.IsNullOrEmpty(tituloPagina) && tituloPagina != apartadoActual ? tituloPagina : null;
+
+        // aria-current="page" en la opción activa; null no escribe el atributo
+        string? Actual(bool activo) => activo ? "page" : null;
+        var solicitudesAccion = userRole == Roles.Auxiliar ? "MisSolicitudes" : "Index";
+
+        <!-- Barra superior: una capa de vidrio fija; el contenido pasa por debajo -->
+        <header class="pf-topbar">
+            <div class="pf-topbar-inner">
+                <button type="button" class="pf-header-icono pf-menu-movil" id="pfMenuMovil" aria-label="Abrir menú"
+                        aria-expanded="false" aria-controls="pfHoja">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" /></svg>
+                </button>
+                <a class="pf-marca" asp-controller="Home" asp-action="Index">Pick<span>Flow</span></a>
+
+                <nav class="pf-topnav" id="pfTopnav" aria-label="Principal">
+                    @* Cada opción solo se muestra a los roles que pueden usarla; el controlador también lo valida con [Authorize] *@
+                    <a class="pf-topnav-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(enInicio)">
+                        <span class="pf-ico"><partial name="_Icono" model='"inicio"' /></span>Inicio
                     </a>
-                    <button type="button" class="pf-menu-toggle pf-menu-toggle--sidebar" data-menu-toggle
-                            aria-controls="pfSidebar" aria-expanded="true" aria-label="Ocultar menú" title="Ocultar menú">
-                        <span class="pf-menu-toggle-lines" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <a class="pf-topnav-link" asp-controller="Pedidos" asp-action="Index" aria-current="@Actual(currentController == "Pedidos")">
+                        <span class="pf-ico"><partial name="_Icono" model='"pedidos"' /></span>Pedidos
+                    </a>
+                    <a class="pf-topnav-link" asp-controller="Solicitudes" asp-action="@solicitudesAccion" aria-current="@Actual(currentController == "Solicitudes")">
+                        <span class="pf-ico"><partial name="_Icono" model='"solicitudes"' /></span>Solicitudes
+                        @if (userRole != Roles.Auxiliar)
+                        {
+                            @await Component.InvokeAsync("MenuBadges", new { tipo = "solicitudes" })
+                        }
+                    </a>
+
+                    <div class="dropdown">
+                        <button type="button" class="pf-topnav-link @(enRecursos ? "activo" : "")" data-bs-toggle="dropdown" data-bs-offset="0,12"
+                                aria-expanded="false" id="pfGrupoRecursos">
+                            Recursos<span class="pf-ico pf-chev"><partial name="_Icono" model='"abajo"' /></span>
+                        </button>
+                        <div class="dropdown-menu pf-panel" aria-labelledby="pfGrupoRecursos">
+                            <div class="pf-panel-titulo">Recursos de la bodega</div>
+                            <a class="pf-panel-opcion" asp-controller="Empleados" asp-action="Index" aria-current="@Actual(currentController == "Empleados")">
+                                <span class="pf-panel-ico"><partial name="_Icono" model='"empleados"' /></span>
+                                <span class="pf-panel-texto"><b>Empleados</b><span>Auxiliares, turnos y rendimiento</span></span>
+                            </a>
+                            <a class="pf-panel-opcion" asp-controller="Bodegas" asp-action="Index" aria-current="@Actual(currentController == "Bodegas")">
+                                <span class="pf-panel-ico"><partial name="_Icono" model='"bodegas"' /></span>
+                                <span class="pf-panel-texto"><b>Bodegas</b><span>Ubicaciones por pasillo, estante y nivel</span></span>
+                            </a>
+                            @if (esAdmin)
+                            {
+                                <a class="pf-panel-opcion" asp-controller="Productos" asp-action="Index" aria-current="@Actual(currentController == "Productos")">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"productos"' /></span>
+                                    <span class="pf-panel-texto"><b>Productos</b><span>Categorías y tiempos de manipulación</span></span>
+                                </a>
+                            }
+                            @if (esSupervisor)
+                            {
+                                <a class="pf-panel-opcion" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"usuarios"' /></span>
+                                    <span class="pf-panel-texto"><b>Auxiliares</b><span>Cuentas de los auxiliares de tu bodega</span></span>
+                                </a>
+                            }
+                        </div>
+                    </div>
+
+                    <a class="pf-topnav-link" asp-controller="Reportes" asp-action="Index" aria-current="@Actual(currentController == "Reportes")">
+                        <span class="pf-ico"><partial name="_Icono" model='"reportes"' /></span>Reportes
+                    </a>
+
+                    @if (esAdmin)
+                    {
+                        <div class="dropdown">
+                            <button type="button" class="pf-topnav-link @(enSistema ? "activo" : "")" data-bs-toggle="dropdown" data-bs-offset="0,12"
+                                    aria-expanded="false" id="pfGrupoSistema">
+                                Sistema<span class="pf-ico pf-chev"><partial name="_Icono" model='"abajo"' /></span>
+                            </button>
+                            <div class="dropdown-menu pf-panel" aria-labelledby="pfGrupoSistema">
+                                <div class="pf-panel-titulo">Solo administradores</div>
+                                <a class="pf-panel-opcion" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"usuarios"' /></span>
+                                    <span class="pf-panel-texto"><b>Usuarios y roles</b><span>Cuentas, permisos y accesos</span></span>
+                                </a>
+                                <a class="pf-panel-opcion" asp-controller="Auditoria" asp-action="Index" aria-current="@Actual(currentController == "Auditoria" && !enConfiguracion)">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"registro"' /></span>
+                                    <span class="pf-panel-texto"><b>Registro del sistema</b><span>Quién hizo qué y cuándo</span></span>
+                                </a>
+                                <a class="pf-panel-opcion" asp-controller="Observaciones" asp-action="Index" aria-current="@Actual(currentController == "Observaciones")">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"observaciones"' /></span>
+                                    <span class="pf-panel-texto"><b>Observaciones</b><span>Respuestas para aprobar o rechazar solicitudes</span></span>
+                                </a>
+                                <a class="pf-panel-opcion" asp-controller="Auditoria" asp-action="Configuracion" aria-current="@Actual(enConfiguracion)">
+                                    <span class="pf-panel-ico"><partial name="_Icono" model='"config"' /></span>
+                                    <span class="pf-panel-texto"><b>Configuración</b><span>Sesión, auditoría y reglas de asignación</span></span>
+                                </a>
+                                <div class="pf-panel-pie">Atajo: <span class="pf-tecla">Ctrl K</span> para ir a cualquier apartado</div>
+                            </div>
+                        </div>
+                    }
+                </nav>
+
+                <div class="pf-header-espacio"></div>
+
+                <button type="button" class="pf-buscar" id="pfBuscarBtn" aria-haspopup="dialog" aria-keyshortcuts="Control+K" aria-label="Buscar en PickFlow">
+                    <partial name="_Icono" model='"buscar"' />
+                    <span class="pf-buscar-texto">Buscar en PickFlow</span>
+                    <span class="pf-tecla" aria-hidden="true">Ctrl K</span>
+                </button>
+                <a asp-controller="Notificaciones" asp-action="Index" class="pf-header-icono pf-campana" aria-label="Notificaciones"
+                   aria-current="@Actual(currentController == "Notificaciones")">
+                    <partial name="_Icono" model='"notificaciones"' />
+                    @await Component.InvokeAsync("MenuBadges", new { tipo = "notificaciones" })
+                </a>
+                @if (puedeCargar)
+                {
+                    <a asp-controller="Pedidos" asp-action="CargarExcel" class="btn-pf-orange pf-btn-cargar" aria-label="Cargar Excel"
+                       aria-current="@Actual(enCargarExcel)">
+                        <span class="pf-ico"><partial name="_Icono" model='"excel"' /></span>
+                        <span class="pf-btn-texto">Cargar Excel</span>
+                    </a>
+                }
+
+                <!-- Cuenta: cambiar contraseña, apariencia y cerrar sesión -->
+                <div class="dropdown">
+                    <button type="button" class="pf-avatar-btn" id="pfCuentaBtn" data-bs-toggle="dropdown" data-bs-offset="0,12" aria-expanded="false"
+                            aria-label="Cuenta de @displayName, @userRole">
+                        <span class="pf-avatar" aria-hidden="true">@displayName[0]</span>
                     </button>
+                    <div class="dropdown-menu dropdown-menu-end pf-panel pf-cuenta-menu" aria-labelledby="pfCuentaBtn">
+                        <div class="pf-cuenta-cab">
+                            <span class="pf-avatar" aria-hidden="true">@displayName[0]</span>
+                            <span class="pf-cuenta-datos">
+                                <span class="pf-cuenta-nombre">@displayName</span>
+                                <span class="pf-cuenta-rol">@userRole</span>
+                            </span>
+                        </div>
+                        @* Dato de solo lectura: en qué bodega trabaja; el resto del perfil está en "Ver perfil" *@
+                        <dl class="pf-cuenta-detalles">
+                            <div class="pf-cuenta-detalle pf-cuenta-detalle--bodega" title="@(bodegaPerfil != null ? $"{bodegaPerfil.Nombre} ({bodegaPerfil.Codigo})" : null)">
+                                <dt><partial name="_Icono" model='"bodegas"' /><span class="visually-hidden">Bodega</span></dt>
+                                <dd>
+                                    @if (bodegaPerfil != null)
+                                    {
+                                        @bodegaPerfil.Nombre <span class="pf-cuenta-codigo">@bodegaPerfil.Codigo</span>
+                                    }
+                                    else
+                                    {
+                                        @(esAdmin ? "Todas las bodegas" : "Sin bodega asignada")
+                                    }
+                                </dd>
+                            </div>
+                        </dl>
+                        <div class="dropdown-divider"></div>
+                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#pfModalPerfil">
+                            <partial name="_Icono" model='"perfil"' />Ver perfil
+                        </button>
+                        <a class="dropdown-item" asp-controller="Account" asp-action="CambiarContrasena">
+                            <partial name="_Icono" model='"llave"' />Cambiar contraseña
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <div class="pf-cuenta-menu-titulo" id="pfTemaTitulo">Apariencia</div>
+                        <div class="pf-tema" id="pfTema" role="radiogroup" aria-labelledby="pfTemaTitulo">
+                            <button type="button" role="radio" aria-checked="true" data-tema="sistema">Sistema</button>
+                            <button type="button" role="radio" aria-checked="false" data-tema="claro">Claro</button>
+                            <button type="button" role="radio" aria-checked="false" data-tema="oscuro">Oscuro</button>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <form asp-controller="Account" asp-action="Logout" method="post" id="pf-logout-form">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn-pf-logout">
+                                <partial name="_Icono" model='"salir"' />
+                                <span class="pf-logout-text">Cerrar sesión</span>
+                            </button>
+                        </form>
+                    </div>
                 </div>
-
-                <ul class="pf-nav">
-                    <li class="pf-nav-item">
-                        <a class="pf-nav-link @(currentController == "Home" ? "active" : "")" asp-controller="Home" asp-action="Index">
-                            Dashboard
-                        </a>
-                    </li>
-                    <li class="pf-nav-item">
-                        <a class="pf-nav-link @(currentController == "Pedidos" && currentAction != "CargarExcel" ? "active" : "")" asp-controller="Pedidos" asp-action="Index">
-                            Pedidos
-                        </a>
-                    </li>
-                    @if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
-                    {
-                        <li class="pf-nav-item">
-                            <a class="pf-nav-link @(currentController == "Pedidos" && currentAction == "CargarExcel" ? "active" : "")" asp-controller="Pedidos" asp-action="CargarExcel">
-                                Cargar Excel
-                            </a>
-                        </li>
-                    }
-                    <li class="pf-nav-item">
-                        <a class="pf-nav-link @(currentController == "Empleados" ? "active" : "")" asp-controller="Empleados" asp-action="Index">
-                            Empleados
-                        </a>
-                    </li>
-                    <li class="pf-nav-item">
-                        @if (userRole == Roles.Auxiliar)
-                        {
-                            <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="MisSolicitudes">
-                                Solicitudes
-                            </a>
-                        }
-                        else
-                        {
-                            <a class="pf-nav-link @(currentController == "Solicitudes" ? "active" : "")" asp-controller="Solicitudes" asp-action="Index">
-                                Solicitudes
-                                @await Component.InvokeAsync("MenuBadges", new { tipo = "solicitudes" })
-                            </a>
-                        }
-                    </li>
-                    <li class="pf-nav-item">
-                        <a class="pf-nav-link @(currentController == "Reportes" ? "active" : "")" asp-controller="Reportes" asp-action="Index">
-                            Reportes
-                        </a>
-                    </li>
-                    <li class="pf-nav-item">
-                        <a class="pf-nav-link @(currentController == "Notificaciones" ? "active" : "")" asp-controller="Notificaciones" asp-action="Index">
-                            Notificaciones
-                            @await Component.InvokeAsync("MenuBadges", new { tipo = "notificaciones" })
-                        </a>
-                    </li>
-
-                    @if (userRole == Roles.Administrador)
-                    {
-                        <li class="pf-nav-item">
-                            <a class="pf-nav-link @(currentController == "Usuarios" ? "active" : "")" asp-controller="Usuarios" asp-action="Index">
-                                Usuarios y roles
-                            </a>
-                        </li>
-                    }
-
-                    <li class="pf-nav-item">
-                        <a class="pf-nav-link @(currentController == "Bodegas" ? "active" : "")" asp-controller="Bodegas" asp-action="Index">
-                            Bodegas
-                        </a>
-                    </li>
-
-                    @if (userRole == Roles.Administrador)
-                    {
-                        <li class="pf-nav-item">
-                            <a class="pf-nav-link @(currentController == "Productos" ? "active" : "")" asp-controller="Productos" asp-action="Index">
-                                Productos
-                            </a>
-                        </li>
-                    }
-
-                    @if (userRole == Roles.Administrador)
-                    {
-                        <li class="pf-nav-item">
-                            <a class="pf-nav-link @(currentController == "Auditoria" ? "active" : "")" asp-controller="Auditoria" asp-action="Index">
-                                Log del sistema
-                            </a>
-                        </li>
-                    }
-                </ul>
             </div>
+        </header>
 
-            <div class="pf-sidebar-bottom">
-                <form asp-controller="Account" asp-action="Logout" method="post" id="pf-logout-form">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn-pf-logout">
-                        Cerrar sesión
-                    </button>
-                </form>
-            </div>
-        </aside>
-        <div class="pf-sidebar-backdrop" id="pfSidebarBackdrop" aria-hidden="true"></div>
+        <!-- Pantallas angostas: la misma navegación en una hoja de vidrio que baja desde la barra.
+             La paleta de comandos (Ctrl K) también toma de aquí sus opciones. -->
+        <div class="pf-hoja-fondo" id="pfHojaFondo" aria-hidden="true"></div>
+        <nav class="pf-hoja" id="pfHoja" aria-label="Principal">
+            <div class="pf-hoja-grupo">Operación</div>
+            <a class="pf-hoja-link" asp-controller="Home" asp-action="Index" aria-current="@Actual(enInicio)">
+                <partial name="_Icono" model='"inicio"' /><span class="pf-hoja-texto">Inicio</span>
+            </a>
+            <a class="pf-hoja-link" asp-controller="Pedidos" asp-action="Index" aria-current="@Actual(currentController == "Pedidos" && !enCargarExcel)">
+                <partial name="_Icono" model='"pedidos"' /><span class="pf-hoja-texto">Pedidos</span>
+            </a>
+            @if (puedeCargar)
+            {
+                <a class="pf-hoja-link" asp-controller="Pedidos" asp-action="CargarExcel" aria-current="@Actual(enCargarExcel)">
+                    <partial name="_Icono" model='"excel"' /><span class="pf-hoja-texto">Cargar Excel</span>
+                </a>
+            }
+            <a class="pf-hoja-link" asp-controller="Solicitudes" asp-action="@solicitudesAccion" aria-current="@Actual(currentController == "Solicitudes")">
+                <partial name="_Icono" model='"solicitudes"' /><span class="pf-hoja-texto">Solicitudes</span>
+                @if (userRole != Roles.Auxiliar)
+                {
+                    @await Component.InvokeAsync("MenuBadges", new { tipo = "solicitudes" })
+                }
+            </a>
+            <a class="pf-hoja-link" asp-controller="Notificaciones" asp-action="Index" aria-current="@Actual(currentController == "Notificaciones")">
+                <partial name="_Icono" model='"notificaciones"' /><span class="pf-hoja-texto">Notificaciones</span>
+            </a>
+
+            <div class="pf-hoja-grupo">Recursos</div>
+            <a class="pf-hoja-link" asp-controller="Empleados" asp-action="Index" aria-current="@Actual(currentController == "Empleados")">
+                <partial name="_Icono" model='"empleados"' /><span class="pf-hoja-texto">Empleados</span>
+            </a>
+            <a class="pf-hoja-link" asp-controller="Bodegas" asp-action="Index" aria-current="@Actual(currentController == "Bodegas")">
+                <partial name="_Icono" model='"bodegas"' /><span class="pf-hoja-texto">Bodegas</span>
+            </a>
+            @if (esAdmin)
+            {
+                <a class="pf-hoja-link" asp-controller="Productos" asp-action="Index" aria-current="@Actual(currentController == "Productos")">
+                    <partial name="_Icono" model='"productos"' /><span class="pf-hoja-texto">Productos</span>
+                </a>
+            }
+            @if (esSupervisor)
+            {
+                <a class="pf-hoja-link" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                    <partial name="_Icono" model='"usuarios"' /><span class="pf-hoja-texto">Auxiliares</span>
+                </a>
+            }
+
+            <div class="pf-hoja-grupo">Análisis</div>
+            <a class="pf-hoja-link" asp-controller="Reportes" asp-action="Index" aria-current="@Actual(currentController == "Reportes")">
+                <partial name="_Icono" model='"reportes"' /><span class="pf-hoja-texto">Reportes</span>
+            </a>
+
+            @if (esAdmin)
+            {
+                <div class="pf-hoja-grupo">Sistema</div>
+                <a class="pf-hoja-link" asp-controller="Usuarios" asp-action="Index" aria-current="@Actual(currentController == "Usuarios")">
+                    <partial name="_Icono" model='"usuarios"' /><span class="pf-hoja-texto">Usuarios y roles</span>
+                </a>
+                <a class="pf-hoja-link" asp-controller="Auditoria" asp-action="Index" aria-current="@Actual(currentController == "Auditoria" && !enConfiguracion)">
+                    <partial name="_Icono" model='"registro"' /><span class="pf-hoja-texto">Registro del sistema</span>
+                </a>
+                <a class="pf-hoja-link" asp-controller="Observaciones" asp-action="Index" aria-current="@Actual(currentController == "Observaciones")">
+                    <partial name="_Icono" model='"observaciones"' /><span class="pf-hoja-texto">Observaciones</span>
+                </a>
+                <a class="pf-hoja-link" asp-controller="Auditoria" asp-action="Configuracion" aria-current="@Actual(enConfiguracion)">
+                    <partial name="_Icono" model='"config"' /><span class="pf-hoja-texto">Configuración</span>
+                </a>
+            }
+        </nav>
 
         <!-- Confirmación de cierre de sesión (estilo alerta: título, texto breve, Cancelar a la izquierda y la acción a la derecha) -->
         <div class="modal fade" id="pfModalCerrarSesion" tabindex="-1" aria-labelledby="pfCerrarSesionTitulo" aria-describedby="pfCerrarSesionTexto" aria-hidden="true">
@@ -153,46 +318,125 @@
             </div>
         </div>
 
-        <div class="pf-main-wrapper">
-            <header class="pf-header d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-3">
-                    <button type="button" class="pf-menu-toggle pf-menu-toggle--header" data-menu-toggle
-                            aria-controls="pfSidebar" aria-expanded="false" aria-label="Mostrar menú" title="Mostrar menú">
-                        <span class="pf-menu-toggle-lines" aria-hidden="true"><span></span><span></span><span></span></span>
-                    </button>
-                    <div class="pf-user-badge">
-                        <span>@displayName</span> | <span>@userRole</span>
+        @if (perfil != null)
+        {
+            @* Ver perfil: todos los datos de la cuenta, solo para consultar (los cambia un Administrador desde Usuarios) *@
+            <div class="modal fade" id="pfModalPerfil" tabindex="-1" aria-labelledby="pfPerfilTitulo" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered pf-perfil-dialog">
+                    <div class="modal-content">
+                        <div class="pf-perfil-cab">
+                            <span class="pf-avatar pf-avatar--grande" aria-hidden="true">@displayName[0]</span>
+                            <h2 class="pf-perfil-nombre" id="pfPerfilTitulo">@perfil.NombreCompleto</h2>
+                            <span class="pf-perfil-rol">@perfil.NombreRol</span>
+                        </div>
+                        <dl class="pf-perfil-datos">
+                            <div>
+                                <dt>Correo</dt>
+                                <dd>@perfil.Correo</dd>
+                            </div>
+                            <div>
+                                <dt>Identificación</dt>
+                                <dd class="pf-num">@(string.IsNullOrWhiteSpace(perfil.Identificacion) ? "Sin registrar" : perfil.Identificacion)</dd>
+                            </div>
+                            <div>
+                                <dt>Bodega</dt>
+                                <dd>
+                                    @if (bodegaPerfil != null)
+                                    {
+                                        @bodegaPerfil.Nombre <span class="pf-cuenta-codigo">@bodegaPerfil.Codigo</span>
+                                    }
+                                    else
+                                    {
+                                        @(esAdmin ? "Todas las bodegas" : "Sin bodega asignada")
+                                    }
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Estado</dt>
+                                <dd>@perfil.Estado</dd>
+                            </div>
+                            <div>
+                                <dt>Miembro desde</dt>
+                                <dd class="pf-num">@perfil.FechaRegistro.ToString("dd/MM/yyyy")</dd>
+                            </div>
+                            @if (perfil.UltimoAcceso is DateTime ultimoAcceso)
+                            {
+                                <div>
+                                    <dt>Último inicio de sesión</dt>
+                                    <dd class="pf-num">@ultimoAcceso.ToString("dd/MM/yyyy HH:mm")</dd>
+                                </div>
+                            }
+                        </dl>
+                        <p class="pf-perfil-nota">@(esAdmin ? "Estos datos se cambian en Sistema · Usuarios y roles." : "Si algún dato no es correcto, pídele a un Administrador que lo corrija.")</p>
+                        <div class="pf-alert-actions">
+                            <button type="button" class="pf-alert-btn pf-alert-btn--secondary" data-bs-dismiss="modal">Cerrar</button>
+                        </div>
                     </div>
                 </div>
-                <a asp-controller="Account" asp-action="CambiarContrasena" class="btn btn-sm btn-outline-secondary">
-                    Cambiar contraseña
-                </a>
-            </header>
+            </div>
+        }
 
+        <div class="pf-main-wrapper">
             <main class="pf-content">
-                @if (TempData["SuccessMessage"] != null)
-                {
-                    <div class="alert alert-success alert-dismissible fade show rounded-3 mb-4" role="alert">
-                        <i class="bi bi-check-circle-fill me-2"></i> @TempData["SuccessMessage"]
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                }
+                <nav class="pf-ruta" aria-label="Ruta">
+                    <span>@grupoActual</span>
+                    <span class="pf-ruta-sep" aria-hidden="true">·</span>
+                    @if (subpagina != null)
+                    {
+                        <a asp-controller="@currentController" asp-action="Index">@apartadoActual</a>
+                        <span class="pf-ruta-sep" aria-hidden="true">·</span>
+                        <span class="pf-ruta-actual" aria-current="page">@subpagina</span>
+                    }
+                    else
+                    {
+                        <span class="pf-ruta-actual" aria-current="page">@apartadoActual</span>
+                    }
+                </nav>
+
+                @* Mensajes que los controladores dejan en TempData antes de redirigir: el de error y el de
+                   advertencia quedan arriba hasta que se cierran; el de éxito es un aviso flotante que se va solo *@
                 @if (TempData["ErrorMessage"] != null)
                 {
-                    <div class="alert alert-danger alert-dismissible fade show rounded-3 mb-4" role="alert">
+                    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["ErrorMessage"]
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
                     </div>
                 }
                 @if (TempData["WarningMessage"] != null)
                 {
-                    <div class="mockup-alert-warning mb-4">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["WarningMessage"]
+                    <div class="pf-alert-warning mb-4">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <span>@TempData["WarningMessage"]</span>
                     </div>
                 }
 
+                @* Aquí se dibuja la vista de la acción actual (por ejemplo, Views/Pedidos/Index.cshtml) *@
                 @RenderBody()
             </main>
+        </div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="pf-aviso pf-aviso--oculto" id="pfAviso" role="status" aria-live="polite">
+                <partial name="_Icono" model='"check"' />
+                <span class="pf-aviso-texto">@TempData["SuccessMessage"]</span>
+                <button type="button" class="pf-aviso-cerrar" data-pf-aviso-cerrar>Cerrar</button>
+            </div>
+        }
+
+        <!-- Paleta de comandos (Ctrl K): las opciones salen de la navegación (site.js) -->
+        <div class="pf-paleta" id="pfPaleta" hidden>
+            <button type="button" class="pf-paleta-fondo" aria-label="Cerrar búsqueda" data-pf-paleta-cerrar tabindex="-1"></button>
+            <div class="pf-paleta-caja" role="dialog" aria-modal="true" aria-label="Buscar en PickFlow">
+                <label class="pf-paleta-campo">
+                    <partial name="_Icono" model='"buscar"' />
+                    <span class="visually-hidden">Buscar</span>
+                    <input type="search" id="pfPaletaCampo" placeholder="Busca un apartado o una acción" autocomplete="off"
+                           role="combobox" aria-expanded="true" aria-controls="pfPaletaLista" aria-autocomplete="list" />
+                    <button type="button" data-pf-paleta-cerrar>Esc</button>
+                </label>
+                <ul class="pf-paleta-lista" id="pfPaletaLista" role="listbox" aria-label="Resultados"></ul>
+                <div class="pf-paleta-pie">Flechas para moverte · Enter para abrir · Esc para cerrar</div>
+            </div>
         </div>
     }
     else

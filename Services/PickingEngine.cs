@@ -4,13 +4,20 @@ using PickingApp.Models;
 
 namespace PickingApp.Services
 {
+    // Motor de cálculo del picking: tiempo estándar de un pedido, rendimiento de cada empleado
+    // y reglas para decidir si un empleado puede recibir un pedido. Implementa IPickingEngine.
     public class PickingEngine : IPickingEngine
     {
         private readonly ApplicationDbContext _context;
 
-        public PickingEngine(ApplicationDbContext context)
+        // Hora actual para las reglas de jornada. En la aplicación es el reloj del sistema (Program.cs);
+        // las pruebas pasan una hora fija para que el resultado no dependa de cuándo se ejecutan.
+        private readonly TimeProvider _reloj;
+
+        public PickingEngine(ApplicationDbContext context, TimeProvider reloj)
         {
             _context = context;
+            _reloj = reloj;
         }
 
         // Tiempo estándar = Σ (unidades × minutos por unidad de la categoría del producto ÷ unidades por caja del producto)
@@ -38,8 +45,11 @@ namespace PickingApp.Services
                 .GroupBy(l => l.PedidoId)
                 .ToDictionary(g => g.Key, g =>
                 {
+                    // Tiempo de recoger: unidades × minutos por unidad (ya dividido por unidades por caja)
                     var tiempoUnidades = g.Sum(l => l.Cantidad * l.MinutosPorUnidad);
+                    // Tiempo de caminar: cada ubicación distinta suma los minutos de recorrido configurados
                     var tiempoRecorrido = g.Select(l => l.UbicacionId).Distinct().Count() * minutosPorUbicacion;
+                    // Nunca menos de 1 minuto, redondeado a 1 decimal
                     return Math.Round(Math.Max(1.0, tiempoUnidades + tiempoRecorrido), 1);
                 });
         }
@@ -154,14 +164,14 @@ namespace PickingApp.Services
         {
             var ids = empleadoIds.Distinct().ToList();
 
-            var estadoPedido = await _context.Pedidos
+            var pedido = await _context.Pedidos
                 .Where(p => p.Id == pedidoId)
-                .Select(p => p.Estado)
+                .Select(p => new { p.Estado, p.BodegaId })
                 .FirstOrDefaultAsync();
 
-            var errorPedido = estadoPedido == null ? "El pedido no existe." : estadoPedido switch
+            var errorPedido = pedido == null ? "El pedido no existe." : pedido.Estado switch
             {
-                PedidoEstados.Cancelado => "El pedido se encuentra cancelado y no puede reactivarse (RN-03-CU31).",
+                PedidoEstados.Cancelado => "El pedido se encuentra cancelado y no puede reactivarse.",
                 PedidoEstados.Completado => "El pedido ya se encuentra completado y no puede asignarse ni reasignarse.",
                 PedidoEstados.Dividido => "El pedido fue dividido en partes: asigne cada parte por separado.",
                 _ => null
@@ -184,6 +194,7 @@ namespace PickingApp.Services
 
             var contexto = new ContextoAsignacion
             {
+                BodegaId = pedido!.BodegaId,
                 TiempoEstandarMinutos = await CalcularTiempoEstandarAsync(pedidoId),
                 UbicacionesPedido = await _context.DetallesPedido
                     .Where(d => d.PedidoId == pedidoId)
@@ -192,7 +203,7 @@ namespace PickingApp.Services
                     .CountAsync(),
                 MesesMinimos = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MesesExperienciaAdvertencia),
                 MaxUbicaciones = await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MaxUbicacionesAdvertencia),
-                HoraActual = DateTime.Now.TimeOfDay
+                HoraActual = _reloj.GetLocalNow().TimeOfDay
             };
             var rendimientos = await CalcularRendimientosAsync(ids);
 
@@ -204,6 +215,7 @@ namespace PickingApp.Services
         // Datos del pedido y de configuración comunes a todos los empleados evaluados
         private sealed class ContextoAsignacion
         {
+            public int BodegaId { get; init; }
             public double TiempoEstandarMinutos { get; init; }
             public int UbicacionesPedido { get; init; }
             public int MesesMinimos { get; init; }
@@ -221,6 +233,16 @@ namespace PickingApp.Services
                 TiempoEstimadoMinutos = rendimiento.Estimar(contexto.TiempoEstandarMinutos)
             };
 
+            // Regla 0: el pedido se recoge en su bodega, así que solo lo recibe personal de esa bodega
+            if (empleado.BodegaId != contexto.BodegaId)
+            {
+                result.MensajeError = empleado.BodegaId == null
+                    ? $"El empleado '{empleado.NombreCompleto}' no tiene bodega asignada. El Administrador puede asignársela desde Editar."
+                    : $"El empleado '{empleado.NombreCompleto}' trabaja en otra bodega y no puede recibir pedidos de esta.";
+                result.MotivoCorto = "De otra bodega";
+                return result;
+            }
+
             // Regla 1: Empleado Activo
             if (!empleado.Activo)
             {
@@ -232,26 +254,22 @@ namespace PickingApp.Services
             // Regla 2: Un solo pedido simultáneo
             if (tienePedidoEnCurso)
             {
-                result.MensajeError = $"El empleado '{empleado.NombreCompleto}' ya tiene un pedido asignado en curso (RN-01-CU26).";
+                result.MensajeError = $"El empleado '{empleado.NombreCompleto}' ya tiene un pedido asignado en curso.";
                 result.MotivoCorto = "Con pedido en curso";
                 return result;
             }
 
             // Regla 3: Validar Jornada Laboral
             var horaActual = contexto.HoraActual;
-            var enHorario = empleado.HorarioEntrada < empleado.HorarioSalida
-                ? horaActual >= empleado.HorarioEntrada && horaActual <= empleado.HorarioSalida
-                // Turno nocturno que cruza medianoche
-                : horaActual >= empleado.HorarioEntrada || horaActual <= empleado.HorarioSalida;
-
-            if (!enHorario)
+            if (!empleado.TrabajaA(horaActual))
             {
                 result.MensajeError = $"El empleado '{empleado.NombreCompleto}' se encuentra fuera de su jornada laboral ({empleado.HorarioEntrada:hh\\:mm} - {empleado.HorarioSalida:hh\\:mm}).";
                 result.MotivoCorto = "Fuera de jornada";
                 return result;
             }
 
-            // Regla 4: Tiempo estimado vs Tiempo restante de jornada
+            // Regla 4: Tiempo estimado vs Tiempo restante de jornada.
+            // Si la salida es menor que la hora actual, el turno termina después de medianoche.
             var tiempoRestanteJornada = empleado.HorarioSalida > horaActual
                 ? empleado.HorarioSalida - horaActual
                 : (TimeSpan.FromHours(24) - horaActual) + empleado.HorarioSalida;
@@ -273,18 +291,6 @@ namespace PickingApp.Services
 
             result.PuedeAsignar = true;
             return result;
-        }
-
-        // Tiempo real de picking: desde el inicio efectivo (asignación + margen) hasta la finalización
-        public double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion)
-        {
-            if (fechaFinalizacion <= inicioProceso)
-            {
-                return 1.0; // Mínimo 1 minuto
-            }
-
-            var diferencia = (fechaFinalizacion - inicioProceso).TotalMinutes;
-            return Math.Round(diferencia, 1);
         }
     }
 }

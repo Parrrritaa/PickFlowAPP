@@ -2,6 +2,7 @@
 
 namespace PickingApp.Services
 {
+    // Resultado de evaluar a un empleado para un pedido: si se puede asignar, por qué no y el tiempo estimado
     public class AsignacionValidationResult
     {
         public bool PuedeAsignar { get; set; }
@@ -48,6 +49,8 @@ namespace PickingApp.Services
             : $"{PedidosConsiderados} de {MinimoPedidos} pedidos · usa el estándar";
     }
 
+    // Contrato del motor de picking: dice QUÉ métodos existen, no CÓMO se calculan (eso está en PickingEngine.cs).
+    // Los controladores dependen de esta interfaz y Program.cs decide qué clase la implementa.
     public interface IPickingEngine
     {
         Task<AsignacionValidationResult> ValidarAsignacionAsync(int pedidoId, int empleadoId);
@@ -56,6 +59,5 @@ namespace PickingApp.Services
         Task<Dictionary<int, double>> CalcularTiemposEstandarAsync(IReadOnlyCollection<int> pedidoIds);
         Task<Dictionary<int, double>> CalcularMinutosPorLineaAsync(int pedidoId);
         Task<Dictionary<int, RendimientoEmpleado>> CalcularRendimientosAsync(IReadOnlyCollection<int> empleadoIds);
-        double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion);
     }
 }

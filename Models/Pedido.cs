@@ -3,6 +3,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Pedido de picking cargado desde Excel. Sus productos están en Detalles (tabla DetallesPedido)
+    // y su estado sigue el ciclo Pendiente → Asignado/Reasignado → Completado o Cancelado.
     public class Pedido
     {
         [Key]
@@ -19,11 +21,9 @@ namespace PickingApp.Models
         public virtual Bodega? Bodega { get; set; }
 
         [Required]
-        [StringLength(20)]
-        public string Prioridad { get; set; } = "Media"; // "Alta", "Media", "Baja"
+        public string Prioridad { get; set; } = Prioridades.Media; // Valores en Prioridades
 
         [Required]
-        [StringLength(30)]
         public string Estado { get; set; } = PedidoEstados.Pendiente; // Valores en PedidoEstados
 
         public int? EmpleadoId { get; set; }
@@ -35,16 +35,24 @@ namespace PickingApp.Models
 
         public DateTime? FechaAsignacion { get; set; }
 
+        // Quien asignó o reasignó el pedido por última vez (sale en la orden impresa). Null en los anteriores a este campo.
+        public int? AsignadoPorId { get; set; }
+
+        [ForeignKey("AsignadoPorId")]
+        public virtual Usuario? AsignadoPor { get; set; }
+
         public DateTime? FechaInicioProceso { get; set; }
 
         public DateTime? FechaFinalizacion { get; set; }
 
+        // Tiempo que calcula PickingEngine para el empleado asignado (estándar × factor de rendimiento)
         public double? TiempoEstimadoMinutos { get; set; }
 
         // Tiempo estándar según las categorías de sus productos, sin ajustar por empleado.
         // Se congela al asignar para que el historial no cambie si luego se editan las categorías.
         public double? TiempoEstandarMinutos { get; set; }
 
+        // Tiempo real: de FechaInicioProceso a FechaFinalizacion, se calcula al completar el pedido
         public double? TiempoProcesamientoMinutos { get; set; }
 
         [StringLength(250)]
@@ -65,6 +73,7 @@ namespace PickingApp.Models
 
         public virtual ICollection<Pedido> Partes { get; set; } = new List<Pedido>();
 
+        // Propiedades de navegación: EF las llena con .Include(p => p.Detalles) en las consultas
         public virtual ICollection<DetallePedido> Detalles { get; set; } = new List<DetallePedido>();
         public virtual ICollection<NovedadPedido> Novedades { get; set; } = new List<NovedadPedido>();
 
@@ -104,6 +113,22 @@ namespace PickingApp.Models
         public bool PuedeDeshacerDivision =>
             EstaDividido && Partes.All(pa => pa.Estado == PedidoEstados.Pendiente && !pa.Novedades.Any());
 
+        // Tiempo real de picking: desde el inicio efectivo (asignación + margen) hasta la finalización; mínimo 1 minuto
+        public static double CalcularTiempoProcesamiento(DateTime inicioProceso, DateTime fechaFinalizacion) =>
+            Math.Round(Math.Max(1, (fechaFinalizacion - inicioProceso).TotalMinutes), 1);
+
+        // Parte k de la división (PED-XXX-Pk): pendiente, con la cabecera del original y sin líneas todavía
+        public Pedido NuevaParte(int k) => new()
+        {
+            CodigoPedido = $"{CodigoPedido}-P{k}",
+            BodegaId = BodegaId,
+            Prioridad = Prioridad,
+            Estado = PedidoEstados.Pendiente,
+            FechaCarga = FechaCarga,
+            NumeroParte = k,
+            PedidoPadre = this
+        };
+
         public void Asignar(int empleadoId, DateTime inicioProceso, double tiempoEstimado, double tiempoEstandar) =>
             TomarEmpleado(PedidoEstados.Asignado, empleadoId, inicioProceso, tiempoEstimado, tiempoEstandar);
 
@@ -113,6 +138,7 @@ namespace PickingApp.Models
             MotivoReasignacion = motivo;
         }
 
+        // Solo cambia el objeto en memoria; el controlador lo guarda en MySQL con SaveChangesAsync
         private void TomarEmpleado(string estado, int empleadoId, DateTime inicioProceso, double tiempoEstimado, double tiempoEstandar)
         {
             EmpleadoId = empleadoId;

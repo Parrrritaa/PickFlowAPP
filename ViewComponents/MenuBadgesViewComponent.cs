@@ -1,8 +1,9 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Services;
 
 namespace PickingApp.ViewComponents
 {
@@ -11,7 +12,7 @@ namespace PickingApp.ViewComponents
     // y SolicitudesController.Index, para que el número coincida con lo que se ve al entrar.
     public class MenuBadgesViewComponent : ViewComponent
     {
-        private const string TipoGestionableSupervisor = TiposSolicitud.RegistroEmpleado;
+        private const int TipoGestionableSupervisor = FlujoSolicitudes.TipoGestionableSupervisor;
         private readonly ApplicationDbContext _context;
 
         public MenuBadgesViewComponent(ApplicationDbContext context)
@@ -19,6 +20,7 @@ namespace PickingApp.ViewComponents
             _context = context;
         }
 
+        // _Layout.cshtml lo llama con Component.InvokeAsync("MenuBadges", ...) y muestra el número que devuelve
         public async Task<IViewComponentResult> InvokeAsync(string tipo)
         {
             var userIdClaim = UserClaimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -31,15 +33,14 @@ namespace PickingApp.ViewComponents
 
             var count = tipo switch
             {
-                "notificaciones" => await _context.Notificaciones.CountAsync(n => !n.Leida &&
-                    (n.UsuarioDestinoId == userId || n.RolDestino == userRole ||
-                     (n.UsuarioDestinoId == null && n.RolDestino == null))),
+                "notificaciones" => await _context.Notificaciones.CountAsync(n => n.UsuarioDestinoId == userId && !n.Leida),
 
                 "solicitudes" when userRole == Roles.Administrador =>
                     await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente),
 
                 "solicitudes" when userRole == Roles.Supervisor =>
-                    await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitud == TipoGestionableSupervisor),
+                    await _context.Solicitudes.DelAlcance(UserClaimsPrincipal)
+                        .CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor),
 
                 _ => 0
             };

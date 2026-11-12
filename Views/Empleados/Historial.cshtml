@@ -1,0 +1,182 @@
+@model PickingApp.Models.ViewModels.EmpleadoHistorialViewModel
+@using PickingApp.Services
+@{
+    var empleado = Model.Empleado;
+    ViewData["Title"] = $"Historial de {empleado.NombreCompleto}";
+    var tendencia = Model.Tendencia;
+
+    // "+12 %" / "−8 %" / "0 %": el signo dice la dirección, el color solo la refuerza
+    string Porcentaje(double valor)
+    {
+        var p = (int)Math.Round(valor * 100);
+        return p > 0 ? $"+{p} %" : p < 0 ? $"−{-p} %" : "0 %";
+    }
+    string ClaseDesvio(double? desvio) =>
+        desvio == null || Math.Abs(desvio.Value) < 0.05 ? "" : desvio < 0 ? "pf-desvio--rapido" : "pf-desvio--lento";
+
+    var (iconoTendencia, textoTendencia) = tendencia.Direccion switch
+    {
+        DireccionTendencia.MasRapido => ("bi-arrow-down-right", "Más rápido"),
+        DireccionTendencia.MasLento => ("bi-arrow-up-right", "Más lento"),
+        DireccionTendencia.Estable => ("bi-arrow-right", "Estable"),
+        _ => ("bi-dash", "Sin datos")
+    };
+}
+
+<a asp-action="Index" class="pf-link-volver" data-pf-volver="ultima"><i class="bi bi-chevron-left" aria-hidden="true"></i> Empleados</a>
+
+<div class="pf-dash-head">
+    <div>
+        <h1 class="pf-page-title">@empleado.NombreCompleto</h1>
+        <p class="pf-dash-sub">
+            @if (Model.SalidaDeEstaBodega is { } salida)
+            {
+                @($"Inactivo en esta bodega · Trasladado a {salida.BodegaDestino!.Nombre} el {salida.Fecha:dd/MM/yyyy}")
+            }
+            else
+            {
+                @($"{PickingApp.Models.Empleado.DescribirEstado(empleado.Activo, Model.Ocupado)} · Turno {empleado.JornadaLaboral} · {empleado.MesesExperiencia} meses de experiencia")
+            }
+        </p>
+    </div>
+</div>
+
+<partial name="_PasoPorBodegas" model="Model.Periodos" />
+
+@if (Model.TotalCompletados == 0)
+{
+    <div class="pf-card pf-notif-empty pf-historial-vacio pf-appear">
+        <div class="pf-notif-empty-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></div>
+        <div class="pf-notif-empty-title">Aún no hay pedidos completados</div>
+        @if (Model.SalidaDeEstaBodega == null)
+        {
+            <div class="pf-notif-empty-text">Cuando @empleado.NombreCompleto complete su primer pedido, aquí verá su tiempo real frente al estimado.</div>
+            <a asp-controller="Pedidos" asp-action="Index" asp-route-estado="@PickingApp.Models.PedidoEstados.Pendiente" class="btn-pf-blue mt-3">Ver pedidos pendientes</a>
+        }
+        else
+        {
+            <div class="pf-notif-empty-text">@empleado.NombreCompleto no completó pedidos en esta bodega.</div>
+        }
+    </div>
+}
+else
+{
+    <p class="pf-historial-resumen">@tendencia.Resumen</p>
+
+    <div class="pf-kpis pf-kpis--fijo" role="group" aria-label="Resumen del empleado">
+        <div class="pf-kpi">
+            <span class="pf-kpi-label">Pedidos completados</span>
+            <span class="pf-kpi-valor">@Model.TotalCompletados</span>
+            @if (Model.CompletadosQueCuentan < Model.TotalCompletados)
+            {
+                <span class="pf-kpi-nota">@Model.CompletadosQueCuentan desde el último reinicio</span>
+            }
+        </div>
+        <div class="pf-kpi">
+            <span class="pf-kpi-label">Rendimiento</span>
+            <div class="pf-kpi-nota"><partial name="_Rendimiento" model="Model.Rendimiento" /></div>
+        </div>
+        <div class="pf-kpi">
+            <span class="pf-kpi-label">Frente a lo estimado</span>
+            @if (Model.DesvioSobreEstimado is double desvio)
+            {
+                <span class="pf-kpi-valor @ClaseDesvio(desvio)">@Porcentaje(desvio)</span>
+                <span class="pf-kpi-nota">@(Math.Abs(desvio) < 0.005 ? "Justo lo estimado" : desvio > 0 ? "Más tiempo del estimado" : "Menos tiempo del estimado")</span>
+            }
+            else
+            {
+                <span class="pf-kpi-valor pf-kpi-valor--vacio">-</span>
+                <span class="pf-kpi-nota">Sus pedidos no tienen estimación guardada</span>
+            }
+        </div>
+        <div class="pf-kpi">
+            <span class="pf-kpi-label">Tendencia</span>
+            <span class="pf-kpi-valor pf-tendencia pf-tendencia--@tendencia.Direccion.ToString().ToLowerInvariant()">
+                <i class="bi @iconoTendencia" aria-hidden="true"></i>@textoTendencia
+            </span>
+            @if (tendencia.Direccion != DireccionTendencia.SinDatos)
+            {
+                <span class="pf-kpi-nota">Últimos @tendencia.PedidosComparados frente a los @tendencia.PedidosComparados anteriores</span>
+            }
+        </div>
+    </div>
+
+    <div class="pf-card pf-chart-card mb-4">
+        <div>
+            <h2 class="pf-chart-h">Tiempo real y estimado por pedido</h2>
+            <p class="pf-chart-resumen">
+                @(Model.Grafica.Count == 1 ? "Su único pedido completado" : $"Sus últimos {Model.Grafica.Count} pedidos completados, del más antiguo al más reciente").
+                La tabla de abajo tiene todos los valores.
+            </p>
+        </div>
+        <div class="pf-chart-canvas">
+            <canvas id="graficaHistorial" role="img"
+                    aria-label="Gráfica de líneas con el tiempo real y el estimado de los últimos @Model.Grafica.Count pedidos. @tendencia.Resumen"></canvas>
+        </div>
+    </div>
+
+    <div class="pf-card">
+        <h2 class="pf-card-h mb-3">Pedidos completados</h2>
+        <div class="table-responsive">
+            <table class="pf-table" data-pf-filas-servidor="historial" data-pf-tamano="@Model.Paginacion.TamanoPagina">
+                <thead>
+                    <tr>
+                        <th>Pedido</th>
+                        <th>Finalizado</th>
+                        <th class="text-end">Estándar</th>
+                        <th class="text-end">Estimado</th>
+                        <th class="text-end">Real</th>
+                        <th class="text-end">Frente a lo estimado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in Model.Pedidos)
+                    {
+                        <tr class="@(f.CuentaParaRendimiento ? "" : "pf-fila-no-cuenta")">
+                            <td class="fw-semibold">
+                                <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@f.PedidoId" class="text-decoration-none" data-fila-abre>@f.CodigoPedido</a>
+                                @if (!f.CuentaParaRendimiento)
+                                {
+                                    <div class="small text-muted fw-normal">Antes del reinicio: no cuenta para el rendimiento</div>
+                                }
+                            </td>
+                            <td>@f.Finalizado.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="text-end">@Formato.Duracion(f.Estandar)</td>
+                            <td class="text-end">@(f.Estimado is double estimado ? Formato.Duracion(estimado) : "-")</td>
+                            <td class="text-end fw-semibold">@Formato.Duracion(f.Real)</td>
+                            <td class="text-end">
+                                @if (f.Desvio is double d)
+                                {
+                                    <span class="pf-desvio @ClaseDesvio(d)">@Porcentaje(d)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_Paginacion" model="Model.Paginacion" />
+    </div>
+
+    @* Datos de la gráfica para wwwroot/js/historial-empleado.js *@
+    <script type="application/json" id="datosHistorial">@Json.Serialize(Model.Grafica.Select(f => new
+    {
+        pedido = f.CodigoPedido,
+        fecha = f.Finalizado.ToString("dd/MM"),
+        real = f.Real,
+        estimado = f.Estimado
+    }))</script>
+}
+
+@section Scripts {
+    @if (Model.TotalCompletados > 0)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+        <script src="~/js/historial-empleado.js" asp-append-version="true"></script>
+    }
+}

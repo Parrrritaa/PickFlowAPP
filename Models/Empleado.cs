@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Operario de bodega que recoge los pedidos. No inicia sesión: no confundir con Usuario.
     public class Empleado
     {
         [Key]
@@ -33,6 +34,14 @@ namespace PickingApp.Models
 
         public bool Activo { get; set; } = true;
 
+        public virtual ICollection<TrasladoPersonal> Traslados { get; set; } = new List<TrasladoPersonal>();
+
+        // shortcut: admite null mientras el administrador asigna bodega a los empleados existentes; pasa a obligatorio después.
+        public int? BodegaId { get; set; }
+
+        [ForeignKey("BodegaId")]
+        public virtual Bodega? Bodega { get; set; }
+
         // La ocupación no se guarda: un empleado está ocupado mientras tenga un pedido en curso.
         public static string DescribirEstado(bool activo, bool conPedidoEnCurso)
         {
@@ -48,6 +57,12 @@ namespace PickingApp.Models
         [NotMapped]
         public string JornadaLaboral => $"{HorarioEntrada:hh\\:mm} - {HorarioSalida:hh\\:mm}";
 
+        // Dentro de su horario a esa hora; un turno cuya salida no es posterior a la entrada cruza la medianoche
+        public bool TrabajaA(TimeSpan hora) => HorarioEntrada < HorarioSalida
+            ? hora >= HorarioEntrada && hora <= HorarioSalida
+            : hora >= HorarioEntrada || hora <= HorarioSalida;
+
+        // [NotMapped]: se calcula en C# y no existe como columna en MySQL
         [NotMapped]
         public int MesesExperiencia
         {

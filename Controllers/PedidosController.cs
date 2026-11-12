@@ -1,15 +1,17 @@
-﻿using System.Security.Claims;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
 {
     [Authorize]
     // Consulta y ciclo de vida del pedido. El resto de acciones está en los archivos PedidosController.*.cs
+    // ("partial" permite repartir una misma clase en varios archivos: Carga, Asignacion, Division, Novedades)
     public partial class PedidosController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -32,17 +34,22 @@ namespace PickingApp.Controllers
         // CU-24: Consultar pedidos con filtros
         // vista = "divididos" muestra aparte los pedidos divididos con sus partes, para no saturar la lista principal
         public async Task<IActionResult> Index(string? estado, string? prioridad, int? bodegaId, string? busqueda,
-            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta, string? vista)
+            int? empleadoId, DateTime? fechaDesde, DateTime? fechaHasta, string? vista, int? pagina, string? novedad)
         {
             var verDivididos = vista == "divididos";
 
-            var query = _context.Pedidos
+            // Include trae también los datos relacionados (JOIN), así la vista puede mostrar el nombre de la bodega
+            // o del empleado. La consulta aún no se ejecuta: se van sumando filtros y se lanza en ToListAsync
+            var query = _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
                 .Include(p => p.Partes)
                     .ThenInclude(pa => pa.Empleado)
                 .Include(p => p.Partes)
                     .ThenInclude(pa => pa.Detalles)
+                .Include(p => p.Partes)
+                    .ThenInclude(pa => pa.Novedades)
+                .Include(p => p.Novedades)
                 .AsSplitQuery()
                 .AsQueryable();
 
@@ -50,11 +57,8 @@ namespace PickingApp.Controllers
                 ? query.Where(p => p.Partes.Any())
                 : query.Where(p => p.PedidoPadreId == null && !p.Partes.Any());
 
-            if (!string.IsNullOrEmpty(estado))
-            {
-                query = query.Where(p => p.Estado == estado);
-            }
-
+            // Cada filtro que llega desde el formulario de búsqueda agrega un WHERE a la consulta.
+            // El estado va al final: las pestañas cuentan sus pedidos con todos los demás filtros.
             if (!string.IsNullOrEmpty(prioridad))
             {
                 query = query.Where(p => p.Prioridad == prioridad);
@@ -67,9 +71,12 @@ namespace PickingApp.Controllers
 
             if (!string.IsNullOrWhiteSpace(busqueda))
             {
-                var b = busqueda.Trim().ToLower();
-                query = query.Where(p => p.CodigoPedido.ToLower().Contains(b) ||
-                                         p.Detalles.Any(d => d.NombreProducto.ToLower().Contains(b) || d.CodigoProducto.ToLower().Contains(b)));
+                // La intercalación de MySQL ya compara sin distinguir mayúsculas. En los divididos el empleado está en las partes.
+                var b = busqueda.Trim();
+                query = query.Where(p => p.CodigoPedido.Contains(b) ||
+                                         p.Detalles.Any(d => d.NombreProducto.Contains(b) || d.CodigoProducto.Contains(b)) ||
+                                         (p.Empleado != null && p.Empleado.NombreCompleto.Contains(b)) ||
+                                         p.Partes.Any(pa => pa.Empleado != null && pa.Empleado.NombreCompleto.Contains(b)));
             }
 
             // empleadoId = -1 filtra los pedidos sin empleado asignado; en los divididos se mira el empleado de sus partes
@@ -98,32 +105,112 @@ namespace PickingApp.Controllers
                 query = query.Where(p => p.FechaCarga < hastaExclusivo);
             }
 
-            // Se listan todas las bodegas (no solo las activas) para poder consultar pedidos históricos de bodegas desactivadas
-            ViewBag.Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync();
-            ViewBag.Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync();
-            ViewBag.FiltroEstado = estado;
-            ViewBag.FiltroPrioridad = prioridad;
-            ViewBag.FiltroBodegaId = bodegaId;
-            ViewBag.FiltroEmpleadoId = empleadoId;
-            ViewBag.FiltroFechaDesde = fechaDesde?.ToString("yyyy-MM-dd");
-            ViewBag.FiltroFechaHasta = fechaHasta?.ToString("yyyy-MM-dd");
-            ViewBag.Busqueda = busqueda;
-            ViewBag.Vista = verDivididos ? "divididos" : null;
-            ViewBag.DivididosEnCurso = await _context.Pedidos.CountAsync(p => p.Estado == PedidoEstados.Dividido);
+            // novedad: "todas" (alguna, atendida o no), un tipo (sin atender de ese tipo) o cualquier otro valor
+            // ("pendientes"): alguna sin atender. En los divididos cuentan también las novedades de sus partes.
+            if (!string.IsNullOrEmpty(novedad))
+            {
+                var tipo = TiposNovedad.Todos.Contains(novedad) ? novedad : null;
+                var soloSinAtender = novedad != FiltrosNovedad.Todas;
+                query = query.Where(p =>
+                    p.Novedades.Any(n => (!soloSinAtender || !n.Atendida) && (tipo == null || n.TipoNovedad == tipo)) ||
+                    p.Partes.Any(pa => pa.Novedades.Any(n => (!soloSinAtender || !n.Atendida) && (tipo == null || n.TipoNovedad == tipo))));
+            }
 
+            var conteoPorEstado = await query.GroupBy(p => p.Estado)
+                .Select(g => new { Estado = g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(g => g.Estado, g => g.Cantidad);
+            if (!string.IsNullOrEmpty(estado))
+            {
+                query = query.Where(p => p.Estado == estado);
+            }
+
+            // Resumen de novedades para la franja de arriba, solo de los pedidos de esta pestaña:
+            // en Pedidos, los que no se dividieron; en Divididos, las partes y los pedidos originales
+            var novedadesVista = verDivididos
+                ? _context.NovedadesPedido.DelAlcance(User).Where(n => n.Pedido!.PedidoPadreId != null || n.Pedido.Partes.Any())
+                : _context.NovedadesPedido.DelAlcance(User).Where(n => n.Pedido!.PedidoPadreId == null && !n.Pedido.Partes.Any());
+            var sinAtender = novedadesVista.Where(n => !n.Atendida);
+
+            // Solo se trae la página pedida: primero se cuenta el total con los filtros y luego Skip/Take.
+            // Divididos tiene su propia medida: sus filas son más altas que las de Pedidos.
+            var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, verDivididos ? "divididos" : "pedidos"), await query.CountAsync());
+
+            // Aquí se ejecuta el SELECT en MySQL. Orden: primero prioridad Alta, luego los más recientes.
+            // El Id al final deja el orden fijo, para que un pedido no salte de una página a otra.
             var pedidos = await query
-                .OrderByDescending(p => p.Prioridad == "Alta")
+                .OrderByDescending(p => p.Prioridad == Prioridades.Alta)
                 .ThenByDescending(p => p.FechaCarga)
                 .ThenBy(p => p.CodigoPedido)
+                .ThenBy(p => p.Id)
+                .Skip(paginacion.Saltar)
+                .Take(paginacion.TamanoPagina)
                 .ToListAsync();
 
-            return View(pedidos);
+            return View(new PedidosIndexViewModel
+            {
+                Pedidos = pedidos,
+                Paginacion = paginacion,
+                // Se listan todas las bodegas (no solo las activas) para poder consultar pedidos históricos de bodegas desactivadas
+                Bodegas = await _context.Bodegas.DelAlcance(User).OrderBy(b => b.Codigo).ToListAsync(),
+                Empleados = await _context.Empleados.DelAlcance(User).OrderBy(e => e.NombreCompleto).ToListAsync(),
+                FiltroEstado = estado,
+                ConteoPorEstado = conteoPorEstado,
+                FiltroPrioridad = prioridad,
+                FiltroBodegaId = bodegaId,
+                FiltroEmpleadoId = empleadoId,
+                FiltroFechaDesde = fechaDesde?.ToString("yyyy-MM-dd"),
+                FiltroFechaHasta = fechaHasta?.ToString("yyyy-MM-dd"),
+                Busqueda = busqueda,
+                FiltroNovedad = novedad,
+                NovedadesSinAtenderPorTipo = (await sinAtender
+                        .GroupBy(n => n.TipoNovedad)
+                        .Select(g => new { Tipo = g.Key, Cantidad = g.Count() })
+                        .ToListAsync())
+                    .ToDictionary(g => g.Tipo, g => g.Cantidad),
+                // Una parte cuenta como su pedido original: "en 2 pedidos" habla de lo que se ve en la lista
+                PedidosConNovedadSinAtender = await sinAtender.Select(n => n.Pedido!.PedidoPadreId ?? n.PedidoId).Distinct().CountAsync(),
+                HayNovedadesAtendidas = await novedadesVista.AnyAsync(n => n.Atendida),
+                VerDivididos = verDivididos,
+                DivididosEnCurso = await _context.Pedidos.DelAlcance(User).CountAsync(p => p.Estado == PedidoEstados.Dividido)
+            });
+        }
+
+        // Orden de picking impresa para el empleado: hoja vertical en blanco y negro con todo el pedido y su asignación
+        // (Views/Pedidos/Imprimir.cshtml, sin la plantilla de la app). Detalle la abre sola tras asignar o reasignar.
+        public async Task<IActionResult> Imprimir(int id)
+        {
+            var pedido = await _context.Pedidos.DelAlcance(User)
+                .Include(p => p.Bodega)
+                .Include(p => p.Empleado)
+                .Include(p => p.AsignadoPor).ThenInclude(u => u!.Rol)
+                .Include(p => p.Detalles)
+                    .ThenInclude(d => d.Ubicacion)
+                        .ThenInclude(u => u!.Producto)
+                            .ThenInclude(pr => pr!.Categoria)
+                .Include(p => p.Novedades)
+                .Include(p => p.PedidoPadre)
+                    .ThenInclude(pp => pp!.Partes)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedido == null) return NotFound();
+
+            // Detalle la imprime desde un marco oculto de la misma app. Program.cs pone X-Frame-Options: DENY en todo
+            // (ninguna página se deja mostrar en un marco); esta sí, pero solo dentro de PickFlow, no en otro sitio.
+            Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+
+            return View(new PedidoImpresionViewModel
+            {
+                Pedido = pedido,
+                CategoriaPredeterminada = await _context.CategoriasProducto
+                    .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "Predeterminada"
+            });
         }
 
         // Detalle de Pedido (con ruta de picking de ubicaciones, productos, novedades)
         public async Task<IActionResult> Detalle(int id)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Bodega)
                 .Include(p => p.Empleado)
                 .Include(p => p.Detalles)
@@ -144,14 +231,16 @@ namespace PickingApp.Controllers
 
             if (pedido == null) return NotFound();
 
-            // Tiempo estándar según las categorías de los productos, comparado con una jornada completa
-            ViewBag.TiempoEstandar = pedido.TiempoEstandarMinutos ?? await _pickingEngine.CalcularTiempoEstandarAsync(pedido.Id);
-            ViewBag.CategoriaPredeterminada = await _context.CategoriasProducto
-                .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync();
-            ViewBag.MaxHorasJornada = await ObtenerMaxHorasJornadaAsync();
-            ViewBag.TiemposPartes = await _pickingEngine.CalcularTiemposEstandarAsync(pedido.Partes.Select(pa => pa.Id).ToList());
-
-            return View(pedido);
+            return View(new PedidoDetalleViewModel
+            {
+                Pedido = pedido,
+                // Tiempo estándar según las categorías de los productos, comparado con una jornada completa
+                TiempoEstandar = pedido.TiempoEstandarMinutos ?? await _pickingEngine.CalcularTiempoEstandarAsync(pedido.Id),
+                CategoriaPredeterminada = await _context.CategoriasProducto
+                    .Where(c => c.EsPredeterminada).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "Predeterminada",
+                MaxHorasJornada = await ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada),
+                TiemposPartes = await _pickingEngine.CalcularTiemposEstandarAsync(pedido.Partes.Select(pa => pa.Id).ToList())
+            });
         }
 
         // CU-28: Marcar pedido como completado
@@ -162,11 +251,11 @@ namespace PickingApp.Controllers
         {
             if (!confirmacionFisica)
             {
-                TempData["ErrorMessage"] = "El pedido no puede marcarse como completado porque no existe confirmación física de la entrega (FE-1-CU28).";
+                TempData["ErrorMessage"] = "El pedido no puede marcarse como completado porque no existe confirmación física de la entrega.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             if (!pedido.EstaEnCurso)
@@ -175,11 +264,12 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var fechaFin = DateTime.Now;
+            // Cálculo del tiempo real de picking (Pedido.CalcularTiempoProcesamiento).
             // El tiempo real cuenta desde el inicio fijado al asignar (asignación + margen de ese momento)
+            var fechaFin = DateTime.Now;
             var inicioProceso = pedido.FechaInicioProceso
-                ?? (pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10)).AddMinutes(await ObtenerMargenInicioAsync());
-            var tiempoReal = _pickingEngine.CalcularTiempoProcesamiento(inicioProceso, fechaFin);
+                ?? (pedido.FechaAsignacion ?? fechaFin.AddMinutes(-10)).AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos));
+            var tiempoReal = Pedido.CalcularTiempoProcesamiento(inicioProceso, fechaFin);
 
             pedido.Estado = PedidoEstados.Completado;
             pedido.ConfirmacionFisica = true;
@@ -188,9 +278,10 @@ namespace PickingApp.Controllers
 
             var padreCerrado = await CerrarPedidoDivididoSiTerminoAsync(pedido.PedidoPadreId);
 
+            // Guarda en una sola transacción el pedido completado (y el pedido original si se cerró)
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Completar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(AccionesLog.CompletarPedido, "Pedidos",
                 $"Pedido {pedido.CodigoPedido} marcado como completado con entrega física. Tiempo real calculado: {tiempoReal} min");
             await RegistrarCierrePedidoDivididoAsync(padreCerrado);
 
@@ -202,20 +293,22 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Cancelar(int pedidoId, string motivoCancelacion)
+        public async Task<IActionResult> Cancelar(int pedidoId,
+            [Required(ErrorMessage = "El motivo de cancelación es obligatorio.")]
+            [StringLength(250, ErrorMessage = "El motivo de cancelación admite hasta {1} caracteres.")] string motivoCancelacion)
         {
-            if (string.IsNullOrWhiteSpace(motivoCancelacion))
+            if (!ModelState.IsValid)
             {
-                TempData["ErrorMessage"] = "El motivo de cancelación es obligatorio.";
+                TempData["ErrorMessage"] = ModelState.PrimerError();
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             if (pedido.Estado == PedidoEstados.Cancelado)
             {
-                TempData["ErrorMessage"] = "El pedido ya se encuentra cancelado y no puede reactivarse (RNF-01).";
+                TempData["ErrorMessage"] = "El pedido ya se encuentra cancelado y no puede reactivarse.";
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
@@ -250,7 +343,7 @@ namespace PickingApp.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _auditService.RegistrarAsync("Cancelar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(AccionesLog.CancelarPedido, "Pedidos",
                 $"Pedido {pedido.CodigoPedido} cancelado{(partesCanceladas > 0 ? $" junto con {partesCanceladas} parte(s) sin terminar" : "")}. Motivo: {motivoCancelacion}");
             await RegistrarCierrePedidoDivididoAsync(padreCerrado);
 
@@ -266,7 +359,13 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CambiarPrioridad(int pedidoId, string nuevaPrioridad)
         {
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            if (!Prioridades.Todas.Contains(nuevaPrioridad))
+            {
+                TempData["ErrorMessage"] = "Seleccione una prioridad válida.";
+                return RedirectToAction(nameof(Detalle), new { id = pedidoId });
+            }
+
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             var prioridadAnterior = pedido.Prioridad;
@@ -306,11 +405,9 @@ namespace PickingApp.Controllers
             if (padre == null) return;
 
             var completado = padre.Estado == PedidoEstados.Completado;
-            await _auditService.RegistrarAsync(completado ? "Completar Pedido" : "Cancelar Pedido", "Pedidos",
+            await _auditService.RegistrarAsync(completado ? AccionesLog.CompletarPedido : AccionesLog.CancelarPedido, "Pedidos",
                 $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
         }
 
-        private Task<double> ObtenerMaxHorasJornadaAsync() =>
-            ParametrosSistema.ObtenerDecimalAsync(_context, ParametrosSistema.MaxHorasJornada);
     }
 }

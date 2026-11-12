@@ -1,155 +1,289 @@
-@model IEnumerable<PickingApp.Models.Pedido>
+﻿@model PickingApp.Models.ViewModels.DashboardViewModel
 @{
-    ViewData["Title"] = "Dashboard";
-    var pendientes = (int)(ViewBag.TotalPendientes ?? 0);
-    var enProceso = (int)(ViewBag.TotalEnProceso ?? 0);
-    var completados = (int)(ViewBag.TotalCompletados ?? 0);
-    var cancelados = (int)(ViewBag.TotalCancelados ?? 0);
-    var reasignados = (int)(ViewBag.TotalReasignados ?? 0);
+    ViewData["Title"] = "Inicio";
+
+    // Franja de estados (los números llegan en el DashboardViewModel desde HomeController.Index); el color es el mismo de la gráfica
+    var estados = new (string Clave, string Nombre, int Total, string Color)[]
+    {
+        (PickingApp.Models.PedidoEstados.Pendiente, "Pendientes", Model.TotalPendientes, "#3B71CA"),
+        (PickingApp.Models.PedidoEstados.Asignado, "En proceso", Model.TotalEnProceso, "#EB7D26"),
+        (PickingApp.Models.PedidoEstados.Completado, "Completados", Model.TotalCompletados, "#52A447"),
+        (PickingApp.Models.PedidoEstados.Cancelado, "Cancelados", Model.TotalCancelados, "#DC2626"),
+        (PickingApp.Models.PedidoEstados.Reasignado, "Reasignados", Model.TotalReasignados, "var(--pf-neutral-fill)")
+    };
+    var totalPedidos = estados.Sum(e => e.Total);
+    var porAtender = Model.TotalPendientes + Model.TotalEnProceso + Model.TotalReasignados;
+    var ahora = DateTime.Now;
+    var hoy = ahora.ToString("dddd d 'de' MMMM", System.Globalization.CultureInfo.GetCultureInfo("es-CO"));
+    hoy = char.ToUpper(hoy[0]) + hoy[1..];
+
+    // Saludo con el primer nombre de la sesión (lo que va antes de la @ si es un correo)
+    var nombre = User.Identity?.Name ?? "";
+    nombre = nombre.Contains("@") ? nombre.Split('@')[0] : nombre.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+    nombre = string.IsNullOrEmpty(nombre) ? "" : char.ToUpper(nombre[0]) + nombre[1..];
+    var saludo = ahora.Hour < 12 ? "Buenos días" : ahora.Hour < 19 ? "Buenas tardes" : "Buenas noches";
+
+    var coloresEstado = estados.ToDictionary(e => e.Clave, e => e.Color);
+
+    // Supervisor y Auxiliar ven solo su bodega: ni agrupar ni filtrar por bodega les dice nada
+    var esAdmin = User.IsInRole(PickingApp.Models.Roles.Administrador);
 }
 
-<h1 class="pf-page-title">Dashboard</h1>
-
-<!-- 5 Metric Cards matching Slide 5 -->
-<div class="row g-3 mb-4">
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Pedidos pendientes</span>
-            <span class="metric-value val-blue">@ViewBag.TotalPendientes</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">En proceso</span>
-            <span class="metric-value val-orange">@ViewBag.TotalEnProceso</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Completados</span>
-            <span class="metric-value val-green">@ViewBag.TotalCompletados</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Cancelados</span>
-            <span class="metric-value val-red">@ViewBag.TotalCancelados</span>
-        </div>
-    </div>
-    <div class="col">
-        <div class="pf-metric-card">
-            <span class="metric-label">Reasignados</span>
-            <span class="metric-value val-dark">@ViewBag.TotalReasignados</span>
-        </div>
+<div class="pf-dash-head">
+    <div>
+        @* Easter egg: al tocar el título suena una trompeta (wwwroot/js/dashboard-sonido.js) *@
+        <h1 class="pf-page-title" id="pfDashTitulo" data-sonido="@Url.Content("~/audio/trompeta-dashboard.mp3")">@saludo@(string.IsNullOrEmpty(nombre) ? "" : $", {nombre}")</h1>
+        <p class="pf-dash-sub">
+            @hoy ·
+            @(porAtender == 0 ? "no hay pedidos por atender" : porAtender == 1 ? "1 pedido por atender" : $"{porAtender} pedidos por atender")
+        </p>
     </div>
 </div>
 
-<!-- Bottom Section: Chart and Recent Orders matching Slide 5 -->
-<div class="row g-4">
-    <!-- Chart: Detalles -->
-    <div class="col-lg-7">
-        <div class="mockup-card h-100 d-flex flex-column align-items-center justify-content-between">
-            <h4 class="fw-bold mb-3" style="color: #4B5563;">Detalles</h4>
-            @if (pendientes + enProceso + completados + cancelados + reasignados == 0)
-            {
-                <div class="text-center text-muted py-5">No hay pedidos registrados todavía.</div>
-            }
-            else
-            {
-                <div style="width: 100%; max-width: 380px; height: 260px; position: relative;" class="d-flex align-items-center justify-content-center">
-                    <canvas id="detallesChart"></canvas>
+<!-- Cifras por estado: cada tarjeta muestra u oculta su estado en la gráfica -->
+<section class="pf-kpis" id="pfEstados" role="group" aria-label="Pedidos por estado. Pulse un estado para mostrarlo u ocultarlo en la gráfica">
+    @foreach (var (e, i) in estados.Select((e, i) => (e, i)))
+    {
+        var pct = totalPedidos == 0 ? 0 : (int)Math.Round(e.Total * 100.0 / totalPedidos);
+        <button type="button" class="pf-kpi @(e.Total == 0 ? "is-zero" : "")" data-estado="@e.Clave" aria-pressed="true"
+                title="Mostrar u ocultar en la gráfica" style="--dot: @e.Color; animation-delay: @(i * 50)ms">
+            <span class="pf-kpi-label">
+                <i class="pf-kpi-dot" aria-hidden="true"></i>@e.Nombre
+                <i class="bi bi-eye-slash pf-kpi-oculto" aria-hidden="true"></i>
+            </span>
+            <span class="pf-kpi-valor" data-valor="@e.Total">@e.Total</span>
+            <span class="pf-kpi-barra" aria-hidden="true"><span style="width: @pct%"></span></span>
+            <span class="pf-kpi-nota">@pct % del total</span>
+        </button>
+    }
+</section>
+
+<div class="pf-dash-fila">
+    <!-- Gráfica configurable (wwwroot/js/dashboard-grafica.js, datos de HomeController.DatosGrafica) -->
+    <div class="pf-dash-grande">
+        <div class="pf-card h-100 pf-chart-card" id="pfGrafica" data-url="@Url.Action("DatosGrafica", "Home")">
+            <div class="pf-chart-head">
+                <div class="pf-chart-titulo">
+                    <h2 class="pf-chart-h">
+                        <label for="pfAgrupar">Pedidos por</label>
+                        <span class="pf-select-titulo dropdown">
+                            <!-- El select guarda el valor que lee el script; el menú es solo la cara visible -->
+                            <select id="pfAgrupar" hidden>
+                                <option value="estado">estado</option>
+                                <option value="prioridad">prioridad</option>
+                                @if (esAdmin)
+                                {
+                                    <option value="bodega">bodega</option>
+                                }
+                                <option value="empleado">empleado</option>
+                                <option value="dia">día de carga</option>
+                            </select>
+                            <button type="button" class="pf-agrupar-btn" id="pfAgruparBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span id="pfAgruparTexto">estado</span>
+                                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                            </button>
+                            <div class="dropdown-menu pf-pop pf-menu-opciones" id="pfAgruparMenu" aria-labelledby="pfAgruparBtn">
+                                <button type="button" class="pf-menu-opcion" data-valor="estado">estado</button>
+                                <button type="button" class="pf-menu-opcion" data-valor="prioridad">prioridad</button>
+                                @if (esAdmin)
+                                {
+                                    <button type="button" class="pf-menu-opcion" data-valor="bodega">bodega</button>
+                                }
+                                <button type="button" class="pf-menu-opcion" data-valor="empleado">empleado</button>
+                                <button type="button" class="pf-menu-opcion" data-valor="dia">día de carga</button>
+                            </div>
+                        </span>
+                    </h2>
+                    <p class="pf-chart-resumen" id="pfResumen" aria-live="polite">&nbsp;</p>
                 </div>
-                <div class="d-flex flex-wrap justify-content-center gap-3 mt-3 small text-muted">
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #3B71CA; display: inline-block; margin-right: 5px;"></span> pedidos pendientes</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #EB7D26; display: inline-block; margin-right: 5px;"></span> en proceso</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #52A447; display: inline-block; margin-right: 5px;"></span> completados</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #DC2626; display: inline-block; margin-right: 5px;"></span> cancelados</span>
-                    <span class="d-flex align-items-center"><span style="width: 10px; height: 10px; background: #1F2937; display: inline-block; margin-right: 5px;"></span> reasignados</span>
+
+                <div class="pf-chart-tools">
+                    <!-- Tipo de gráfica: el botón muestra la elegida; el menú, todas con una vista previa -->
+                    <div class="dropdown">
+                        <button type="button" class="pf-tool-btn" id="pfTipoBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="pf-tipo-icono" id="pfTipoIcono" aria-hidden="true"></span>
+                            <span id="pfTipoNombre">Dona</span>
+                            <i class="bi bi-chevron-down pf-tool-chevron" aria-hidden="true"></i>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end pf-pop" aria-labelledby="pfTipoBtn">
+                            <div class="pf-pop-titulo">Tipo de gráfica</div>
+                            <div class="pf-tipos" id="pfTipos">
+                                <button type="button" class="pf-tipo active" data-tipo="doughnut" aria-pressed="true">
+                                    <partial name="_IconoTipoGrafica" model='"doughnut"' />
+                                    <span>Dona</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="pie" aria-pressed="false">
+                                    <partial name="_IconoTipoGrafica" model='"pie"' />
+                                    <span>Pastel</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="bar" aria-pressed="false">
+                                    <partial name="_IconoTipoGrafica" model='"bar"' />
+                                    <span>Barras</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="hbar" aria-pressed="false">
+                                    <partial name="_IconoTipoGrafica" model='"hbar"' />
+                                    <span>Horizontal</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="line" aria-pressed="false">
+                                    <partial name="_IconoTipoGrafica" model='"line"' />
+                                    <span>Líneas</span>
+                                </button>
+                                <button type="button" class="pf-tipo" data-tipo="area" aria-pressed="false">
+                                    <partial name="_IconoTipoGrafica" model='"area"' />
+                                    <span>Área</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros secundarios: el número dice cuántos hay activos -->
+                    <div class="dropdown">
+                        <button type="button" class="pf-tool-btn" id="pfFiltrosBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                            <i class="bi bi-sliders" aria-hidden="true"></i>
+                            <span>Filtros</span>
+                            <span class="pf-tool-cuenta" id="pfFiltrosCuenta" hidden></span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end pf-pop pf-pop-filtros" aria-labelledby="pfFiltrosBtn">
+                            <label class="pf-pop-campo">Periodo
+                                <select id="pfDias" class="form-select form-select-sm">
+                                    <option value="0">Todo</option>
+                                    <option value="7">Últimos 7 días</option>
+                                    <option value="30">Últimos 30 días</option>
+                                    <option value="90">Últimos 90 días</option>
+                                </select>
+                            </label>
+                            @* El script lee este select; sin selector queda vacío y el servidor aplica la bodega fija *@
+                            <label class="pf-pop-campo @(esAdmin ? "" : "d-none")">Bodega
+                                <select id="pfBodega" class="form-select form-select-sm">
+                                    <option value="">Todas</option>
+                                    @foreach (var b in Model.Bodegas)
+                                    {
+                                        <option value="@b.Id">@b.Nombre</option>
+                                    }
+                                </select>
+                            </label>
+                            <label class="pf-pop-campo">Prioridad
+                                <select id="pfPrioridad" class="form-select form-select-sm">
+                                    <option value="">Todas</option>
+                                    <option>Alta</option>
+                                    <option>Media</option>
+                                    <option>Baja</option>
+                                </select>
+                            </label>
+                            <button type="button" class="pf-link-btn" id="pfLimpiar" disabled>Limpiar filtros</button>
+                        </div>
+                    </div>
                 </div>
-            }
+            </div>
+
+            <div class="pf-chart-body" id="pfCuerpo">
+                <div class="pf-chart-canvas"><canvas id="detallesChart" role="img" aria-label="Gráfica de pedidos"></canvas><div class="pf-chart-center" id="pfCentro"></div></div>
+                <div class="pf-legend" id="pfLeyenda"></div>
+                <div class="pf-chart-empty" id="pfVacio" hidden>No hay pedidos con estos filtros.</div>
+                <div class="pf-chart-table" id="pfTabla" hidden></div>
+            </div>
+
+            <div class="pf-chart-foot">
+                <button type="button" class="pf-link-btn" id="pfVerTabla">Ver como tabla</button>
+            </div>
         </div>
     </div>
 
-    <!-- Table: Pedidos recientes -->
-    <div class="col-lg-5">
-        <div class="mockup-card h-100">
-            <h4 class="fw-bold mb-3" style="color: #111827;">Pedidos recientes</h4>
-            <div class="table-responsive">
-                <table class="mockup-table">
-                    <thead>
-                        <tr>
-                            <th>Pedido</th>
-                            <th>Prioridad</th>
-                            <th>Estado</th>
-                            <th>Empleado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if (Model != null && Model.Any())
-                        {
-                            @foreach (var pedido in Model)
-                            {
-                                <tr>
-                                    <td>
-                                        <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@pedido.Id" class="text-decoration-none fw-semibold" style="color: #111827;">
-                                            @pedido.CodigoPedido
-                                        </a>
-                                    </td>
-                                    <td>@pedido.Prioridad</td>
-                                    <td>@pedido.Estado</td>
-                                    <td>@(pedido.Empleado?.NombreCompleto ?? "Sin asignar")</td>
-                                </tr>
-                            }
-                        }
-                        else
-                        {
-                            <tr>
-                                <td colspan="4" class="text-center text-muted py-4">No hay pedidos registrados</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+    <!-- Últimos pedidos cargados (el modelo que envía HomeController.Index): los que están en curso
+         muestran su avance según el tiempo estimado y avanzan solos (wwwroot/js/dashboard-en-curso.js) -->
+    <div class="pf-dash-chica">
+        <section class="pf-card h-100 pf-recientes" aria-labelledby="pfRecientesT">
+            <div class="pf-card-head">
+                <div>
+                    <h2 class="pf-card-h" id="pfRecientesT">Pedidos recientes</h2>
+                    <p class="pf-card-sub">Los últimos cinco cargados</p>
+                </div>
+                <a asp-controller="Pedidos" asp-action="Index" class="pf-link-btn">Ver pedidos <i class="bi bi-chevron-right" aria-hidden="true"></i></a>
             </div>
-        </div>
+            @if (Model.UltimosPedidos.Any())
+            {
+                <ul class="pf-recientes-lista">
+                    @foreach (var pedido in Model.UltimosPedidos)
+                    {
+                        var enCurso = pedido.EstaEnCurso;
+                        var inicio = pedido.FechaInicioProceso ?? pedido.FechaAsignacion;
+                        var estimado = pedido.TiempoEstimadoMinutos;
+                        var conAvance = enCurso && inicio.HasValue && estimado > 0;
+                        var claseEstado = pedido.Estado switch
+                        {
+                            PickingApp.Models.PedidoEstados.Completado => "is-completado",
+                            PickingApp.Models.PedidoEstados.Cancelado => "is-cancelado",
+                            PickingApp.Models.PedidoEstados.Pendiente => "is-pendiente",
+                            _ => "is-curso"
+                        };
+                        var iniciales = pedido.Empleado == null ? "" : string.Concat(pedido.Empleado.NombreCompleto
+                            .Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpper(w[0])));
+                        @* Un atributo con valor null no se escribe: solo los pedidos en curso llevan los datos del avance *@
+                        <li class="pf-reciente @claseEstado"
+                            data-inicio="@(conAvance ? inicio!.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null)"
+                            data-estimado="@(conAvance ? estimado!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null)">
+                            <div class="pf-reciente-fila">
+                                <a asp-controller="Pedidos" asp-action="Detalle" asp-route-id="@pedido.Id" class="pf-recientes-codigo pf-mono" data-fila-abre>@pedido.CodigoPedido</a>
+                                <span class="pf-reciente-estado" style="--dot: @(coloresEstado.GetValueOrDefault(pedido.Estado, "var(--pf-neutral-fill)"))">
+                                    @if (pedido.Estado == PickingApp.Models.PedidoEstados.Completado)
+                                    {
+                                        <span class="pf-ico"><partial name="_Icono" model='"check"' /></span>
+                                    }
+                                    <span data-estado-texto>@(pedido.Estado == PickingApp.Models.PedidoEstados.Asignado ? "En proceso" : pedido.Estado)</span>
+                                </span>
+                            </div>
+                            <div class="pf-reciente-meta">
+                                @if (pedido.Empleado != null)
+                                {
+                                    <span class="pf-reciente-avatar" aria-hidden="true">@iniciales</span>
+                                    <span class="pf-reciente-nombre">@pedido.Empleado.NombreCompleto</span>
+                                }
+                                else
+                                {
+                                    <span class="pf-reciente-nombre pf-sin-asignar">Sin asignar</span>
+                                }
+                                <span aria-hidden="true">·</span>
+                                <span>Prioridad @pedido.Prioridad.ToLowerInvariant()</span>
+                            </div>
+                            <div class="pf-reciente-barra" aria-hidden="true">
+                                <span style="transform: scaleX(@(pedido.Estado == PickingApp.Models.PedidoEstados.Completado ? "1" : "0"))"></span>
+                            </div>
+                            <div class="pf-reciente-pie pf-num">
+                                @if (conAvance)
+                                {
+                                    <span>Inició @inicio!.Value.ToString("HH:mm")</span>
+                                    <span>Estimado @Math.Round(estimado!.Value) min</span>
+                                }
+                                else if (pedido.Estado == PickingApp.Models.PedidoEstados.Completado && pedido.TiempoProcesamientoMinutos.HasValue)
+                                {
+                                    <span>Terminó @(pedido.FechaFinalizacion?.ToString("dd/MM HH:mm"))</span>
+                                    <span>Tardó @Math.Round(pedido.TiempoProcesamientoMinutos.Value) min</span>
+                                }
+                                else
+                                {
+                                    <span>Cargado @pedido.FechaCarga.ToString("dd/MM HH:mm")</span>
+                                    <span>@(pedido.Bodega?.Nombre)</span>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="pf-recientes-vacio">
+                    <span class="pf-ico" aria-hidden="true"><partial name="_Icono" model='"pedidos"' /></span>
+                    Todavía no hay pedidos. Cárgalos desde un Excel para empezar.
+                </div>
+            }
+        </section>
     </div>
 </div>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const ctx = document.getElementById('detallesChart');
-            if (ctx) {
-                const dataValues = [@pendientes, @enProceso, @completados, @cancelados, @reasignados];
-
-                new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: ['pedidos pendientes', 'en proceso', 'completados', 'cancelados', 'reasignados'],
-                        datasets: [{
-                            data: dataValues,
-                            backgroundColor: [
-                                '#3B71CA',
-                                '#EB7D26',
-                                '#52A447',
-                                '#DC2626',
-                                '#1F2937'
-                            ],
-                            borderWidth: 1,
-                            borderColor: '#FFFFFF'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
-                    }
-                });
-            }
-        });
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+    <script src="~/js/grafica-pedidos.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard-grafica.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard-sonido.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard-en-curso.js" asp-append-version="true"></script>
 }

@@ -2,7 +2,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -10,12 +12,12 @@ namespace PickingApp.Controllers
     // Asignación y reasignación de pedidos a empleados (CU-26, CU-27). Parte de PedidosController: mismas rutas (/Pedidos/...) y dependencias.
     public partial class PedidosController
     {
-        // Slide 8 / CU-26: Asignar pedido a empleado (Vista interactiva)
+        // CU-26: Asignar pedido a empleado (vista interactiva)
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpGet]
         public async Task<IActionResult> Asignar(int id)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Detalles)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -32,7 +34,8 @@ namespace PickingApp.Controllers
 
             // Mismas reglas que se aplican al asignar (activo, pedido en curso, jornada, tiempo restante),
             // evaluadas para todos los empleados en un número fijo de consultas
-            var empleados = await _context.Empleados.Where(e => e.Activo).ToListAsync();
+            // Solo el personal activo de la bodega del pedido (PickingEngine rechaza también a los de otra bodega)
+            var empleados = await _context.Empleados.Where(e => e.Activo && e.BodegaId == pedido.BodegaId).ToListAsync();
             var validaciones = await _pickingEngine.ValidarAsignacionesAsync(id, empleados.Select(e => e.Id).ToList());
 
             bool Asignable(Empleado e) => e.Id != empleadoActualId && validaciones[e.Id].PuedeAsignar;
@@ -45,23 +48,28 @@ namespace PickingApp.Controllers
                 .ThenByDescending(e => e.MesesExperiencia)
                 .ToList();
 
-            ViewBag.Pedido = pedido;
-            ViewBag.TiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id);
-            ViewBag.Validaciones = validaciones;
-            ViewBag.EmpleadoRecomendadoId = empleados.FirstOrDefault(Asignable)?.Id;
-            ViewBag.EmpleadoActualId = empleadoActualId;
-            ViewBag.EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
-                ?? (empleadoActualId.HasValue ? (await _context.Empleados.FindAsync(empleadoActualId.Value))?.NombreCompleto : null);
-            return View(empleados);
+            return View(new AsignarPedidoViewModel
+            {
+                Pedido = pedido,
+                Empleados = empleados,
+                Validaciones = validaciones,
+                TiempoEstandar = await _pickingEngine.CalcularTiempoEstandarAsync(id),
+                EmpleadoRecomendadoId = empleados.FirstOrDefault(Asignable)?.Id,
+                EmpleadoActualId = empleadoActualId,
+                EmpleadoActualNombre = empleados.FirstOrDefault(e => e.Id == empleadoActualId)?.NombreCompleto
+                    ?? (empleadoActualId.HasValue ? (await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == empleadoActualId.Value))?.NombreCompleto : null)
+            });
         }
 
         // CU-26: Asignar pedido a empleado
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Asignar(int pedidoId, int empleadoId, bool ignorarAdvertencia = false)
+        public async Task<IActionResult> Asignar(int pedidoId, int empleadoId)
         {
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            await using var transaccion = await BloquearAsignacionAsync(pedidoId, empleadoId);
+
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             // Un pedido en curso solo cambia de empleado por CU-27 (motivo obligatorio y liberación del anterior)
@@ -71,6 +79,8 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
+            // Se vuelven a validar las reglas en el servidor (activo, un pedido a la vez, jornada, tiempo restante):
+            // lo que muestra la vista pudo cambiar desde que se abrió la página
             var validacion = await _pickingEngine.ValidarAsignacionAsync(pedidoId, empleadoId);
 
             if (!validacion.PuedeAsignar)
@@ -79,25 +89,28 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Detalle), new { id = pedidoId });
             }
 
-            var empleado = await _context.Empleados.FindAsync(empleadoId);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == empleadoId);
             if (empleado == null) return NotFound();
 
             // Si genera advertencia de experiencia (umbrales de Configuración)
             if (validacion.GeneraAdvertencia)
             {
-                NotificarAdvertenciaAsignacion(validacion, pedido, empleado, esReasignacion: false);
+                await NotificarAdvertenciaAsignacionAsync(validacion, pedido, empleado, esReasignacion: false);
             }
 
-            pedido.Asignar(empleadoId, DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync()),
+            // Cambia estado, empleado, fechas y tiempos del pedido (Models/Pedido.cs) y luego los guarda con un UPDATE
+            pedido.Asignar(empleadoId, DateTime.Now.AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos)),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
+            pedido.AsignadoPorId = User.IdUsuario();
 
             await _context.SaveChangesAsync();
+            await transaccion.CommitAsync();
 
             if (validacion.GeneraAdvertencia)
             {
                 await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: false);
             }
-            await _auditService.RegistrarAsync("Asignar Pedido", "Pedidos", 
+            await _auditService.RegistrarAsync(AccionesLog.AsignarPedido, "Pedidos", 
                 $"Pedido {pedido.CodigoPedido} asignado al empleado {empleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)} (estándar {Formato.Duracion(validacion.TiempoEstandarMinutos)} × rendimiento {validacion.Rendimiento?.Factor ?? 1:0.00})");
 
             if (validacion.GeneraAdvertencia)
@@ -105,6 +118,7 @@ namespace PickingApp.Controllers
                 TempData["WarningMessage"] = validacion.MensajeAdvertencia;
             }
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' asignado exitosamente a '{empleado.NombreCompleto}'.";
+            TempData["ImprimirPedido"] = true; // Detalle abre la orden impresa para el empleado
 
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
@@ -127,7 +141,9 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Asignar), new { id = pedidoId });
             }
 
-            var pedido = await _context.Pedidos.FindAsync(pedidoId);
+            await using var transaccion = await BloquearAsignacionAsync(pedidoId, nuevoEmpleadoId);
+
+            var pedido = await _context.Pedidos.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == pedidoId);
             if (pedido == null) return NotFound();
 
             if (!pedido.EstaEnCurso || !pedido.EmpleadoId.HasValue)
@@ -149,7 +165,7 @@ namespace PickingApp.Controllers
                 return RedirectToAction(nameof(Asignar), new { id = pedidoId });
             }
 
-            var nuevoEmpleado = await _context.Empleados.FindAsync(nuevoEmpleadoId);
+            var nuevoEmpleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == nuevoEmpleadoId);
             if (nuevoEmpleado == null) return NotFound();
 
             var nombreEmpleadoAnterior = await _context.Empleados
@@ -159,19 +175,21 @@ namespace PickingApp.Controllers
 
             if (validacion.GeneraAdvertencia)
             {
-                NotificarAdvertenciaAsignacion(validacion, pedido, nuevoEmpleado, esReasignacion: true);
+                await NotificarAdvertenciaAsignacionAsync(validacion, pedido, nuevoEmpleado, esReasignacion: true);
             }
 
-            pedido.Reasignar(nuevoEmpleadoId, motivo, DateTime.Now.AddMinutes(await ObtenerMargenInicioAsync()),
+            pedido.Reasignar(nuevoEmpleadoId, motivo, DateTime.Now.AddMinutes(await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos)),
                 validacion.TiempoEstimadoMinutos, validacion.TiempoEstandarMinutos);
+            pedido.AsignadoPorId = User.IdUsuario();
 
             await _context.SaveChangesAsync();
+            await transaccion.CommitAsync();
 
             if (validacion.GeneraAdvertencia)
             {
                 await RegistrarAdvertenciaAsignacionAsync(validacion, pedido, esReasignacion: true);
             }
-            await _auditService.RegistrarAsync("Reasignar Pedido", "Pedidos", 
+            await _auditService.RegistrarAsync(AccionesLog.ReasignarPedido, "Pedidos", 
                 $"Pedido {pedido.CodigoPedido} reasignado de {nombreEmpleadoAnterior ?? "(sin empleado)"} a {nuevoEmpleado.NombreCompleto}. Estimado: {Formato.Duracion(validacion.TiempoEstimadoMinutos)}. Motivo: {motivo}");
 
             if (validacion.GeneraAdvertencia)
@@ -179,29 +197,31 @@ namespace PickingApp.Controllers
                 TempData["WarningMessage"] = validacion.MensajeAdvertencia;
             }
             TempData["SuccessMessage"] = $"Pedido '{pedido.CodigoPedido}' reasignado exitosamente a '{nuevoEmpleado.NombreCompleto}'.";
+            TempData["ImprimirPedido"] = true; // Detalle abre la orden impresa para el empleado
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 
-        // Minutos entre la asignación y el inicio efectivo del picking (parámetro MargenInicioMinutos)
-        private Task<int> ObtenerMargenInicioAsync() =>
-            ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos);
+        // RN-01-CU26: bloquea el pedido y el empleado (SELECT ... FOR UPDATE) hasta el commit. Una asignación simultánea
+        // sobre cualquiera de los dos espera y luego valida con lo ya guardado: ni el pedido queda con dos empleados
+        // ni el empleado con dos pedidos en curso. Siempre en el mismo orden (pedido, empleado) para no cruzar bloqueos.
+        private async Task<IDbContextTransaction> BloquearAsignacionAsync(int pedidoId, int empleadoId)
+        {
+            var transaccion = await _context.Database.BeginTransactionAsync();
+            await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT Id FROM Pedidos WHERE Id = {pedidoId} FOR UPDATE");
+            await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT Id FROM Empleados WHERE Id = {empleadoId} FOR UPDATE");
+            return transaccion;
+        }
 
         private const int MaxLongitudMotivoReasignacion = 250; // varchar(250) en Pedidos.MotivoReasignacion
 
         // CU-26 / CU-27: advertencia de experiencia (umbrales configurables); no bloquea la asignación.
         // La notificación se agrega antes del SaveChanges para guardarse junto con la asignación;
         // el LOG se escribe después, solo si la asignación quedó guardada.
-        private void NotificarAdvertenciaAsignacion(AsignacionValidationResult validacion, Pedido pedido, Empleado empleado, bool esReasignacion)
-        {
-            _context.Notificaciones.Add(new Notificacion
-            {
-                RolDestino = Roles.Administrador,
-                Titulo = "Alerta de Asignación de Picking",
-                Mensaje = $"El {User.DescripcionParaNotificacion()} {(esReasignacion ? "reasignó" : "asignó")} el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} ({validacion.MotivoAdvertencia}).",
-                Tipo = "Warning",
-                FechaCreacion = DateTime.Now
-            });
-        }
+        private Task NotificarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido, Empleado empleado, bool esReasignacion) =>
+            Avisos.AlRolAsync(_context, Roles.IdAdministrador,
+                "Alerta de Asignación de Picking",
+                $"El {User.DescripcionParaNotificacion()} {(esReasignacion ? "reasignó" : "asignó")} el pedido {pedido.CodigoPedido} al empleado {empleado.NombreCompleto} ({validacion.MotivoAdvertencia}).",
+                TiposNotificacion.Warning);
 
         private Task RegistrarAdvertenciaAsignacionAsync(AsignacionValidationResult validacion, Pedido pedido, bool esReasignacion) =>
             _auditService.RegistrarAsync("Advertencia de Asignación", "Pedidos",

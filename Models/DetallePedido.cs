@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Una línea del pedido: qué producto, cuántas unidades y de qué ubicación se recoge
     public class DetallePedido
     {
         [Key]
@@ -30,5 +31,14 @@ namespace PickingApp.Models
 
         [ForeignKey("UbicacionId")]
         public virtual Ubicacion? Ubicacion { get; set; }
+
+        // La misma línea con otra cantidad, para repartirla entre las partes de un pedido dividido
+        public DetallePedido Copia(int cantidad) => new()
+        {
+            CodigoProducto = CodigoProducto,
+            NombreProducto = NombreProducto,
+            Cantidad = cantidad,
+            UbicacionId = UbicacionId
+        };
     }
 }

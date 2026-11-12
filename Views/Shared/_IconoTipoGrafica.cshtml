@@ -1,0 +1,47 @@
+@model string
+@* Vista previa a color de un tipo de gráfica (doughnut, pie, bar, hbar, line, area).
+   La usan el menú de tipos del Dashboard y el reporte general de Reportes. *@
+@switch (Model)
+{
+    case "doughnut":
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+            <circle cx="16" cy="16" r="10" fill="none" stroke="#3B71CA" stroke-width="6" stroke-dasharray="34 63" transform="rotate(-90 16 16)" />
+            <circle cx="16" cy="16" r="10" fill="none" stroke="#EB7D26" stroke-width="6" stroke-dasharray="17 63" stroke-dashoffset="-35" transform="rotate(-90 16 16)" />
+            <circle cx="16" cy="16" r="10" fill="none" stroke="#52A447" stroke-width="6" stroke-dasharray="10 63" stroke-dashoffset="-53" transform="rotate(-90 16 16)" />
+        </svg>
+        break;
+    case "pie":
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M16 16V4a12 12 0 0 1 10.4 18z" fill="#3B71CA" />
+            <path d="M16 16l10.4 6A12 12 0 0 1 6.4 23.2z" fill="#EB7D26" />
+            <path d="M16 16L6.4 23.2A12 12 0 0 1 16 4z" fill="#52A447" />
+        </svg>
+        break;
+    case "bar":
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="5" y="14" width="6" height="13" rx="2" fill="#3B71CA" />
+            <rect x="13" y="6" width="6" height="21" rx="2" fill="#EB7D26" />
+            <rect x="21" y="18" width="6" height="9" rx="2" fill="#52A447" />
+        </svg>
+        break;
+    case "hbar":
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="5" y="5" width="14" height="6" rx="2" fill="#3B71CA" />
+            <rect x="5" y="13" width="22" height="6" rx="2" fill="#EB7D26" />
+            <rect x="5" y="21" width="9" height="6" rx="2" fill="#52A447" />
+        </svg>
+        break;
+    case "line":
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 23l7-8 6 4 11-12" fill="none" stroke="#3B71CA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="11" cy="15" r="2.4" fill="#3B71CA" />
+            <circle cx="17" cy="19" r="2.4" fill="#3B71CA" />
+        </svg>
+        break;
+    case "area":
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 27V21l7-8 6 4 11-11v21z" fill="#3B71CA" fill-opacity="0.28" />
+            <path d="M4 21l7-8 6 4 11-11" fill="none" stroke="#3B71CA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        break;
+}

@@ -1,19 +1,27 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
 
 namespace PickingApp.Services
 {
+    // Envía por SMTP los códigos de verificación de 6 dígitos (recuperar y cambiar contraseña, verificar el correo)
     public class EmailService : IEmailService
     {
-        private readonly IConfiguration _configuration;
+        private const string LogoContentId = "logo-pickflow";
 
-        public EmailService(IConfiguration configuration)
+        private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _env;
+
+        public EmailService(IConfiguration configuration, IWebHostEnvironment env)
         {
             _configuration = configuration;
+            _env = env;
         }
 
-        public async Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo)
+        public async Task EnviarCodigoVerificacionAsync(string destinatarioEmail, string nombreDestinatario, string codigo, PropositoCodigo proposito)
         {
+            // Servidor, puerto y cuenta remitente se leen de appsettings.json → EmailSettings
             var host = _configuration["EmailSettings:SmtpHost"];
             var portConfig = _configuration["EmailSettings:SmtpPort"];
             var senderEmail = _configuration["EmailSettings:SenderEmail"];
@@ -27,24 +35,62 @@ namespace PickingApp.Services
 
             var port = int.Parse(portConfig ?? "587");
 
+            var (titulo, intro) = proposito switch
+            {
+                PropositoCodigo.CambiarContrasena => ("Confirma el cambio de contraseña",
+                    "Pediste cambiar la contraseña de tu cuenta. Para aplicar la nueva, confirma con este código."),
+                PropositoCodigo.VerificarCorreo => ("Verifica tu correo",
+                    "Es la primera vez que inicias sesión en PickFlow con esta cuenta. Para activarla, confirma con este código que el correo es tuyo."),
+                _ => ("Recupera tu contraseña",
+                    "Recibimos una solicitud para restablecer la contraseña de tu cuenta. Usa este código para crear una nueva.")
+            };
+
+            var plantilla = await File.ReadAllTextAsync(Path.Combine(_env.ContentRootPath, "Plantillas", "CorreoCodigoVerificacion.html"));
+            var html = ConstruirHtml(plantilla, titulo, intro, nombreDestinatario, codigo, destinatarioEmail, DateTime.Now);
+
+            // EnableSsl cifra la conexión con el servidor de correo (puerto 587 con STARTTLS)
             using var client = new SmtpClient(host, port)
             {
                 Credentials = new NetworkCredential(senderEmail, senderPassword),
                 EnableSsl = true
             };
 
+            // Sin Body: el único contenido es la vista HTML con el logo de abajo
             using var mensaje = new MailMessage
             {
                 From = new MailAddress(senderEmail, senderName),
-                Subject = "Código de verificación - PickFlow",
-                Body = $"Hola {nombreDestinatario},\n\n" +
-                       $"Tu código de verificación es: {codigo}\n\n" +
-                       "Este código es válido por 10 minutos. Si no solicitaste este código, ignora este mensaje.",
-                IsBodyHtml = false
+                Subject = $"{titulo} - PickFlow"
             };
             mensaje.To.Add(destinatarioEmail);
 
+            // El logo va embebido (cid:) porque Gmail bloquea imágenes en data: y rutas locales
+            var vistaHtml = AlternateView.CreateAlternateViewFromString(html, System.Text.Encoding.UTF8, MediaTypeNames.Text.Html);
+            // Versión blanca y naranja con fondo transparente, para el encabezado azul de la plantilla
+            var logo = new LinkedResource(new MemoryStream(Convert.FromBase64String(LogoCorreo.Base64)), MediaTypeNames.Image.Png)
+            {
+                ContentId = LogoContentId
+            };
+            // Sin nombre, Gmail muestra el logo en la bandeja como un adjunto "noname"
+            logo.ContentType.Name = "pickflow-logo.png";
+            vistaHtml.LinkedResources.Add(logo);
+            mensaje.AlternateViews.Add(vistaHtml);
+
             await client.SendMailAsync(mensaje);
+        }
+
+        // Rellena los marcadores {{...}} de la plantilla; todo dato se codifica para que un nombre con HTML no se inyecte en el correo
+        public static string ConstruirHtml(string plantilla, string titulo, string intro, string nombre, string codigo, string correo, DateTime fecha)
+        {
+            string C(string valor) => WebUtility.HtmlEncode(valor);
+
+            return plantilla
+                .Replace("{{TITULO}}", C(titulo))
+                .Replace("{{INTRO}}", C(intro))
+                .Replace("{{NOMBRE}}", C(nombre))
+                .Replace("{{CODIGO}}", C(codigo))
+                .Replace("{{CORREO}}", C(correo))
+                .Replace("{{FECHA}}", C(fecha.ToString("dd/MM/yyyy h:mm tt", new CultureInfo("es-CO"))))
+                .Replace("{{ANIO}}", fecha.Year.ToString(CultureInfo.InvariantCulture));
         }
     }
 }

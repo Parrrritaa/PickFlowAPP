@@ -1,7 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Cada clase de Models es una tabla de MySQL y cada propiedad una columna.
+    // Los atributos validan los formularios y definen la columna: [Required] = NOT NULL,
+    // [StringLength(100)] = VARCHAR(100), [Key] = llave primaria autoincremental.
     public class Usuario
     {
         [Key]
@@ -21,17 +25,41 @@ namespace PickingApp.Models
         [StringLength(100)]
         public string Correo { get; set; } = string.Empty;
 
+        // Solo se guarda el hash BCrypt de la contraseña (se genera con BCrypt.HashPassword)
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
 
+        // Viaja en la cookie de sesión; al cambiar la contraseña se renueva y las sesiones abiertas dejan de valer.
         [Required]
-        [StringLength(30)]
-        public string Rol { get; set; } = Roles.Auxiliar; // Valores en Roles
+        [StringLength(36)]
+        public string SelloSeguridad { get; set; } = Guid.NewGuid().ToString();
+
+        public void EstablecerPasswordHash(string hash)
+        {
+            PasswordHash = hash;
+            SelloSeguridad = Guid.NewGuid().ToString();
+        }
 
         [Required]
-        [StringLength(20)]
+        public int RolId { get; set; } = Roles.IdAuxiliar;
+
+        // Se carga siempre junto con el usuario (AutoInclude en ApplicationDbContext)
+        [ForeignKey("RolId")]
+        public virtual Rol? Rol { get; set; }
+
+        [NotMapped]
+        public string NombreRol => Rol?.Nombre ?? string.Empty;
+
+        // Supervisor y Auxiliar trabajan en una sola bodega; el Administrador no tiene (ve todas).
+        public int? BodegaId { get; set; }
+
+        [ForeignKey("BodegaId")]
+        public virtual Bodega? Bodega { get; set; }
+
+        [Required]
         public string Estado { get; set; } = EstadosUsuario.Activo; // Valores en EstadosUsuario
 
+        // Se suma en cada login fallido; al llegar al máximo configurado la cuenta queda Bloqueada
         public int IntentosFallidos { get; set; } = 0;
 
         public DateTime? FechaBloqueo { get; set; }
@@ -40,9 +68,9 @@ namespace PickingApp.Models
 
         public DateTime? UltimoAcceso { get; set; }
 
-        // Código de verificación (6 dígitos) enviado por correo para recuperar u confirmar el cambio de contraseña.
-        [StringLength(6)]
-        public string? CodigoVerificacion { get; set; }
+        // Hash BCrypt del código de 6 dígitos enviado por correo para recuperar o confirmar el cambio de contraseña.
+        [StringLength(60)]
+        public string? CodigoVerificacionHash { get; set; }
 
         public DateTime? CodigoVerificacionExpira { get; set; }
 
@@ -51,5 +79,9 @@ namespace PickingApp.Models
 
         // Hash de la nueva contraseña, pendiente de confirmar el código enviado al correo (CU-42).
         public string? PasswordPendienteHash { get; set; }
+
+        // Un usuario nuevo queda sin verificar hasta escribir el código que se le envía al correo la primera vez que
+        // inicia sesión (AccountController.VerificarCorreo). Por defecto true para las cuentas anteriores a esta regla y las del seed.
+        public bool CorreoVerificado { get; set; } = true;
     }
 }

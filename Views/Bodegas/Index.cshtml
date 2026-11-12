@@ -1,37 +1,43 @@
-@model IEnumerable<PickingApp.Models.Bodega>
+@model PickingApp.Models.ViewModels.BodegasIndexViewModel
 @{
     ViewData["Title"] = "Bodegas y ubicaciones";
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
-    var filtroEstado = ViewBag.FiltroEstado as string;
-    var busquedaProducto = ViewBag.BusquedaProducto as string;
-    var resultadosProducto = ViewBag.ResultadosProducto as List<PickingApp.Models.Ubicacion>;
-    var ubicacionesPorBodega = ViewBag.UbicacionesPorBodega as Dictionary<int, int> ?? new Dictionary<int, int>();
+    var bodegas = Model.Bodegas;
+    var filtroEstado = Model.FiltroEstado;
+    var busquedaProducto = Model.BusquedaProducto;
+    var resultadosProducto = Model.ResultadosProducto;
+    var ubicacionesPorBodega = Model.UbicacionesPorBodega;
     var activoEstado = !string.IsNullOrEmpty(filtroEstado);
     var hayBusquedaProducto = !string.IsNullOrWhiteSpace(busquedaProducto);
 }
 
 <h1 class="pf-page-title">Bodegas y ubicaciones</h1>
 
-<div class="mockup-card mb-4">
-    <h4 class="fw-bold mb-3" style="color: #1F2937;">Buscar producto</h4>
-    <p class="pf-seccion-desc small mb-3">Busca un producto por código o nombre para saber en qué bodega está y qué ubicación tiene.</p>
-    <form method="get" asp-action="Index" class="d-flex gap-2 flex-wrap">
-        @if (activoEstado)
-        {
-            <input type="hidden" name="estado" value="@filtroEstado" />
-        }
-        <input type="text" name="busquedaProducto" value="@busquedaProducto" class="form-control" style="max-width: 320px;" placeholder="Código o nombre del producto..." />
-        <button type="submit" class="btn-pf-blue">Buscar</button>
-        @if (hayBusquedaProducto)
-        {
-            <a asp-action="Index" asp-route-estado="@filtroEstado" class="btn-pf-gray">Limpiar búsqueda</a>
-        }
-    </form>
+@* Título y buscador en una sola fila, para que la lista de bodegas se vea sin desplazarse *@
+<div class="pf-card mb-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+            <h4 class="fw-bold mb-1" style="color: var(--pf-ink);">Buscar producto</h4>
+            <p class="pf-seccion-desc small mb-0">Busca un producto por código o nombre para saber en qué bodega está y qué ubicación tiene.</p>
+        </div>
+        <form method="get" asp-action="Index" class="d-flex gap-2 flex-wrap">
+            @if (activoEstado)
+            {
+                <input type="hidden" name="estado" value="@filtroEstado" />
+            }
+            <input type="text" name="busquedaProducto" value="@busquedaProducto" class="form-control" style="width: 320px; max-width: 100%;" placeholder="Código o nombre del producto..." />
+            <button type="submit" class="btn-pf-blue">Buscar</button>
+            @if (hayBusquedaProducto)
+            {
+                <a asp-action="Index" asp-route-estado="@filtroEstado" class="btn-pf-gray">Limpiar búsqueda</a>
+            }
+        </form>
+    </div>
 
     @if (hayBusquedaProducto)
     {
         <div class="table-responsive mt-4">
-            <table class="mockup-table">
+            <table class="pf-table" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>Producto</th>
@@ -72,15 +78,23 @@
     }
 </div>
 
-<div class="mockup-card">
+<div class="pf-card">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <h4 class="fw-bold mb-0" style="color: #1F2937;">Bodegas registradas</h4>
-        @if (userRole == Roles.Administrador)
-        {
-            <a asp-action="Crear" class="btn-pf-blue">
-                + Crear bodega
-            </a>
-        }
+        <h4 class="fw-bold mb-0" style="color: var(--pf-ink);">Bodegas registradas</h4>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            @if (bodegas.Any())
+            {
+                @* Filtra la tabla al escribir (site.js, data-pf-buscar-en); el estado se sigue filtrando en la columna *@
+                <label class="visually-hidden" for="buscarBodega">Buscar bodega</label>
+                <input type="search" id="buscarBodega" class="pf-search-input" placeholder="Buscar nombre o código..." data-pf-buscar-en="tablaBodegas" autocomplete="off" />
+            }
+            @if (userRole == Roles.Administrador)
+            {
+                <a asp-action="Crear" class="btn-pf-blue">
+                    + Crear bodega
+                </a>
+            }
+        </div>
     </div>
 
     <form method="get" asp-action="Index" id="formFiltrosBodegas">
@@ -89,7 +103,7 @@
             <input type="hidden" name="busquedaProducto" value="@busquedaProducto" />
         }
         <div class="table-responsive">
-            <table class="mockup-table">
+            <table class="pf-table" id="tablaBodegas" data-pf-paginar>
                 <thead>
                     <tr>
                         <th>Bodega</th>
@@ -120,9 +134,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (Model != null && Model.Any())
+                    @if (bodegas.Any())
                     {
-                        @foreach (var b in Model)
+                        @foreach (var b in bodegas)
                         {
                             var ubicacionesCount = ubicacionesPorBodega.GetValueOrDefault(b.Id);
                             var estadoText = b.Activa ? "Activa" : "Inactiva";
@@ -136,7 +150,7 @@
                                 <td>@estadoText</td>
                                 <td class="text-center">
                                     <div class="d-flex justify-content-center gap-2 flex-wrap">
-                                        <a asp-action="Detalle" asp-route-id="@b.Id" class="btn-pf-blue" style="padding: 4px 18px; font-size: 14px;">
+                                        <a asp-action="Detalle" asp-route-id="@b.Id" class="btn-pf-blue" data-fila-abre style="padding: 4px 18px; font-size: 14px;">
                                             Ver ubicaciones
                                         </a>
                                         @if (userRole == Roles.Administrador)
@@ -163,6 +177,9 @@
                             </td>
                         </tr>
                     }
+                    <tr class="d-none" data-pf-sin-resultados>
+                        <td colspan="4" class="text-center text-muted py-4">Ninguna bodega coincide con la búsqueda.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -183,13 +200,13 @@
                     </div>
                     <div class="modal-body">
                         <p>Bodega: <strong id="eliminarBodegaNombre"></strong></p>
-                        <div class="mockup-alert-warning mt-0 mb-0">
+                        <div class="pf-alert-warning mt-0 mb-0">
                             Solo se puede eliminar si no tiene ubicaciones ni pedidos asociados.
                         </div>
                     </div>
                     <div class="modal-footer border-0">
                         <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn-pf-blue" style="background-color: #DC2626;">Confirmar</button>
+                        <button type="submit" class="btn-pf-red">Confirmar</button>
                     </div>
                 </form>
             </div>

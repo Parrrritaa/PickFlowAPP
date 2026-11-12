@@ -1,0 +1,29 @@
+@model List<PickingApp.Services.PeriodoBodega>
+@* Fechas en cada bodega; sin traslados no se muestra nada *@
+@if (Model.Any())
+{
+    <div class="pf-card mb-4">
+        <h4 class="fw-bold mb-3" style="color: var(--pf-ink);">Paso por bodegas</h4>
+        <div class="table-responsive">
+            <table class="pf-table">
+                <thead>
+                    <tr>
+                        <th>Bodega</th>
+                        <th>Desde</th>
+                        <th>Hasta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var periodo in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@periodo.Bodega</td>
+                            <td>@(periodo.Desde?.ToString("dd/MM/yyyy") ?? "-")</td>
+                            <td>@(periodo.Hasta?.ToString("dd/MM/yyyy") ?? "Actualmente")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

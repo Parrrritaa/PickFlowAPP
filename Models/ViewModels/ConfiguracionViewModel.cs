@@ -5,5 +5,12 @@ namespace PickingApp.Models.ViewModels
     {
         public bool LogHabilitado { get; init; }
         public IReadOnlyDictionary<string, double> Valores { get; init; } = new Dictionary<string, double>();
+
+        // Para el botón "Borrar historial de pedidos"
+        public int TotalPedidos { get; init; }
+        public int PedidosEnCurso { get; init; }
+
+        // Para el botón "Cargar datos de demostración": null si se puede usar; si no, por qué no
+        public string? MotivoSinDemostracion { get; init; }
     }
 }

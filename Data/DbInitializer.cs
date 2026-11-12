@@ -5,10 +5,15 @@ using PickingApp.Services;
 
 namespace PickingApp.Data
 {
+    // Se ejecuta una vez al arrancar la aplicación (Program.cs). Cada bloque solo inserta datos
+    // si la tabla está vacía, así que reiniciar la aplicación no duplica nada.
     public static class DbInitializer
     {
-        public static async Task SeedAsync(ApplicationDbContext context)
+        // datosDeEjemplo: bodegas, ubicaciones y empleados de prueba; solo en Development, para que una
+        // instalación real empiece vacía en lugar de con registros inventados que parecen reales
+        public static async Task SeedAsync(ApplicationDbContext context, bool datosDeEjemplo)
         {
+            // Crea la base de datos si no existe y aplica las migraciones pendientes de la carpeta Migrations
             await context.Database.MigrateAsync();
 
             // 1. Configuraciones del Sistema (RNF-06, RNF-07)
@@ -32,9 +37,10 @@ namespace PickingApp.Data
                         NombreCompleto = "Jonathan Romero (Admin)",
                         Correo = "admin@pickingapp.com",
                         Identificacion = "1000000001",
+                        // La contraseña se guarda como hash BCrypt, nunca en texto plano
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123*"),
-                        Rol = "Administrador",
-                        Estado = "Activo",
+                        RolId = Roles.IdAdministrador,
+                        Estado = EstadosUsuario.Activo,
                         IntentosFallidos = 0,
                         FechaRegistro = DateTime.Now
                     },
@@ -44,8 +50,8 @@ namespace PickingApp.Data
                         Correo = "supervisor@pickingapp.com",
                         Identificacion = "1000000002",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super123*"),
-                        Rol = "Supervisor",
-                        Estado = "Activo",
+                        RolId = Roles.IdSupervisor,
+                        Estado = EstadosUsuario.Activo,
                         IntentosFallidos = 0,
                         FechaRegistro = DateTime.Now
                     },
@@ -55,8 +61,8 @@ namespace PickingApp.Data
                         Correo = "auxiliar@pickingapp.com",
                         Identificacion = "1000000003",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Aux123*"),
-                        Rol = "Auxiliar",
-                        Estado = "Activo",
+                        RolId = Roles.IdAuxiliar,
+                        Estado = EstadosUsuario.Activo,
                         IntentosFallidos = 0,
                         FechaRegistro = DateTime.Now
                     }
@@ -64,6 +70,8 @@ namespace PickingApp.Data
                 await context.Usuarios.AddRangeAsync(usuarios);
                 await context.SaveChangesAsync();
             }
+
+            if (!datosDeEjemplo) return;
 
             // 3. Bodegas Iniciales (CU-18)
             if (!await context.Bodegas.AnyAsync())
@@ -85,26 +93,34 @@ namespace PickingApp.Data
                     FechaCreacion = DateTime.Now
                 };
 
+                // Se guarda antes de crear las ubicaciones: MySQL asigna el Id de cada bodega en el INSERT
                 await context.Bodegas.AddRangeAsync(bodegaPrincipal, bodegaSecundaria);
                 await context.SaveChangesAsync();
 
-                // 4. Ubicaciones Iniciales (CU-19)
+                // 4. Ubicaciones Iniciales (CU-19). Mismas reglas que el formulario: pasillo, estante y nivel
+                // solo con números, y el código con el formato que genera BodegasController (PASXX-ESTXX-NIVXX)
                 var ubicaciones = new List<Ubicacion>
                 {
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-01-EST-01-NIV-01", Pasillo = "P01", Estante = "E01", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-01-EST-01-NIV-02", Pasillo = "P01", Estante = "E01", Nivel = "N02", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-01-EST-02-NIV-01", Pasillo = "P01", Estante = "E02", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-02-EST-01-NIV-01", Pasillo = "P02", Estante = "E01", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS-02-EST-02-NIV-01", Pasillo = "P02", Estante = "E02", Nivel = "N01", Activa = true },
-                    new Ubicacion { BodegaId = bodegaSecundaria.Id, CodigoUbicacion = "PAS-A-EST-01-NIV-01", Pasillo = "PA", Estante = "E01", Nivel = "N01", Activa = true }
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS01-EST01-NIV01", Pasillo = "1", Estante = "1", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS01-EST01-NIV02", Pasillo = "1", Estante = "1", Nivel = "2", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS01-EST02-NIV01", Pasillo = "1", Estante = "2", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS02-EST01-NIV01", Pasillo = "2", Estante = "1", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaPrincipal.Id, CodigoUbicacion = "PAS02-EST02-NIV01", Pasillo = "2", Estante = "2", Nivel = "1", Activa = true },
+                    new Ubicacion { BodegaId = bodegaSecundaria.Id, CodigoUbicacion = "PAS01-EST01-NIV01", Pasillo = "1", Estante = "1", Nivel = "1", Activa = true }
                 };
                 await context.Ubicaciones.AddRangeAsync(ubicaciones);
+
+                // El supervisor y el auxiliar de prueba trabajan en la bodega principal
+                await context.Usuarios.Where(u => u.RolId != Roles.IdAdministrador && u.BodegaId == null)
+                    .ForEachAsync(u => u.BodegaId = bodegaPrincipal.Id);
                 await context.SaveChangesAsync();
             }
 
             // 5. Empleados de Prueba con distinta experiencia y turnos (CU-06)
             if (!await context.Empleados.AnyAsync())
             {
+                // Dos en la primera bodega y uno en la última, para probar que cada bodega ve solo a su personal
+                var bodegas = await context.Bodegas.OrderBy(b => b.Id).Select(b => (int?)b.Id).ToListAsync();
                 var empleados = new List<Empleado>
                 {
                     new Empleado
@@ -115,7 +131,8 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddYears(-2), // 24 meses experiencia (> 6 meses)
-                        Activo = true
+                        Activo = true,
+                        BodegaId = bodegas.FirstOrDefault()
                     },
                     new Empleado
                     {
@@ -125,7 +142,8 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(8, 0, 0),
                         HorarioSalida = new TimeSpan(17, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-3), // 3 meses experiencia (< 6 meses -> generará advertencia si pedido > 10 ubicaciones)
-                        Activo = true
+                        Activo = true,
+                        BodegaId = bodegas.FirstOrDefault()
                     },
                     new Empleado
                     {
@@ -135,7 +153,8 @@ namespace PickingApp.Data
                         HorarioEntrada = new TimeSpan(14, 0, 0),
                         HorarioSalida = new TimeSpan(22, 0, 0),
                         FechaIngreso = DateTime.Today.AddMonths(-10), // 10 meses experiencia
-                        Activo = true
+                        Activo = true,
+                        BodegaId = bodegas.LastOrDefault()
                     }
                 };
                 await context.Empleados.AddRangeAsync(empleados);

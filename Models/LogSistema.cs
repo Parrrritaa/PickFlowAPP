@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PickingApp.Models
 {
+    // Registro de auditoría: cada acción importante guarda una fila aquí mediante AuditService
     public class LogSistema
     {
         [Key]
@@ -46,7 +47,7 @@ namespace PickingApp.Models
         {
             get
             {
-                var rol = Rol is Roles.Administrador or Roles.Supervisor or Roles.Auxiliar ? Rol : UsuarioAsociado?.Rol;
+                var rol = Rol is Roles.Administrador or Roles.Supervisor or Roles.Auxiliar ? Rol : UsuarioAsociado?.NombreRol;
 
                 if (UsuarioAsociado != null)
                     return rol != null ? $"{UsuarioAsociado.NombreCompleto} ({rol})" : UsuarioAsociado.NombreCompleto;

@@ -196,6 +196,9 @@ namespace PickingApp.Migrations
                     b.Property<bool>("Activo")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<int?>("BodegaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Correo")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
@@ -223,6 +226,8 @@ namespace PickingApp.Migrations
                         .HasColumnType("varchar(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BodegaId");
 
                     b.HasIndex("Identificacion")
                         .IsUnique();
@@ -274,6 +279,8 @@ namespace PickingApp.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FechaHora");
+
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("LogsSistema");
@@ -302,21 +309,16 @@ namespace PickingApp.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
-                    b.Property<string>("RolDestino")
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
                     b.Property<string>("Tipo")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("enum('Info','Warning','Success','Danger')");
 
                     b.Property<string>("Titulo")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)");
 
-                    b.Property<int?>("UsuarioDestinoId")
+                    b.Property<int>("UsuarioDestinoId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -364,16 +366,253 @@ namespace PickingApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<int?>("RegistradoPorId")
+                        .HasColumnType("int");
+
                     b.Property<string>("TipoNovedad")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasColumnType("enum('Faltante','Avería','Ubicación Incorrecta','Diferencia Cantidad','Otro','No disponible')");
 
                     b.HasKey("Id");
 
                     b.HasIndex("PedidoId");
 
+                    b.HasIndex("RegistradoPorId");
+
                     b.ToTable("NovedadesPedido");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.ObservacionSolicitud", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasColumnType("enum('Aprobar','Rechazar')");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int>("TipoSolicitudId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TipoSolicitudId", "Decision", "Texto")
+                        .IsUnique();
+
+                    b.ToTable("ObservacionesSolicitud", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Identificación duplicada",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Datos incompletos o incorrectos",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "No se requiere personal adicional",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Datos verificados",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Incorporación autorizada",
+                            TipoSolicitudId = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Los cambios no están justificados",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Datos incorrectos",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Afecta pedidos en curso",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Cambios verificados",
+                            TipoSolicitudId = 2
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Motivo insuficiente",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Tiene pedidos en curso",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Requiere revisión con Recursos Humanos",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Inactivación justificada",
+                            TipoSolicitudId = 3
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Ubicación en uso por pedidos activos",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Datos de ubicación incorrectos",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 16,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "El producto no corresponde",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 17,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Cambios verificados",
+                            TipoSolicitudId = 4
+                        },
+                        new
+                        {
+                            Id = 18,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Ubicación en uso",
+                            TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 19,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Tiene producto asignado",
+                            TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 20,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Se recomienda inactivar en vez de eliminar",
+                            TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 21,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Eliminación verificada",
+                            TipoSolicitudId = 5
+                        },
+                        new
+                        {
+                            Id = 1001,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Motivo insuficiente",
+                            TipoSolicitudId = 6
+                        },
+                        new
+                        {
+                            Id = 1002,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "La bodega de destino no requiere personal",
+                            TipoSolicitudId = 6
+                        },
+                        new
+                        {
+                            Id = 1003,
+                            Activa = true,
+                            Decision = "Rechazar",
+                            Texto = "Se necesita en la bodega actual",
+                            TipoSolicitudId = 6
+                        },
+                        new
+                        {
+                            Id = 1004,
+                            Activa = true,
+                            Decision = "Aprobar",
+                            Texto = "Traslado autorizado",
+                            TipoSolicitudId = 6
+                        });
                 });
 
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>
@@ -383,6 +622,9 @@ namespace PickingApp.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AsignadoPorId")
+                        .HasColumnType("int");
 
                     b.Property<int>("BodegaId")
                         .HasColumnType("int");
@@ -400,8 +642,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("Estado")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
+                        .HasColumnType("enum('Pendiente','Asignado','Reasignado','Completado','Cancelado','Dividido')");
 
                     b.Property<DateTime?>("FechaAsignacion")
                         .HasColumnType("datetime(6)");
@@ -431,8 +672,7 @@ namespace PickingApp.Migrations
 
                     b.Property<string>("Prioridad")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("enum('Alta','Media','Baja')");
 
                     b.Property<double?>("TiempoEstandarMinutos")
                         .HasColumnType("double");
@@ -445,14 +685,14 @@ namespace PickingApp.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BodegaId");
-
-                    b.HasIndex("CodigoPedido")
-                        .IsUnique();
+                    b.HasIndex("AsignadoPorId");
 
                     b.HasIndex("EmpleadoId");
 
                     b.HasIndex("PedidoPadreId");
+
+                    b.HasIndex("BodegaId", "CodigoPedido")
+                        .IsUnique();
 
                     b.ToTable("Pedidos");
                 });
@@ -491,6 +731,44 @@ namespace PickingApp.Migrations
                     b.ToTable("Productos");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.Rol", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Nombre = "Administrador"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Nombre = "Supervisor"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Nombre = "Auxiliar"
+                        });
+                });
+
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
                     b.Property<int>("Id")
@@ -499,14 +777,16 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BodegaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("DatosJson")
                         .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("Estado")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
+                        .HasColumnType("enum('Pendiente','Aprobada','Rechazada')");
 
                     b.Property<DateTime?>("FechaRespuesta")
                         .HasColumnType("datetime(6)");
@@ -514,14 +794,15 @@ namespace PickingApp.Migrations
                     b.Property<DateTime>("FechaSolicitud")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("MotivoRechazo")
+                    b.Property<int?>("ObservacionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ObservacionRespuesta")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
-                    b.Property<string>("TipoSolicitud")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                    b.Property<int>("TipoSolicitudId")
+                        .HasColumnType("int");
 
                     b.Property<int?>("UsuarioRespondeId")
                         .HasColumnType("int");
@@ -531,11 +812,106 @@ namespace PickingApp.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BodegaId");
+
+                    b.HasIndex("ObservacionId");
+
+                    b.HasIndex("TipoSolicitudId");
+
                     b.HasIndex("UsuarioRespondeId");
 
                     b.HasIndex("UsuarioSolicitanteId");
 
                     b.ToTable("Solicitudes");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.TipoSolicitud", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("TiposSolicitud", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Nombre = "Registro de empleado"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Nombre = "Editar empleado"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Nombre = "Inactivar empleado"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Nombre = "Editar ubicación"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Nombre = "Eliminar ubicación"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Nombre = "Trasladar de bodega"
+                        });
+                });
+
+            modelBuilder.Entity("PickingApp.Models.TrasladoPersonal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BodegaDestinoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BodegaOrigenId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("EmpleadoId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BodegaDestinoId");
+
+                    b.HasIndex("BodegaOrigenId");
+
+                    b.HasIndex("EmpleadoId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("TrasladosPersonal");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Ubicacion", b =>
@@ -592,22 +968,27 @@ namespace PickingApp.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("CodigoVerificacion")
-                        .HasMaxLength(6)
-                        .HasColumnType("varchar(6)");
+                    b.Property<int?>("BodegaId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("CodigoVerificacionExpira")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CodigoVerificacionHash")
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
 
                     b.Property<string>("Correo")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<bool>("CorreoVerificado")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Estado")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("enum('Activo','Inactivo','Bloqueado')");
 
                     b.Property<DateTime?>("FechaBloqueo")
                         .HasColumnType("datetime(6)");
@@ -637,18 +1018,28 @@ namespace PickingApp.Migrations
                     b.Property<string>("PasswordPendienteHash")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Rol")
+                    b.Property<int>("RolId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SelloSeguridad")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
+                        .HasMaxLength(36)
+                        .HasColumnType("varchar(36)");
 
                     b.Property<DateTime?>("UltimoAcceso")
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BodegaId");
+
                     b.HasIndex("Correo")
                         .IsUnique();
+
+                    b.HasIndex("Identificacion")
+                        .IsUnique();
+
+                    b.HasIndex("RolId");
 
                     b.ToTable("Usuarios");
                 });
@@ -672,6 +1063,16 @@ namespace PickingApp.Migrations
                     b.Navigation("Ubicacion");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.Empleado", b =>
+                {
+                    b.HasOne("PickingApp.Models.Bodega", "Bodega")
+                        .WithMany()
+                        .HasForeignKey("BodegaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Bodega");
+                });
+
             modelBuilder.Entity("PickingApp.Models.LogSistema", b =>
                 {
                     b.HasOne("PickingApp.Models.Usuario", "UsuarioAsociado")
@@ -687,7 +1088,8 @@ namespace PickingApp.Migrations
                     b.HasOne("PickingApp.Models.Usuario", "UsuarioDestino")
                         .WithMany()
                         .HasForeignKey("UsuarioDestinoId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("UsuarioDestino");
                 });
@@ -700,11 +1102,32 @@ namespace PickingApp.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("PickingApp.Models.Usuario", null)
+                        .WithMany()
+                        .HasForeignKey("RegistradoPorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Pedido");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.ObservacionSolicitud", b =>
+                {
+                    b.HasOne("PickingApp.Models.TipoSolicitud", "TipoSolicitud")
+                        .WithMany()
+                        .HasForeignKey("TipoSolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TipoSolicitud");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>
                 {
+                    b.HasOne("PickingApp.Models.Usuario", "AsignadoPor")
+                        .WithMany()
+                        .HasForeignKey("AsignadoPorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PickingApp.Models.Bodega", "Bodega")
                         .WithMany("Pedidos")
                         .HasForeignKey("BodegaId")
@@ -720,6 +1143,8 @@ namespace PickingApp.Migrations
                         .WithMany("Partes")
                         .HasForeignKey("PedidoPadreId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AsignadoPor");
 
                     b.Navigation("Bodega");
 
@@ -740,6 +1165,22 @@ namespace PickingApp.Migrations
 
             modelBuilder.Entity("PickingApp.Models.Solicitud", b =>
                 {
+                    b.HasOne("PickingApp.Models.Bodega", "Bodega")
+                        .WithMany()
+                        .HasForeignKey("BodegaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PickingApp.Models.ObservacionSolicitud", "Observacion")
+                        .WithMany()
+                        .HasForeignKey("ObservacionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PickingApp.Models.TipoSolicitud", "TipoSolicitud")
+                        .WithMany()
+                        .HasForeignKey("TipoSolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("PickingApp.Models.Usuario", "UsuarioResponde")
                         .WithMany()
                         .HasForeignKey("UsuarioRespondeId")
@@ -751,9 +1192,46 @@ namespace PickingApp.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Bodega");
+
+                    b.Navigation("Observacion");
+
+                    b.Navigation("TipoSolicitud");
+
                     b.Navigation("UsuarioResponde");
 
                     b.Navigation("UsuarioSolicitante");
+                });
+
+            modelBuilder.Entity("PickingApp.Models.TrasladoPersonal", b =>
+                {
+                    b.HasOne("PickingApp.Models.Bodega", "BodegaDestino")
+                        .WithMany()
+                        .HasForeignKey("BodegaDestinoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PickingApp.Models.Bodega", "BodegaOrigen")
+                        .WithMany()
+                        .HasForeignKey("BodegaOrigenId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PickingApp.Models.Empleado", "Empleado")
+                        .WithMany("Traslados")
+                        .HasForeignKey("EmpleadoId");
+
+                    b.HasOne("PickingApp.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId");
+
+                    b.Navigation("BodegaDestino");
+
+                    b.Navigation("BodegaOrigen");
+
+                    b.Navigation("Empleado");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Ubicacion", b =>
@@ -774,6 +1252,24 @@ namespace PickingApp.Migrations
                     b.Navigation("Producto");
                 });
 
+            modelBuilder.Entity("PickingApp.Models.Usuario", b =>
+                {
+                    b.HasOne("PickingApp.Models.Bodega", "Bodega")
+                        .WithMany()
+                        .HasForeignKey("BodegaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PickingApp.Models.Rol", "Rol")
+                        .WithMany()
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Bodega");
+
+                    b.Navigation("Rol");
+                });
+
             modelBuilder.Entity("PickingApp.Models.Bodega", b =>
                 {
                     b.Navigation("Pedidos");
@@ -789,6 +1285,8 @@ namespace PickingApp.Migrations
             modelBuilder.Entity("PickingApp.Models.Empleado", b =>
                 {
                     b.Navigation("PedidosAsignados");
+
+                    b.Navigation("Traslados");
                 });
 
             modelBuilder.Entity("PickingApp.Models.Pedido", b =>

@@ -1,29 +1,27 @@
-@model PickingApp.Models.ViewModels.SolicitarCodigoViewModel
+﻿@model PickingApp.Models.ViewModels.SolicitarCodigoViewModel
 @{
     ViewData["Title"] = "Recuperar contraseña";
     Layout = "_LayoutLogin";
 }
 
-<div class="pf-login-card">
-    <div class="text-center mb-4">
-        <h3 class="fw-bold" style="color: #00204A;">Recuperar contraseña</h3>
-        <p class="text-muted small">Ingresa tu correo y te enviaremos un código de verificación para restablecer tu contraseña</p>
-    </div>
+<main class="pf-login-card">
+    <h1 class="pf-login-titulo">Recuperar contraseña</h1>
+    <p class="pf-login-sub">Escribe tu correo y te enviaremos un código para crear una contraseña nueva.</p>
 
     <form asp-action="SolicitarRecuperacion" method="post">
         @Html.AntiForgeryToken()
 
-        <div class="mb-3 text-start">
-            <input asp-for="Correo" class="pf-login-input" placeholder="Correo electrónico" required />
-            <span asp-validation-for="Correo" class="text-danger small"></span>
+        <label asp-for="Correo" class="pf-login-etiqueta">Correo</label>
+        <div class="pf-login-campo">
+            <span class="pf-login-campo-ico"><partial name="_Icono" model='"correo"' /></span>
+            <input asp-for="Correo" class="pf-login-input" placeholder="nombre@empresa.com" autocomplete="email" required />
         </div>
+        <span asp-validation-for="Correo" class="pf-login-error"></span>
 
         <button type="submit" class="btn-pf-login">
             Enviar código de verificación
         </button>
 
-        <div class="mt-2">
-            <a asp-action="Login" class="pf-login-link">Volver a iniciar sesión</a>
-        </div>
     </form>
-</div>
+    <p class="pf-login-pie"><a asp-action="Login" class="pf-login-link">Volver a iniciar sesión</a></p>
+</main>

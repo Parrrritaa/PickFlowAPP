@@ -1,18 +1,28 @@
-@model List<PickingApp.Models.Producto>
+﻿@model PickingApp.Models.ViewModels.ProductosIndexViewModel
 @using PickingApp.Services
 @{
     ViewData["Title"] = "Productos y categorías";
-    var categorias = ViewBag.Categorias as List<PickingApp.Models.CategoriaProducto> ?? new List<PickingApp.Models.CategoriaProducto>();
-    var minutosPorUbicacion = ViewBag.MinutosPorUbicacion as double? ?? 1.0;
+    var productos = Model.Productos;
+    var categorias = Model.Categorias;
+    var minutosPorUbicacion = Model.MinutosPorUbicacion;
     var predeterminada = categorias.FirstOrDefault(c => c.EsPredeterminada);
     var nombrePredeterminada = predeterminada?.Nombre ?? "la categoría por defecto";
-    var sinClasificar = Model.Count(p => p.CategoriaProductoId == null);
+    var sinClasificar = productos.Count(p => p.CategoriaProductoId == null);
 }
 
 <h1 class="pf-page-title">Productos y categorías</h1>
 
+@* Dos pantallas en el mismo apartado: se cambia sin recargar y la elegida queda en la URL (#categorias / #productos),
+   así al guardar se vuelve a la misma (el controlador redirige con ese fragmento). *@
+<div class="pf-segmented mb-4" role="radiogroup" aria-label="Pantalla" style="max-width: 360px;">
+    <input type="radio" class="pf-seg-input" name="vistaProductos" id="vistaCategorias" value="categorias" checked />
+    <label for="vistaCategorias">Categorías (@categorias.Count)</label>
+    <input type="radio" class="pf-seg-input" name="vistaProductos" id="vistaProductosLista" value="productos" />
+    <label for="vistaProductosLista">Productos (@productos.Count)</label>
+</div>
+
 <!-- ===== Categorías de manipulación ===== -->
-<div class="mockup-card">
+<div class="pf-card" data-vista="categorias">
     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
         <div>
             <h4 class="fw-bold mb-1 text-dark">Categorías de manipulación</h4>
@@ -28,7 +38,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="mockup-table">
+        <table class="pf-table" data-pf-paginar>
             <thead>
                 <tr>
                     <th>Categoría</th>
@@ -49,7 +59,7 @@
                             }
                             @if (!string.IsNullOrEmpty(c.Descripcion))
                             {
-                                <div class="small" style="color: #4B5563;">@c.Descripcion</div>
+                                <div class="small" style="color: var(--pf-ink2);">@c.Descripcion</div>
                             }
                         </td>
                         <td>@c.MinutosPorUnidad.ToString("0.##") min</td>
@@ -57,7 +67,7 @@
                             @c.Productos.Count
                             @if (c.EsPredeterminada && sinClasificar > 0)
                             {
-                                <span class="small" style="color: #4B5563;">+ @sinClasificar sin clasificar</span>
+                                <span class="small" style="color: var(--pf-ink2);">+ @sinClasificar sin clasificar</span>
                             }
                         </td>
                         <td>
@@ -90,7 +100,7 @@
 </div>
 
 <!-- ===== Clasificación de productos ===== -->
-<div class="mockup-card">
+<div class="pf-card" data-vista="productos" hidden>
     <form asp-action="GuardarClasificacion" method="post" id="formClasificacion">
         @Html.AntiForgeryToken()
         <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
@@ -98,11 +108,11 @@
                 <h4 class="fw-bold mb-1 text-dark">Clasificación de productos</h4>
                 <p class="pf-seccion-desc">Los productos sin categoría usan «@nombrePredeterminada» (la categoría por defecto).</p>
             </div>
-            @if (Model.Any())
+            @if (productos.Any())
             {
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <label class="visually-hidden" for="buscarProducto">Buscar producto</label>
-                    <input type="search" id="buscarProducto" class="mockup-search-input" placeholder="Buscar código o nombre..." />
+                    <input type="search" id="buscarProducto" class="pf-search-input" placeholder="Buscar código o nombre..." />
                     <label class="visually-hidden" for="filtroCategoria">Filtrar por categoría</label>
                     <select id="filtroCategoria" class="form-select form-select-sm" style="width: auto;">
                         <option value="">Todas las categorías</option>
@@ -116,32 +126,22 @@
             }
         </div>
 
-        @if (Model.Any())
+        @if (productos.Any())
         {
-            <div class="pf-aplicar-lote">
-                <label for="categoriaLote" class="small fw-semibold mb-0">Cambiar los productos visibles a:</label>
-                <select id="categoriaLote" class="form-select form-select-sm" style="width: auto;">
-                    <option value="">Sin clasificar (usa «@nombrePredeterminada»)</option>
-                    @foreach (var c in categorias)
-                    {
-                        <option value="@c.Id">@c.Nombre</option>
-                    }
-                </select>
-                <button type="button" class="btn-pf-gray" style="padding: 4px 14px; font-size: 14px;" id="btnAplicarLote">Aplicar</button>
-            </div>
-
             <div class="table-responsive">
-                <table class="mockup-table" id="tablaProductos">
+                @* 6 por página fijas: con la barra de guardar debajo, las que "caben" eran muy pocas *@
+                <table class="pf-table" id="tablaProductos" data-pf-paginar="6">
                     <thead>
                         <tr>
                             <th>Código</th>
                             <th>Producto</th>
                             <th>Ubicaciones</th>
                             <th style="min-width: 210px;">Categoría</th>
+                            <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var p in Model)
+                        @foreach (var p in productos)
                         {
                             <tr data-buscar="@($"{p.Codigo} {p.Nombre}".ToLowerInvariant())">
                                 <td class="fw-semibold">@p.Codigo</td>
@@ -157,18 +157,40 @@
                                         }
                                     </select>
                                 </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn-pf-gray" style="padding: 4px 14px; font-size: 14px;"
+                                            data-bs-toggle="modal" data-bs-target="#modalProducto"
+                                            data-id="@p.Id" data-codigo="@p.Codigo" data-nombre="@p.Nombre" data-unidades="@p.UnidadesPorCaja" data-ubicaciones="@p.Ubicaciones.Count">
+                                        Editar
+                                    </button>
+                                </td>
                             </tr>
                         }
                         <tr id="filaSinProductos" class="d-none">
-                            <td colspan="4" class="text-center text-muted py-3">Ningún producto coincide con el filtro.</td>
+                            <td colspan="5" class="text-center text-muted py-3">Ningún producto coincide con el filtro.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            <div class="pf-barra-guardar">
-                <span id="textoCambios" aria-live="polite">Sin cambios pendientes</span>
-                <button type="submit" class="btn-pf-blue" id="btnGuardarClasificacion" disabled>Guardar cambios</button>
+            @* El cambio en lote va en la barra de guardar y no en una fila propia sobre la tabla: deja espacio para
+               más productos por página y queda junto al botón que guarda lo que aplica *@
+            <div class="pf-barra-guardar flex-wrap">
+                <div class="pf-aplicar-lote mb-0">
+                    <label for="categoriaLote" class="small fw-semibold mb-0">Cambiar los productos visibles a:</label>
+                    <select id="categoriaLote" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">Sin clasificar (usa «@nombrePredeterminada»)</option>
+                        @foreach (var c in categorias)
+                        {
+                            <option value="@c.Id">@c.Nombre</option>
+                        }
+                    </select>
+                    <button type="button" class="btn-pf-gray" style="padding: 4px 14px; font-size: 14px;" id="btnAplicarLote">Aplicar</button>
+                </div>
+                <div class="d-flex align-items-center gap-3 ms-auto">
+                    <span id="textoCambios" aria-live="polite">Sin cambios pendientes</span>
+                    <button type="submit" class="btn-pf-blue" id="btnGuardarClasificacion" disabled>Guardar cambios</button>
+                </div>
             </div>
         }
         else
@@ -215,6 +237,38 @@
     </div>
 </div>
 
+<!-- Editar producto: nombre y cantidad por caja (la categoría se cambia en la tabla) -->
+<div class="modal fade" id="modalProducto" tabindex="-1" aria-labelledby="tituloModalProducto" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="EditarProducto" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="productoId" />
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="tituloModalProducto">Editar producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small mb-3" style="color: var(--pf-ink2);" id="textoModalProducto"></p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="productoNombre">Nombre</label>
+                        <input type="text" class="form-control" id="productoNombre" name="nombre" maxlength="150" required />
+                    </div>
+                    <div>
+                        <label class="form-label fw-semibold" for="productoUnidades">Cantidad máx. por caja</label>
+                        <input type="number" class="form-control" id="productoUnidades" name="unidadesPorCaja" min="1" max="@Producto.MaxUnidadesPorCaja" step="1" required />
+                        <div class="form-text">Unidades que trae la caja o empaque. Usa 1 si se recoge de a una unidad.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn-pf-blue">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Confirmar eliminación de categoría -->
 <div class="modal fade" id="modalEliminarCategoria" tabindex="-1" aria-labelledby="tituloEliminarCategoria" aria-describedby="textoEliminarCategoria" aria-hidden="true">
     <div class="modal-dialog pf-alert-dialog">
@@ -222,12 +276,12 @@
             <form asp-action="EliminarCategoria" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="id" id="eliminarCategoriaId" />
-                <div class="pf-alert-icon" aria-hidden="true" style="color: #DC2626; background-color: rgba(220, 38, 38, 0.1);"><i class="bi bi-trash3"></i></div>
+                <div class="pf-alert-icon" aria-hidden="true" style="color: var(--pf-red); background-color: var(--pf-red-soft);"><i class="bi bi-trash3"></i></div>
                 <h2 class="pf-alert-title" id="tituloEliminarCategoria">¿Eliminar la categoría?</h2>
                 <p class="pf-alert-text" id="textoEliminarCategoria"></p>
                 <div class="pf-alert-actions">
                     <button type="button" class="pf-alert-btn pf-alert-btn--secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="pf-alert-btn pf-alert-btn--primary" style="background-color: #DC2626;">Eliminar</button>
+                    <button type="submit" class="pf-alert-btn pf-alert-btn--peligro">Eliminar</button>
                 </div>
             </form>
         </div>
@@ -235,106 +289,27 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/paginas/productos.js" asp-append-version="true" data-nombre-predeterminada="@nombrePredeterminada"></script>
     <script>
         (function () {
-            var nombrePredeterminada = @Json.Serialize(nombrePredeterminada);
+            var radios = document.querySelectorAll('input[name="vistaProductos"]');
 
-            // Diálogo de categoría: el mismo formulario sirve para crear y editar
-            var modalCategoria = document.getElementById('modalCategoria');
-            modalCategoria.addEventListener('show.bs.modal', function (e) {
-                var origen = e.relatedTarget;
-                var editar = origen && origen.dataset.modo === 'editar';
-                document.getElementById('tituloModalCategoria').textContent = editar ? 'Editar categoría' : 'Nueva categoría';
-                document.getElementById('categoriaId').value = editar ? origen.dataset.id : '';
-                document.getElementById('categoriaNombre').value = editar ? origen.dataset.nombre : '';
-                document.getElementById('categoriaMinutos').value = editar ? origen.dataset.minutos : '';
-                document.getElementById('categoriaDescripcion').value = editar ? (origen.dataset.descripcion || '') : '';
-            });
-            modalCategoria.addEventListener('shown.bs.modal', function () {
-                document.getElementById('categoriaNombre').focus();
-            });
-
-            var modalEliminar = document.getElementById('modalEliminarCategoria');
-            modalEliminar.addEventListener('show.bs.modal', function (e) {
-                var origen = e.relatedTarget;
-                var n = parseInt(origen.dataset.productos, 10) || 0;
-                document.getElementById('eliminarCategoriaId').value = origen.dataset.id;
-                document.getElementById('tituloEliminarCategoria').textContent = '¿Eliminar «' + origen.dataset.nombre + '»?';
-                document.getElementById('textoEliminarCategoria').textContent = n === 0
-                    ? 'No tiene productos asignados.'
-                    : (n === 1 ? 'Su producto pasará' : 'Sus ' + n + ' productos pasarán') + ' a usar «' + nombrePredeterminada + '», la categoría por defecto.';
-            });
-
-            // Clasificación de productos: cambios pendientes, filtro y aplicación en lote
-            var form = document.getElementById('formClasificacion');
-            var tabla = document.getElementById('tablaProductos');
-            if (!tabla) return;
-            var selects = Array.prototype.slice.call(tabla.querySelectorAll('.pf-select-categoria'));
-            var btnGuardar = document.getElementById('btnGuardarClasificacion');
-            var textoCambios = document.getElementById('textoCambios');
-            var buscar = document.getElementById('buscarProducto');
-            var filtroCategoria = document.getElementById('filtroCategoria');
-            var sinProductos = document.getElementById('filaSinProductos');
-            var enviando = false;
-
-            function pendientes() {
-                return selects.filter(function (s) { return s.value !== (s.dataset.original || ''); }).length;
-            }
-
-            function actualizarCambios() {
-                selects.forEach(function (s) {
-                    s.closest('tr').classList.toggle('pf-fila-modificada', s.value !== (s.dataset.original || ''));
+            function mostrar(vista) {
+                document.querySelectorAll('[data-vista]').forEach(function (s) { s.hidden = s.dataset.vista !== vista; });
+                radios.forEach(function (r) { r.checked = r.value === vista; });
+                // Oculta, la tabla no se pudo medir: se vuelve a calcular cuántas filas caben (site.js)
+                document.querySelectorAll('[data-vista="' + vista + '"] [data-pf-paginar]').forEach(function (t) {
+                    t.dispatchEvent(new CustomEvent('pf:repaginar'));
                 });
-                var n = pendientes();
-                btnGuardar.disabled = n === 0;
-                btnGuardar.textContent = n === 0 ? 'Guardar cambios' : (n === 1 ? 'Guardar 1 cambio' : 'Guardar ' + n + ' cambios');
-                textoCambios.textContent = n === 0 ? 'Sin cambios pendientes' : (n === 1 ? '1 producto modificado' : n + ' productos modificados');
             }
 
-            function filasVisibles() {
-                return selects.map(function (s) { return s.closest('tr'); }).filter(function (f) { return !f.classList.contains('d-none'); });
-            }
-
-            function filtrar() {
-                var t = buscar.value.trim().toLowerCase();
-                var cat = filtroCategoria.value;
-                var visibles = 0;
-                selects.forEach(function (s) {
-                    var fila = s.closest('tr');
-                    var coincideCat = cat === '' || (cat === '__defecto' ? s.value === '' : s.value === cat);
-                    var mostrar = fila.dataset.buscar.indexOf(t) !== -1 && coincideCat;
-                    fila.classList.toggle('d-none', !mostrar);
-                    if (mostrar) visibles++;
+            mostrar(location.hash === '#productos' ? 'productos' : 'categorias');
+            radios.forEach(function (r) {
+                r.addEventListener('change', function () {
+                    mostrar(r.value);
+                    history.replaceState(null, '', '#' + r.value);
                 });
-                sinProductos.classList.toggle('d-none', visibles > 0);
-            }
-
-            tabla.addEventListener('change', function (e) {
-                if (e.target.classList.contains('pf-select-categoria')) actualizarCambios();
             });
-            buscar.addEventListener('input', filtrar);
-            filtroCategoria.addEventListener('change', filtrar);
-
-            document.getElementById('btnAplicarLote').addEventListener('click', function () {
-                var valor = document.getElementById('categoriaLote').value;
-                filasVisibles().forEach(function (f) {
-                    var s = f.querySelector('.pf-select-categoria');
-                    s.value = valor;
-                });
-                actualizarCambios();
-            });
-
-            form.addEventListener('submit', function () { enviando = true; });
-
-            // Evita perder la clasificación si se sale de la página sin guardar
-            window.addEventListener('beforeunload', function (e) {
-                if (!enviando && pendientes() > 0) {
-                    e.preventDefault();
-                    e.returnValue = '';
-                }
-            });
-
-            actualizarCambios();
         })();
     </script>
 }

@@ -1,24 +1,19 @@
-﻿@model PickingApp.Models.Ubicacion
+﻿@model PickingApp.Models.ViewModels.UbicacionFormViewModel
 @{
-    var bodega = ViewBag.Bodega as PickingApp.Models.Bodega;
-    var numeroProducto = ViewBag.NumeroProducto as string;
-    var nombreProducto = ViewBag.NombreProducto as string;
-    var categorias = ViewBag.Categorias as List<PickingApp.Models.CategoriaProducto> ?? new List<PickingApp.Models.CategoriaProducto>();
-    var categoriaSeleccionada = ViewBag.CategoriaSeleccionada as string ?? "";
-    var unidadesPorCaja = ViewBag.UnidadesPorCaja as string ?? "1";
+    var bodega = Model.Bodega;
     ViewData["Title"] = "Crear ubicación";
 }
 
 <h1 class="pf-page-title">Crear ubicación</h1>
 
-<div class="mockup-card">
-    <div class="mockup-info-banner">
+<div class="pf-card">
+    <div class="pf-info-banner">
         Complete la información de la ubicación que desea registrar en el sistema.
     </div>
 
     @if (!ViewData.ModelState.IsValid)
     {
-        <div class="mockup-alert-warning mb-3">
+        <div class="pf-alert-warning mb-3">
             @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
             {
                 <div>@error.ErrorMessage</div>
@@ -28,75 +23,43 @@
 
     <form asp-action="CrearUbicacion" method="post">
         @Html.AntiForgeryToken()
-        <input type="hidden" asp-for="BodegaId" />
+        <input type="hidden" asp-for="Ubicacion.BodegaId" />
 
         <div class="row mb-3">
-            <div class="col-md-12 mockup-form-group">
-                <label class="mockup-label">Bodega</label>
-                <input type="text" class="mockup-input" value="@(bodega?.Nombre ?? "Sin bodega")" disabled style="background-color: #E5E7EB !important;" />
+            <div class="col-md-12 pf-form-group">
+                <label class="pf-label">Bodega</label>
+                <input type="text" class="pf-input" value="@bodega.Nombre" disabled style="background-color: var(--pf-hover) !important;" />
             </div>
         </div>
 
         <div class="row mb-3">
-            <div class="col-md-4 mockup-form-group">
-                <label class="mockup-label">Pasillo <span class="text-danger">*</span></label>
-                <input asp-for="Pasillo" class="mockup-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
-                <span asp-validation-for="Pasillo" class="text-danger small"></span>
+            <div class="col-md-4 pf-form-group">
+                <label class="pf-label">Pasillo <span class="text-danger">*</span></label>
+                <input asp-for="Ubicacion.Pasillo" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
+                <span asp-validation-for="Ubicacion.Pasillo" class="text-danger small"></span>
             </div>
-            <div class="col-md-4 mockup-form-group">
-                <label class="mockup-label">Estante <span class="text-danger">*</span></label>
-                <input asp-for="Estante" class="mockup-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
-                <span asp-validation-for="Estante" class="text-danger small"></span>
+            <div class="col-md-4 pf-form-group">
+                <label class="pf-label">Estante <span class="text-danger">*</span></label>
+                <input asp-for="Ubicacion.Estante" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
+                <span asp-validation-for="Ubicacion.Estante" class="text-danger small"></span>
             </div>
-            <div class="col-md-4 mockup-form-group">
-                <label class="mockup-label">Nivel <span class="text-danger">*</span></label>
-                <input asp-for="Nivel" class="mockup-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
-                <span asp-validation-for="Nivel" class="text-danger small"></span>
+            <div class="col-md-4 pf-form-group">
+                <label class="pf-label">Nivel <span class="text-danger">*</span></label>
+                <input asp-for="Ubicacion.Nivel" class="pf-input" placeholder="1" inputmode="numeric" pattern="\d*" title="Solo números" required />
+                <span asp-validation-for="Ubicacion.Nivel" class="text-danger small"></span>
             </div>
         </div>
 
-        <div class="mockup-info-banner mb-3" style="font-size: 13px;">
+        <div class="pf-info-banner mb-3" style="font-size: 13px;">
             El código de la ubicación se genera automáticamente a partir de estos datos (ej: <strong>PAS01-EST02-NIV03</strong>).
         </div>
 
-        <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Número de producto <span class="text-danger">*</span></label>
-                <input type="text" name="numeroProducto" class="mockup-input" placeholder="100" value="@numeroProducto" inputmode="numeric" pattern="\d*" title="Solo números" required />
-            </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Nombre de producto <span class="text-danger">*</span></label>
-                <input type="text" name="nombreProducto" class="mockup-input" placeholder="Mouse Inalámbrico Logitech" value="@nombreProducto" required />
-            </div>
-        </div>
-
-        <div class="row mb-3">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label" for="categoriaProductoId">Categoría del producto</label>
-                <select name="categoriaProductoId" id="categoriaProductoId" class="mockup-input">
-                    <option value="">Sin clasificar (usa «@(categorias.FirstOrDefault(c => c.EsPredeterminada)?.Nombre ?? "por defecto")»)</option>
-                    @foreach (var c in categorias)
-                    {
-                        <option value="@c.Id" selected="@(categoriaSeleccionada == c.Id.ToString())">@c.Nombre · @c.MinutosPorUnidad.ToString("0.##") min/u</option>
-                    }
-                </select>
-                <div class="form-text small">Define cuánto se tarda en recoger una unidad. Si el producto ya existe, conserva su categoría salvo que elijas otra.</div>
-            </div>
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label" for="unidadesPorCaja">Cantidad máx. de producto por caja</label>
-                <input type="number" name="unidadesPorCaja" id="unidadesPorCaja" class="mockup-input" min="1" step="1" value="@unidadesPorCaja" required />
-                <div class="form-text small">Unidades que trae la caja/empaque de este producto. Si vienen varias unidades por caja, el tiempo de picking no se multiplica por cada una. Usa 1 si el producto se recoge de a una unidad (ej. un monitor).</div>
-            </div>
-        </div>
-
-        <div class="mockup-info-banner mb-3" style="font-size: 13px;">
-            El código de producto se genera automáticamente a partir del número ingresado (ej: <strong>PROD-100</strong>). Cada ubicación almacena un único producto: si el código ya existe, se reutilizará; si no, se creará automáticamente.
-        </div>
+        <partial name="_SeleccionProducto" model="Model.Seleccion" />
 
         <div class="row mb-4">
-            <div class="col-md-6 mockup-form-group">
-                <label class="mockup-label">Estado</label>
-                <select asp-for="Activa" class="mockup-input">
+            <div class="col-md-6 pf-form-group">
+                <label class="pf-label">Estado</label>
+                <select asp-for="Ubicacion.Activa" class="pf-input">
                     <option value="true">Activa</option>
                     <option value="false">Inactiva</option>
                 </select>
@@ -104,7 +67,7 @@
         </div>
 
         <div class="d-flex justify-content-end gap-3 pt-2">
-            <a asp-action="Detalle" asp-route-id="@Model.BodegaId" class="btn-pf-gray">
+            <a asp-action="Detalle" asp-route-id="@Model.Ubicacion.BodegaId" class="btn-pf-gray" data-pf-volver="ultima">
                 Cancelar
             </a>
             <button type="submit" class="btn-pf-blue">

@@ -19,14 +19,17 @@ namespace PickingApp.Models
         public string Descripcion { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(50)]
-        public string TipoNovedad { get; set; } = "Faltante"; // "Faltante", "Avería", "Ubicación Incorrecta", "Otro"
+        public string TipoNovedad { get; set; } = TiposNovedad.Faltante; // Valores en TiposNovedad
 
         public DateTime FechaRegistro { get; set; } = DateTime.Now;
 
         [Required]
         [StringLength(100)]
         public string RegistradoPor { get; set; } = string.Empty;
+
+        // Cuenta de quien la registró: a ella le llega el aviso cuando la atienden. El nombre de arriba puede
+        // repetirse entre usuarios; este Id no. Null si el usuario ya no existe o no se pudo identificar.
+        public int? RegistradoPorId { get; set; }
 
         public bool Atendida { get; set; } = false;
 
