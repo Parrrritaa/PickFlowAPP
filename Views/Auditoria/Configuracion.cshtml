@@ -161,7 +161,7 @@
                     </div>
                     <div class="modal-footer border-0">
                         @* Cancelar recibe el foco al abrir: la acción destructiva nunca es la predeterminada *@
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" autofocus>Cancelar</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-pf-foco>Cancelar</button>
                         <button type="submit" class="btn btn-danger" data-borrar-pedidos>
                             Borrar @(Model.TotalPedidos == 1 ? "1 pedido" : $"{Model.TotalPedidos} pedidos")
                         </button>
@@ -175,7 +175,7 @@
         (function () {
             var modal = document.getElementById('modalBorrarPedidos');
             modal.addEventListener('shown.bs.modal', function () {
-                modal.querySelector('[autofocus]').focus();
+                modal.querySelector('[data-pf-foco]').focus();
             });
             // Evita un doble envío mientras se borran los pedidos
             modal.querySelector('form').addEventListener('submit', function () {

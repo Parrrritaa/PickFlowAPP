@@ -333,6 +333,9 @@
                                         <div class="pf-partes-colapsable" id="partes-@p.Id">
                                             <div class="pf-partes-inner">
                                                 <table class="pf-subtabla-partes">
+                                                    <thead class="visually-hidden">
+                                                        <tr><th>Pedido</th><th>Fecha</th><th>Prioridad</th><th>Bodega</th><th>Estado</th><th>Empleado</th><th>Abrir</th></tr>
+                                                    </thead>
                                                     <tbody>
                             @foreach (var pa in partesPedido)
                             {
