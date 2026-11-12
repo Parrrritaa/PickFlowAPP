@@ -8,6 +8,7 @@
         public const int InactivacionEmpleado = 3;
         public const int EdicionUbicacion = 4;
         public const int EliminacionUbicacion = 5;
+        public const int Traslado = 6;
 
         public static readonly TipoSolicitud[] Catalogo =
         {
@@ -15,7 +16,8 @@
             new() { Id = EdicionEmpleado, Nombre = "Editar empleado" },
             new() { Id = InactivacionEmpleado, Nombre = "Inactivar empleado" },
             new() { Id = EdicionUbicacion, Nombre = "Editar ubicación" },
-            new() { Id = EliminacionUbicacion, Nombre = "Eliminar ubicación" }
+            new() { Id = EliminacionUbicacion, Nombre = "Eliminar ubicación" },
+            new() { Id = Traslado, Nombre = "Trasladar de bodega" }
         };
     }
 
@@ -81,6 +83,8 @@
         public TimeSpan HorarioEntrada { get; set; }
         public TimeSpan HorarioSalida { get; set; }
         public DateTime FechaIngreso { get; set; }
+        // Bodega de quien solicitó el registro; null en solicitudes anteriores a las bodegas del personal
+        public int? BodegaId { get; set; }
 
         public static DatosEmpleadoSolicitud Desde(Empleado empleado) => new()
         {
@@ -90,7 +94,8 @@
             Correo = empleado.Correo,
             HorarioEntrada = empleado.HorarioEntrada,
             HorarioSalida = empleado.HorarioSalida,
-            FechaIngreso = empleado.FechaIngreso
+            FechaIngreso = empleado.FechaIngreso,
+            BodegaId = empleado.BodegaId
         };
     }
 
@@ -106,6 +111,20 @@
         public int EmpleadoId { get; set; }
         public string Identificacion { get; set; } = string.Empty;
         public string NombreCompleto { get; set; } = string.Empty;
+        public string Motivo { get; set; } = string.Empty;
+    }
+
+    // Traslado de un empleado o de un auxiliar. Los nombres guardan cómo estaban al pedirlo.
+    public class SolicitudTraslado
+    {
+        public bool EsEmpleado { get; set; }
+        public int PersonaId { get; set; }
+        public string NombreCompleto { get; set; } = string.Empty;
+        public string? Identificacion { get; set; }
+        public int BodegaOrigenId { get; set; }
+        public string BodegaOrigen { get; set; } = string.Empty;
+        public int BodegaDestinoId { get; set; }
+        public string BodegaDestino { get; set; } = string.Empty;
         public string Motivo { get; set; } = string.Empty;
     }
 

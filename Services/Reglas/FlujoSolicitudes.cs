@@ -17,9 +17,11 @@ namespace PickingApp.Services
             string tituloAviso, string queSolicito, string tipoAviso)
         {
             var solicitud = Solicitud.Nueva(tipo, solicitante.IdUsuario(), datos);
+            solicitud.BodegaId = solicitante.IdBodega();
             context.Solicitudes.Add(solicitud);
             await Avisos.AlRolAsync(context, tipo == TipoGestionableSupervisor ? Roles.IdSupervisor : Roles.IdAdministrador,
-                tituloAviso, $"El {solicitante.DescripcionParaNotificacion()} solicitó {queSolicito}.", tipoAviso, "/Solicitudes/Index");
+                tituloAviso, $"El {solicitante.DescripcionParaNotificacion()} solicitó {queSolicito}.", tipoAviso, "/Solicitudes/Index",
+                solicitud.BodegaId);
             await context.SaveChangesAsync();
             return solicitud;
         }
@@ -34,6 +36,7 @@ namespace PickingApp.Services
             TiposSolicitud.InactivacionEmpleado => InactivarEmpleadoAsync(context, solicitud.LeerDatos<SolicitudInactivacionEmpleado>()),
             TiposSolicitud.EdicionUbicacion => EditarUbicacionAsync(context, solicitud.LeerDatos<SolicitudEdicionUbicacion>()),
             TiposSolicitud.EliminacionUbicacion => EliminarUbicacionAsync(context, solicitud.LeerDatos<SolicitudEliminacionUbicacion>()),
+            TiposSolicitud.Traslado => TrasladarAsync(context, solicitud.LeerDatos<SolicitudTraslado>()),
             _ => throw new ReglaNegocioException($"No se puede aprobar: tipo de solicitud desconocido ({solicitud.TipoSolicitudId}).")
         };
 
@@ -50,7 +53,8 @@ namespace PickingApp.Services
                 Correo = correo,
                 HorarioEntrada = datos.HorarioEntrada,
                 HorarioSalida = datos.HorarioSalida,
-                FechaIngreso = datos.FechaIngreso
+                FechaIngreso = datos.FechaIngreso,
+                BodegaId = datos.BodegaId
             });
         }
 
@@ -81,15 +85,60 @@ namespace PickingApp.Services
                 ?? throw new ReglaNegocioException("No se puede aprobar: el empleado ya no existe. Rechace la solicitud.");
 
             // El empleado pudo tomar un pedido entre la creación de la solicitud y su aprobación
-            var pedidoEnCurso = await context.Pedidos
-                .Where(p => p.EmpleadoId == empleado.Id && PedidoEstados.EnCurso.Contains(p.Estado))
-                .Select(p => p.CodigoPedido)
-                .FirstOrDefaultAsync();
+            var pedidoEnCurso = await PedidoEnCursoAsync(context, empleado.Id);
             if (pedidoEnCurso != null)
             {
                 throw new ReglaNegocioException($"No se puede aprobar: el empleado '{empleado.NombreCompleto}' tiene el pedido {pedidoEnCurso} en curso y no es posible inactivarlo. Reasigne, complete o cancele el pedido primero; la solicitud sigue pendiente.");
             }
             empleado.Activo = false;
+        }
+
+        public static Task<string?> PedidoEnCursoAsync(ApplicationDbContext context, int empleadoId) => context.Pedidos
+            .Where(p => p.EmpleadoId == empleadoId && PedidoEstados.EnCurso.Contains(p.Estado))
+            .Select(p => (string?)p.CodigoPedido)
+            .FirstOrDefaultAsync();
+
+        // Lo que hoy impide aprobar el traslado (también se muestra a quien la revisa); null si se puede.
+        // Mientras esperaba, la persona pudo cambiar de bodega, tomar un pedido o la bodega de destino inactivarse.
+        public static async Task<string?> ImpedimentoTrasladoAsync(ApplicationDbContext context, SolicitudTraslado datos)
+        {
+            if (!await context.Bodegas.AnyAsync(b => b.Id == datos.BodegaDestinoId && b.Activa))
+            {
+                return $"la bodega {datos.BodegaDestino} ya no está activa. Rechace la solicitud.";
+            }
+
+            if (datos.EsEmpleado)
+            {
+                var empleado = await context.Empleados.FindAsync(datos.PersonaId);
+                if (empleado == null) return "el empleado ya no existe. Rechace la solicitud.";
+                if (empleado.BodegaId != datos.BodegaOrigenId) return $"'{empleado.NombreCompleto}' ya no está en la bodega {datos.BodegaOrigen}. Rechace la solicitud.";
+                return await PedidoEnCursoAsync(context, empleado.Id) is string pedido
+                    ? $"'{empleado.NombreCompleto}' tiene el pedido {pedido} en curso. Reasigne, complete o cancele el pedido primero; la solicitud sigue pendiente."
+                    : null;
+            }
+
+            var usuario = await context.Usuarios.FindAsync(datos.PersonaId);
+            if (usuario == null) return "el auxiliar ya no existe. Rechace la solicitud.";
+            return usuario.RolId != Roles.IdAuxiliar || usuario.BodegaId != datos.BodegaOrigenId
+                ? $"'{usuario.NombreCompleto}' ya no es auxiliar de la bodega {datos.BodegaOrigen}. Rechace la solicitud."
+                : null;
+        }
+
+        private static async Task TrasladarAsync(ApplicationDbContext context, SolicitudTraslado datos)
+        {
+            if (await ImpedimentoTrasladoAsync(context, datos) is string impedimento)
+            {
+                throw new ReglaNegocioException($"No se puede aprobar: {impedimento}");
+            }
+
+            if (datos.EsEmpleado)
+            {
+                await Traslados.CambiarBodegaAsync(context, (await context.Empleados.FindAsync(datos.PersonaId))!, datos.BodegaDestinoId);
+            }
+            else
+            {
+                Traslados.CambiarBodega(context, (await context.Usuarios.FindAsync(datos.PersonaId))!, datos.BodegaDestinoId);
+            }
         }
 
         private static async Task EditarUbicacionAsync(ApplicationDbContext context, SolicitudEdicionUbicacion datos)

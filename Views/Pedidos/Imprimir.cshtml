@@ -1,0 +1,378 @@
+@model PickingApp.Models.ViewModels.PedidoImpresionViewModel
+@using PickingApp.Services
+@{
+    // Hoja propia, sin la plantilla de la app: se imprime tal cual (vertical, blanco y negro; solo el logo a color)
+    Layout = null;
+    var pedido = Model.Pedido;
+    var empleado = pedido.Empleado;
+    var impreso = DateTime.Now;
+
+    // Ruta de picking: por pasillo, estante y nivel (numéricos cuando lo son); lo que no tiene ubicación, al final
+    int Numero(string? valor) => int.TryParse(valor, out var n) ? n : int.MaxValue;
+    var lineas = pedido.Detalles
+        .OrderBy(d => d.Ubicacion == null)
+        .ThenBy(d => Numero(d.Ubicacion?.Pasillo)).ThenBy(d => d.Ubicacion?.Pasillo)
+        .ThenBy(d => Numero(d.Ubicacion?.Estante)).ThenBy(d => Numero(d.Ubicacion?.Nivel))
+        .ThenBy(d => d.Ubicacion?.CodigoUbicacion)
+        .ToList();
+    var unidades = lineas.Sum(d => d.Cantidad);
+    var noDisponibles = pedido.Novedades.Where(n => n.TipoNovedad == TiposNovedad.NoDisponible).OrderBy(n => n.FechaRegistro).ToList();
+    var otrasNovedades = pedido.Novedades.Where(n => n.TipoNovedad != TiposNovedad.NoDisponible).OrderBy(n => n.FechaRegistro).ToList();
+
+    // "24 u. = 2 cajas" cuando el producto viene por caja: el empleado recoge cajas completas
+    string Cajas(DetallePedido d)
+    {
+        var porCaja = d.Ubicacion?.Producto?.UnidadesPorCaja ?? 1;
+        if (porCaja <= 1 || d.Cantidad < porCaja) return "";
+        var cajas = d.Cantidad / porCaja;
+        var sueltas = d.Cantidad % porCaja;
+        return $"{cajas} caja{(cajas == 1 ? "" : "s")} de {porCaja}" + (sueltas > 0 ? $" + {sueltas} u." : "");
+    }
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orden de picking @pedido.CodigoPedido</title>
+    <style>
+        @@page { size: A4 portrait; margin: 12mm 12mm 14mm; }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            background: #fff;
+            color: #000;
+            font: 10pt/1.4 "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+        }
+
+        /* Pantalla: la hoja centrada con una barra para imprimir; en papel solo la hoja */
+        .barra {
+            position: sticky;
+            top: 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px;
+            background: #f1f1f1;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .barra button {
+            min-height: 40px;
+            padding: 0 18px;
+            border: 1px solid #000;
+            border-radius: 8px;
+            background: #fff;
+            color: #000;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .barra button:first-child { background: #000; color: #fff; }
+
+        .hoja {
+            max-width: 186mm;
+            margin: 16px auto 32px;
+            padding: 0 4mm;
+        }
+
+        @@media print {
+            .barra { display: none; }
+            .hoja { max-width: none; margin: 0; padding: 0; }
+        }
+
+        .cabecera {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+        }
+
+        .marca { display: flex; align-items: center; gap: 12px; }
+        .marca img { height: 42px; width: auto; }
+
+        .titulo { margin: 0; font-size: 9pt; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #444; }
+        .codigo { margin: 2px 0 0; font-size: 20pt; font-weight: 800; letter-spacing: -0.01em; }
+        .parte { margin: 2px 0 0; font-size: 9.5pt; }
+
+        .impreso { text-align: right; font-size: 8.5pt; color: #444; white-space: nowrap; }
+
+        .prioridad {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 2px 10px;
+            border: 1.5px solid #000;
+            border-radius: 999px;
+            font-size: 9pt;
+            font-weight: 700;
+        }
+
+        .prioridad.alta { background: #000; color: #fff; }
+
+        h2 {
+            margin: 14px 0 6px;
+            font-size: 9pt;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #000;
+        }
+
+        .datos {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px 16px;
+            margin: 0;
+        }
+
+        .datos div { min-width: 0; }
+        .datos dt { font-size: 8pt; color: #444; }
+        .datos dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+        .datos .ancho { grid-column: 1 / -1; }
+
+        .bloque { padding: 8px 10px; border: 1px solid #000; border-radius: 6px; }
+
+        .resumen { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 10px; font-size: 9.5pt; }
+        .resumen strong { font-size: 11pt; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+        thead { display: table-header-group; } /* se repite en cada página */
+        tr { page-break-inside: avoid; break-inside: avoid; }
+
+        th {
+            padding: 5px 6px;
+            border-bottom: 1.5px solid #000;
+            font-size: 8pt;
+            font-weight: 700;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        td { padding: 6px; border-bottom: 1px solid #999; vertical-align: top; }
+
+        .chk { width: 8mm; text-align: center; }
+        .chk span { display: inline-block; width: 4.2mm; height: 4.2mm; border: 1.5px solid #000; border-radius: 1mm; }
+        .num { width: 7mm; color: #444; }
+        .ubic { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .sub { display: block; font-size: 8pt; font-weight: 400; color: #444; }
+        .cant { text-align: right; font-size: 11pt; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        th.cant { font-size: 8pt; font-weight: 700; }
+        .nowrap { white-space: nowrap; }
+        .total td { border-bottom: 0; border-top: 1.5px solid #000; font-weight: 700; }
+
+        .lista { margin: 0; padding-left: 18px; }
+        .lista li { margin-bottom: 3px; }
+
+        .renglones div { height: 7mm; border-bottom: 1px solid #999; }
+
+        .firmas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18mm; }
+        .firmas div { padding-top: 4px; border-top: 1px solid #000; font-size: 8.5pt; text-align: center; }
+
+        .pie { margin-top: 10px; font-size: 7.5pt; color: #444; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="barra">
+        <button type="button" onclick="window.print()">Imprimir</button>
+        <button type="button" onclick="window.close()">Cerrar</button>
+    </div>
+
+    <main class="hoja">
+        <header class="cabecera">
+            <div class="marca">
+                <img src="~/images/pickflow-logo.jpg" alt="PickFlow" />
+                <div>
+                    <p class="titulo">Orden de picking</p>
+                    <p class="codigo">@pedido.CodigoPedido</p>
+                    @if (pedido.PedidoPadre != null)
+                    {
+                        <p class="parte">Parte @pedido.NumeroParte de @pedido.PedidoPadre.Partes.Count del pedido @pedido.PedidoPadre.CodigoPedido</p>
+                    }
+                </div>
+            </div>
+            <div class="impreso">
+                Impresa el @impreso.ToString("dd/MM/yyyy") a las @impreso.ToString("HH:mm")<br />
+                por @(User.Identity?.Name ?? "Usuario")<br />
+                <span class="prioridad @(pedido.Prioridad == Prioridades.Alta ? "alta" : "")">Prioridad @pedido.Prioridad</span>
+            </div>
+        </header>
+
+        <h2>Asignación</h2>
+        <dl class="datos bloque">
+            <div>
+                <dt>Empleado</dt>
+                <dd>@(empleado?.NombreCompleto ?? "Sin asignar")</dd>
+            </div>
+            <div>
+                <dt>Identificación</dt>
+                <dd>@(empleado?.Identificacion ?? "-")</dd>
+            </div>
+            <div>
+                <dt>Turno</dt>
+                <dd>@(empleado == null ? "-" : $"{empleado.HorarioEntrada:hh\\:mm} - {empleado.HorarioSalida:hh\\:mm}")</dd>
+            </div>
+            <div>
+                <dt>Asignado por</dt>
+                <dd>@(pedido.AsignadoPor == null ? "Sin registro" : $"{pedido.AsignadoPor.NombreCompleto} ({pedido.AsignadoPor.NombreRol})")</dd>
+            </div>
+            <div>
+                <dt>Fecha y hora de asignación</dt>
+                <dd>@(pedido.FechaAsignacion?.ToString("dd/MM/yyyy HH:mm") ?? "-")</dd>
+            </div>
+            <div>
+                <dt>Inicio del picking</dt>
+                <dd>@(pedido.FechaInicioProceso?.ToString("dd/MM/yyyy HH:mm") ?? "-")</dd>
+            </div>
+            <div>
+                <dt>Tiempo estimado</dt>
+                <dd>@(pedido.TiempoEstimadoMinutos is double estimado ? Formato.Duracion(estimado) : "-")</dd>
+            </div>
+            <div>
+                <dt>Tiempo estándar</dt>
+                <dd>@(pedido.TiempoEstandarMinutos is double estandar ? Formato.Duracion(estandar) : "-")</dd>
+            </div>
+            <div>
+                <dt>Estado</dt>
+                <dd>@pedido.Estado</dd>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(pedido.MotivoReasignacion))
+            {
+                <div class="ancho">
+                    <dt>Motivo de la reasignación</dt>
+                    <dd>@pedido.MotivoReasignacion</dd>
+                </div>
+            }
+        </dl>
+
+        <h2>Pedido</h2>
+        <dl class="datos">
+            <div>
+                <dt>Bodega</dt>
+                <dd>
+                    @if (pedido.Bodega == null)
+                    {
+                        @("-")
+                    }
+                    else
+                    {
+                        @pedido.Bodega.Nombre <span class="nowrap">(@pedido.Bodega.Codigo)</span>
+                    }
+                </dd>
+            </div>
+            <div>
+                <dt>Fecha de carga</dt>
+                <dd>@pedido.FechaCarga.ToString("dd/MM/yyyy HH:mm")</dd>
+            </div>
+            <div>
+                <dt>Prioridad</dt>
+                <dd>@pedido.Prioridad</dd>
+            </div>
+        </dl>
+        <div class="resumen">
+            <span><strong>@lineas.Count</strong> producto@(lineas.Count == 1 ? "" : "s")</span>
+            <span><strong>@unidades</strong> unidades</span>
+        </div>
+
+        <h2>Productos por recoger, en orden de recorrido</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th class="chk">Listo</th>
+                    <th class="num">#</th>
+                    <th>Ubicación</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th class="cant">Cantidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < lineas.Count; i++)
+                {
+                    var d = lineas[i];
+                    <tr>
+                        <td class="chk"><span></span></td>
+                        <td class="num">@(i + 1)</td>
+                        <td class="ubic">
+                            @if (d.Ubicacion != null)
+                            {
+                                @d.Ubicacion.CodigoUbicacion
+                                <span class="sub">Pasillo @d.Ubicacion.Pasillo · Estante @d.Ubicacion.Estante · Nivel @d.Ubicacion.Nivel</span>
+                            }
+                            else
+                            {
+                                <span class="sub">Sin ubicación</span>
+                            }
+                        </td>
+                        <td>
+                            <strong>@d.NombreProducto</strong>
+                            <span class="sub">@d.CodigoProducto</span>
+                        </td>
+                        <td>@(d.Ubicacion?.Producto?.Categoria?.Nombre ?? Model.CategoriaPredeterminada)</td>
+                        <td class="cant">
+                            @d.Cantidad u.
+                            @if (Cajas(d) is { Length: > 0 } cajas)
+                            {
+                                <span class="sub">@cajas</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (!lineas.Any())
+                {
+                    <tr><td colspan="6">Este pedido no tiene productos para recoger.</td></tr>
+                }
+                else
+                {
+                    <tr class="total">
+                        <td colspan="5">Total</td>
+                        <td class="cant">@unidades u.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (noDisponibles.Any())
+        {
+            <h2>No se recogen: no están en esta bodega</h2>
+            <ul class="lista">
+                @foreach (var n in noDisponibles)
+                {
+                    <li>@n.Descripcion</li>
+                }
+            </ul>
+        }
+
+        @if (otrasNovedades.Any())
+        {
+            <h2>Novedades del pedido</h2>
+            <ul class="lista">
+                @foreach (var n in otrasNovedades)
+                {
+                    <li>
+                        <strong>@n.TipoNovedad</strong> (@n.FechaRegistro.ToString("dd/MM/yyyy HH:mm"), @n.RegistradoPor):
+                        @n.Descripcion
+                        @(n.Atendida ? $" Atendida: {n.ObservacionesAtencion}" : " Sin atender.")
+                    </li>
+                }
+            </ul>
+        }
+
+        <h2>Observaciones del empleado</h2>
+        <div class="renglones"><div></div><div></div><div></div></div>
+
+        <div class="firmas">
+            <div>Empleado que recogió</div>
+            <div>Quien recibe</div>
+            <div>Número de estibas</div>
+        </div>
+
+        <p class="pie">PickFlow · Orden de picking @pedido.CodigoPedido · @(pedido.Bodega?.Codigo)</p>
+    </main>
+</body>
+</html>

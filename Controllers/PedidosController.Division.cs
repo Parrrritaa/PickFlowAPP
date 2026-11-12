@@ -16,7 +16,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> Dividir(int id)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Bodega)
                 .Include(p => p.Detalles)
                     .ThenInclude(d => d.Ubicacion)
@@ -53,7 +53,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Dividir(int pedidoId, int partes, Dictionary<string, string>? cantidades)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Detalles)
                 .FirstOrDefaultAsync(p => p.Id == pedidoId);
 
@@ -107,7 +107,7 @@ namespace PickingApp.Controllers
             }
 
             var codigos = Enumerable.Range(1, partes).Select(k => $"{pedido.CodigoPedido}-P{k}").ToList();
-            if (codigos.Any(c => c.Length > 50) || await _context.Pedidos.AnyAsync(p => codigos.Contains(p.CodigoPedido)))
+            if (codigos.Any(c => c.Length > 50) || await _context.Pedidos.AnyAsync(p => p.BodegaId == pedido.BodegaId && codigos.Contains(p.CodigoPedido)))
             {
                 return ErrorDivision(pedidoId, "Ya existen pedidos con los códigos de las partes; revise los pedidos cargados.");
             }
@@ -139,7 +139,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeshacerDivision(int pedidoId)
         {
-            var pedido = await _context.Pedidos
+            var pedido = await _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Partes)
                     .ThenInclude(pa => pa.Novedades)
                 .FirstOrDefaultAsync(p => p.Id == pedidoId);

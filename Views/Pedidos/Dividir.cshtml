@@ -107,7 +107,8 @@
         </p>
 
         <div class="table-responsive pf-tabla-reparto-contenedor">
-            <table class="pf-table pf-tabla-reparto" id="tablaReparto">
+            @* Paginada (site.js): las filas de otras páginas solo se ocultan, sus campos siguen en el formulario y se envían *@
+            <table class="pf-table pf-tabla-reparto" id="tablaReparto" data-pf-paginar>
                 <thead>
                     <tr id="filaEncabezado">
                         <th class="pf-col-fija">Producto</th>
@@ -137,7 +138,7 @@
         <div id="mensajeReparto" class="pf-mensaje-reparto mt-3" role="status" aria-live="polite"></div>
 
         <div class="d-flex justify-content-end gap-3 mt-3 flex-wrap">
-            <a asp-action="Detalle" asp-route-id="@pedido.Id" class="btn-pf-gray">Cancelar</a>
+            <a asp-action="Detalle" asp-route-id="@pedido.Id" class="btn-pf-gray" data-pf-volver="ultima">Cancelar</a>
             <button type="submit" class="btn-pf-blue" id="btnDividir">Dividir pedido</button>
         </div>
     </form>

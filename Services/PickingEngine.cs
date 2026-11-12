@@ -164,12 +164,12 @@ namespace PickingApp.Services
         {
             var ids = empleadoIds.Distinct().ToList();
 
-            var estadoPedido = await _context.Pedidos
+            var pedido = await _context.Pedidos
                 .Where(p => p.Id == pedidoId)
-                .Select(p => p.Estado)
+                .Select(p => new { p.Estado, p.BodegaId })
                 .FirstOrDefaultAsync();
 
-            var errorPedido = estadoPedido == null ? "El pedido no existe." : estadoPedido switch
+            var errorPedido = pedido == null ? "El pedido no existe." : pedido.Estado switch
             {
                 PedidoEstados.Cancelado => "El pedido se encuentra cancelado y no puede reactivarse.",
                 PedidoEstados.Completado => "El pedido ya se encuentra completado y no puede asignarse ni reasignarse.",
@@ -194,6 +194,7 @@ namespace PickingApp.Services
 
             var contexto = new ContextoAsignacion
             {
+                BodegaId = pedido!.BodegaId,
                 TiempoEstandarMinutos = await CalcularTiempoEstandarAsync(pedidoId),
                 UbicacionesPedido = await _context.DetallesPedido
                     .Where(d => d.PedidoId == pedidoId)
@@ -214,6 +215,7 @@ namespace PickingApp.Services
         // Datos del pedido y de configuración comunes a todos los empleados evaluados
         private sealed class ContextoAsignacion
         {
+            public int BodegaId { get; init; }
             public double TiempoEstandarMinutos { get; init; }
             public int UbicacionesPedido { get; init; }
             public int MesesMinimos { get; init; }
@@ -230,6 +232,16 @@ namespace PickingApp.Services
                 Rendimiento = rendimiento,
                 TiempoEstimadoMinutos = rendimiento.Estimar(contexto.TiempoEstandarMinutos)
             };
+
+            // Regla 0: el pedido se recoge en su bodega, así que solo lo recibe personal de esa bodega
+            if (empleado.BodegaId != contexto.BodegaId)
+            {
+                result.MensajeError = empleado.BodegaId == null
+                    ? $"El empleado '{empleado.NombreCompleto}' no tiene bodega asignada. El Administrador puede asignársela desde Editar."
+                    : $"El empleado '{empleado.NombreCompleto}' trabaja en otra bodega y no puede recibir pedidos de esta.";
+                result.MotivoCorto = "De otra bodega";
+                return result;
+            }
 
             // Regla 1: Empleado Activo
             if (!empleado.Activo)

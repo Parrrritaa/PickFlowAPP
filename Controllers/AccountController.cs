@@ -124,6 +124,7 @@ namespace PickingApp.Controllers
 
             // SELECT del usuario por correo (los correos se guardan en minúsculas)
             var usuario = await _context.Usuarios
+                .Include(u => u.Bodega)
                 .FirstOrDefaultAsync(u => u.Correo == model.Correo.Trim().ToLower());
 
             // BCrypt aplica el mismo proceso a la contraseña escrita, con la sal guardada dentro del hash, y compara
@@ -174,6 +175,15 @@ namespace PickingApp.Controllers
                 ModelState.AddModelError(string.Empty, "Tu cuenta se encuentra inactiva. Contacta al Administrador.");
                 await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Inactivo", "Autenticación",
                     "Intento de acceso a cuenta inactiva");
+                return ErrorLogin(model);
+            }
+
+            var sinBodega = SesionUsuario.MotivoSinBodega(usuario);
+            if (sinBodega != null)
+            {
+                ModelState.AddModelError(string.Empty, sinBodega);
+                await _auditService.LogAsync(usuario.Correo, usuario.NombreRol, "Acceso Sin Bodega", "Autenticación",
+                    "Intento de acceso sin una bodega activa asignada");
                 return ErrorLogin(model);
             }
 

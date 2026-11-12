@@ -72,7 +72,7 @@ namespace PickingApp.Controllers
         // Orden de llegada, la más antigua primero, para que ninguna se quede esperando.
         private IQueryable<Solicitud> PendientesPorRevisar(int? tipo)
         {
-            var query = _context.Solicitudes.Where(s => s.Estado == EstadosSolicitud.Pendiente);
+            var query = _context.Solicitudes.DelAlcance(User).Where(s => s.Estado == EstadosSolicitud.Pendiente);
             if (User.IsInRole(Roles.Supervisor)) query = query.Where(s => s.TipoSolicitudId == TipoGestionableSupervisor);
             if (tipo.HasValue) query = query.Where(s => s.TipoSolicitudId == tipo.Value);
             return query.OrderBy(s => s.FechaSolicitud).ThenBy(s => s.Id);
@@ -114,6 +114,70 @@ namespace PickingApp.Controllers
             return IrARevisar(primera.Value, cadena: true, tipo);
         }
 
+        // El Supervisor pide trasladar a un empleado o auxiliar de su bodega; lo aprueba el Administrador
+        [Authorize(Roles = Roles.Supervisor)]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SolicitarTraslado(bool esEmpleado, int id, int? bodegaDestinoId, string? motivo)
+        {
+            var origenId = User.BodegaVisible()!.Value;
+            string nombre;
+            string? identificacion;
+            Solicitud? pendiente;
+            string? pedidoEnCurso = null;
+
+            if (esEmpleado)
+            {
+                var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(e => e.Id == id);
+                if (empleado == null) return NotFound();
+                (nombre, identificacion) = (empleado.NombreCompleto, empleado.Identificacion);
+                pendiente = await SolicitudesPendientes.DeEmpleadoAsync(_context, id);
+                pedidoEnCurso = await FlujoSolicitudes.PedidoEnCursoAsync(_context, id);
+            }
+            else
+            {
+                var auxiliar = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id && u.RolId == Roles.IdAuxiliar && u.BodegaId == origenId);
+                if (auxiliar == null) return NotFound();
+                (nombre, identificacion) = (auxiliar.NombreCompleto, auxiliar.Identificacion);
+                pendiente = await SolicitudesPendientes.DeTrasladoDeUsuarioAsync(_context, id);
+            }
+
+            motivo = (motivo ?? string.Empty).Trim();
+            var origen = await _context.Bodegas.FindAsync(origenId);
+            var destino = await _context.Bodegas.FirstOrDefaultAsync(b => b.Id == bodegaDestinoId && b.Activa && b.Id != origenId);
+            var volver = RedirectToAction("Index", esEmpleado ? "Empleados" : "Usuarios");
+
+            var error = destino == null ? "Elige una bodega activa distinta a la tuya."
+                : motivo.Length == 0 ? "Debe indicar el motivo del traslado."
+                : pendiente != null ? SolicitudesPendientes.Mensaje(pendiente, $"'{nombre}'")
+                : pedidoEnCurso != null ? $"No se puede solicitar el traslado de '{nombre}' porque tiene el pedido {pedidoEnCurso} en curso. Reasigne, complete o cancele el pedido primero."
+                : null;
+            if (error != null)
+            {
+                TempData["ErrorMessage"] = error;
+                return volver;
+            }
+
+            await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.Traslado, new SolicitudTraslado
+            {
+                EsEmpleado = esEmpleado,
+                PersonaId = id,
+                NombreCompleto = nombre,
+                Identificacion = identificacion,
+                BodegaOrigenId = origenId,
+                BodegaOrigen = origen!.Nombre,
+                BodegaDestinoId = destino!.Id,
+                BodegaDestino = destino.Nombre,
+                Motivo = motivo
+            }, "Solicitud de Traslado", $"trasladar a {nombre} a la bodega {destino.Nombre}", TiposNotificacion.Info);
+
+            await _auditService.RegistrarAsync(AccionesLog.SolicitudTraslado, "Solicitudes",
+                $"Solicitud de traslado de {nombre} de {origen.Nombre} a {destino.Nombre}. Motivo: {motivo}");
+
+            TempData["SuccessMessage"] = $"Se ha generado la solicitud para trasladar a '{nombre}' a {destino.Nombre}. Requiere aprobación del Administrador.";
+            return volver;
+        }
+
         // Bandeja de aprobación para Administrador y Supervisor
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         public Task<IActionResult> Index(FiltrosSolicitudes filtros) => ListarAsync(esBandeja: true, filtros);
@@ -127,7 +191,8 @@ namespace PickingApp.Controllers
             var esSupervisor = User.IsInRole(Roles.Supervisor);
             var userId = UsuarioActualId;
 
-            var baseQuery = _context.Solicitudes.AsQueryable();
+            // Cada solicitud queda en la bodega de quien la creó: también las propias se ven solo desde esa bodega
+            var baseQuery = _context.Solicitudes.DelAlcance(User);
             if (!esBandeja)
             {
                 baseQuery = baseQuery.Where(s => s.UsuarioSolicitanteId == userId);
@@ -163,10 +228,6 @@ namespace PickingApp.Controllers
             {
                 query = query.Where(s => s.TipoSolicitudId == filtros.Tipo.Value);
             }
-            if (!string.IsNullOrEmpty(filtros.Estado))
-            {
-                query = query.Where(s => s.Estado == filtros.Estado);
-            }
             if (esBandeja && filtros.SolicitanteId.HasValue)
             {
                 query = query.Where(s => s.UsuarioSolicitanteId == filtros.SolicitanteId.Value);
@@ -182,8 +243,18 @@ namespace PickingApp.Controllers
                 query = query.Where(s => s.FechaSolicitud < hastaExclusivo);
             }
 
+            // El estado va al final: las pestañas cuentan sus solicitudes con todos los demás filtros
+            var conteoPorEstado = await query.GroupBy(s => s.Estado)
+                .Select(g => new { Estado = g.Key, Cantidad = g.Count() })
+                .ToDictionaryAsync(g => g.Estado, g => g.Cantidad);
+            if (!string.IsNullOrEmpty(filtros.Estado))
+            {
+                query = query.Where(s => s.Estado == filtros.Estado);
+            }
+
             var modelo = new SolicitudesListaViewModel
             {
+                ConteoPorEstado = conteoPorEstado,
                 // Pendientes primero; dentro de cada grupo, las más recientes
                 Solicitudes = await query
                     .OrderByDescending(s => s.Estado == EstadosSolicitud.Pendiente)
@@ -193,7 +264,7 @@ namespace PickingApp.Controllers
                 EsBandeja = esBandeja,
                 MostrarPestanas = esSupervisor,
                 PendientesPorRevisar = esSupervisor
-                    ? await _context.Solicitudes.CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor)
+                    ? await _context.Solicitudes.DelAlcance(User).CountAsync(s => s.Estado == EstadosSolicitud.Pendiente && s.TipoSolicitudId == TipoGestionableSupervisor)
                     : 0,
                 PendientesEnCadena = esBandeja ? await PendientesPorRevisar(filtros.Tipo).CountAsync() : 0,
                 Tipos = await _context.CatalogoTiposSolicitud
@@ -269,7 +340,8 @@ namespace PickingApp.Controllers
             return View("Revisar", modelo);
         }
 
-        private Task<Solicitud?> BuscarAsync(int id) => _context.Solicitudes
+        private Task<Solicitud?> BuscarAsync(int id) => _context.Solicitudes.DelAlcance(User)
+            .Include(s => s.Bodega)
             .Include(s => s.UsuarioSolicitante)
             .Include(s => s.UsuarioResponde)
             .FirstOrDefaultAsync(s => s.Id == id);
@@ -368,6 +440,22 @@ namespace PickingApp.Controllers
                     }
                     break;
                 }
+                case TiposSolicitud.Traslado:
+                {
+                    var traslado = solicitud.LeerDatos<SolicitudTraslado>();
+                    modelo.TituloDatos = traslado.EsEmpleado ? "Empleado a trasladar" : "Auxiliar a trasladar";
+                    modelo.Datos.Add(("Nombre completo", traslado.NombreCompleto));
+                    modelo.Datos.Add(("Número de documento", traslado.Identificacion ?? "Sin registrar"));
+                    modelo.Datos.Add(("Bodega de origen", traslado.BodegaOrigen));
+                    modelo.Datos.Add(("Bodega de destino", traslado.BodegaDestino));
+                    modelo.Motivo = traslado.Motivo;
+
+                    if (pendiente && await FlujoSolicitudes.ImpedimentoTrasladoAsync(_context, traslado) is string impedimento)
+                    {
+                        modelo.Aviso = $"No se puede aprobar: {impedimento}";
+                    }
+                    break;
+                }
                 default:
                     modelo.TituloDatos = "Datos";
                     break;
@@ -432,7 +520,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Aprobar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
-            var solicitud = await _context.Solicitudes
+            var solicitud = await _context.Solicitudes.DelAlcance(User)
                 .Include(s => s.UsuarioSolicitante)
                 .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -506,7 +594,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Rechazar(int id, string? observacion, string? observacionRespuesta, bool cadena = false, int? tipo = null)
         {
-            var solicitud = await _context.Solicitudes.FindAsync(id);
+            var solicitud = await _context.Solicitudes.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (solicitud == null || solicitud.Estado != EstadosSolicitud.Pendiente)
             {
                 TempData["ErrorMessage"] = "La solicitud no se encuentra disponible para rechazo.";

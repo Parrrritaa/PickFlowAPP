@@ -1,12 +1,14 @@
 ﻿@model PickingApp.Models.Usuario
 @using PickingApp.Services
 @{
-    ViewData["Title"] = "Editar usuario";
+    var esAdmin = User.IsInRole(Roles.Administrador);
+    ViewData["Title"] = esAdmin ? "Editar usuario" : "Editar auxiliar";
     // El propio rol y estado no se cambian aquí (UsuariosController.Editar lo rechaza)
     var esUnoMismo = Model.Id == User.IdUsuario();
+    var periodos = ViewData["Periodos"] as List<PeriodoBodega> ?? new();
 }
 
-<h1 class="pf-page-title">Editar usuario</h1>
+<h1 class="pf-page-title">@ViewData["Title"]</h1>
 
 <div class="pf-card">
     <form asp-action="Editar" method="post">
@@ -31,17 +33,27 @@
             </div>
         </div>
 
-        <div class="row mb-3">
-            <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Rol <span class="text-danger">*</span></label>
-                <select name="rolId" class="pf-input" required disabled="@esUnoMismo">
-                    @foreach (var rol in Roles.Catalogo)
-                    {
-                        <option value="@rol.Id" selected="@(Model.RolId == rol.Id)">@rol.Nombre</option>
-                    }
-                </select>
+        @* El Supervisor no ve rol ni bodega: solo el Administrador asciende o traslada (UsuariosController.Editar los ignora) *@
+        @if (esAdmin)
+        {
+            <div class="row mb-3">
+                <div class="col-md-6 pf-form-group">
+                    <label class="pf-label" for="rolId">Rol <span class="text-danger">*</span></label>
+                    <select name="rolId" id="rolId" class="pf-input" required disabled="@esUnoMismo">
+                        @foreach (var rol in Roles.Catalogo)
+                        {
+                            <option value="@rol.Id" selected="@(Model.RolId == rol.Id)">@rol.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 pf-form-group" data-pf-oculto-si="rolId=@Roles.IdAdministrador">
+                    <label class="pf-label" for="bodegaId">Bodega <span class="text-danger">*</span></label>
+                    <select name="bodegaId" id="bodegaId" class="pf-input" required>
+                        @await Component.InvokeAsync("OpcionesBodega", new { seleccionada = Model.BodegaId })
+                    </select>
+                </div>
             </div>
-        </div>
+        }
 
         <div class="row mb-4">
             <div class="col-md-6 pf-form-group">
@@ -63,15 +75,15 @@
                 Tu propio rol y tu estado solo los puede cambiar otro Administrador.
             </div>
         }
-        else
+        else if (esAdmin)
         {
             <div class="pf-alert-warning mb-4" style="font-weight: normal;">
-                Cambiar el rol modificará los módulos y permisos disponibles para este usuario.
+                Cambiar el rol modificará los módulos y permisos disponibles para este usuario. Cambiar la bodega lo traslada: verá solo lo de la bodega nueva.
             </div>
         }
 
         <div class="d-flex justify-content-end gap-3 pt-2">
-            <a asp-action="Index" class="btn-pf-gray">
+            <a asp-action="Index" class="btn-pf-gray" data-pf-volver="ultima">
                 Cancelar
             </a>
             <button type="submit" class="btn-pf-blue">
@@ -79,4 +91,8 @@
             </button>
         </div>
     </form>
+</div>
+
+<div class="mt-4">
+    <partial name="_PasoPorBodegas" model="periodos" />
 </div>

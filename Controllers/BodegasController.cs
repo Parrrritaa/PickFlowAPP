@@ -25,7 +25,13 @@ namespace PickingApp.Controllers
         // CU-22: Consultar bodegas y ubicaciones
         public async Task<IActionResult> Index(string? estado, string? busquedaProducto)
         {
-            var query = _context.Bodegas.AsQueryable();
+            // Supervisor y Auxiliar solo tienen una bodega: no hay lista que mostrar
+            if (User.BodegaVisible() is int propia)
+            {
+                return RedirectToAction(nameof(Detalle), new { id = propia });
+            }
+
+            var query = _context.Bodegas.DelAlcance(User);
 
             if (estado == "Activa")
             {
@@ -44,7 +50,7 @@ namespace PickingApp.Controllers
             {
                 // La intercalación de MySQL ya compara sin distinguir mayúsculas
                 var texto = busquedaProducto.Trim();
-                resultadosProducto = await _context.Ubicaciones
+                resultadosProducto = await _context.Ubicaciones.DelAlcance(User)
                     .Include(u => u.Bodega)
                     .Include(u => u.Producto)
                     .Where(u => u.Producto != null &&
@@ -74,7 +80,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> Detalle(int id, string? filtroUbicacion, string? filtroProducto)
         {
             // AsNoTracking: vista de solo lectura; más abajo se reemplaza bodega.Ubicaciones con la lista filtrada.
-            var bodega = await _context.Bodegas
+            var bodega = await _context.Bodegas.DelAlcance(User)
                 .Include(b => b.Ubicaciones).ThenInclude(u => u.Producto)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(b => b.Id == id);
@@ -105,7 +111,7 @@ namespace PickingApp.Controllers
             return View(new BodegaDetalleViewModel
             {
                 Bodega = bodega,
-                TodasBodegas = await _context.Bodegas.AsNoTracking().ToListAsync(),
+                TodasBodegas = await _context.Bodegas.DelAlcance(User).AsNoTracking().ToListAsync(),
                 UbicacionesPorBodega = await ContarUbicacionesPorBodegaAsync(),
                 FiltroUbicacion = filtroUbicacion,
                 FiltroProducto = filtroProducto
@@ -216,9 +222,10 @@ namespace PickingApp.Controllers
             if (bodega == null) return NotFound();
 
             // Se valida antes de borrar: la relación es Restrict y MySQL rechazaría el DELETE
-            if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == id) || await _context.Pedidos.AnyAsync(p => p.BodegaId == id))
+            if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == id) || await _context.Pedidos.AnyAsync(p => p.BodegaId == id)
+                || await _context.TrasladosPersonal.AnyAsync(t => t.BodegaOrigenId == id || t.BodegaDestinoId == id))
             {
-                TempData["ErrorMessage"] = $"No se puede eliminar la bodega '{bodega.Nombre}' porque tiene ubicaciones y/o pedidos asociados.";
+                TempData["ErrorMessage"] = $"No se puede eliminar la bodega '{bodega.Nombre}' porque tiene ubicaciones, pedidos o traslados de personal asociados.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -237,7 +244,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> CrearUbicacion(int bodegaId)
         {
-            var bodega = await _context.Bodegas.FindAsync(bodegaId);
+            var bodega = await _context.Bodegas.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == bodegaId);
             if (bodega == null) return NotFound();
 
             return await FormularioUbicacionAsync(new Ubicacion { BodegaId = bodegaId }, bodega, new SeleccionProductoViewModel());
@@ -251,7 +258,7 @@ namespace PickingApp.Controllers
         public async Task<IActionResult> CrearUbicacion([Bind(nameof(Ubicacion.BodegaId), nameof(Ubicacion.Pasillo), nameof(Ubicacion.Estante),
             nameof(Ubicacion.Nivel), nameof(Ubicacion.Activa), Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion)
         {
-            var bodega = await _context.Bodegas.FindAsync(model.BodegaId);
+            var bodega = await _context.Bodegas.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == model.BodegaId);
             if (bodega == null) return NotFound();
             ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.Producto)}");
 
@@ -295,7 +302,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> EditarUbicacion(int id)
         {
-            var ubicacion = await _context.Ubicaciones
+            var ubicacion = await _context.Ubicaciones.DelAlcance(User)
                 .Include(u => u.Bodega)
                 .Include(u => u.Producto)
                 .FirstOrDefaultAsync(u => u.Id == id);
@@ -310,7 +317,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditarUbicacion(int id, [Bind(Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion, string? motivo)
         {
-            var ubicacionExistente = await _context.Ubicaciones
+            var ubicacionExistente = await _context.Ubicaciones.DelAlcance(User)
                 .Include(u => u.Bodega)
                 .Include(u => u.Producto)
                 .FirstOrDefaultAsync(u => u.Id == id);
@@ -456,7 +463,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarUbicacion(int id, string? motivo)
         {
-            var ubicacion = await _context.Ubicaciones
+            var ubicacion = await _context.Ubicaciones.DelAlcance(User)
                 .Include(u => u.Bodega)
                 .Include(u => u.Producto)
                 .Include(u => u.DetallesPedido)

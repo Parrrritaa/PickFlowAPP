@@ -40,13 +40,13 @@ namespace PickingApp.Controllers
                 TotalCompletados = totales.Completados,
                 TotalCancelados = totales.Cancelados,
                 TotalReasignados = totales.Reasignados,
-                Bodegas = await _context.Bodegas.OrderBy(b => b.Nombre).ToListAsync(),
+                Bodegas = await _context.Bodegas.DelAlcance(User).OrderBy(b => b.Nombre).ToListAsync(),
                 UltimosPedidos = await UltimosPedidosAsync()
             });
         }
 
-        // Un pedido dividido se cuenta por sus partes, no como un pedido más
-        private IQueryable<Pedido> PedidosDeTrabajo() => _context.Pedidos.Where(p => !p.Partes.Any());
+        // Un pedido dividido se cuenta por sus partes, no como un pedido más. Supervisor y Auxiliar ven solo su bodega.
+        private IQueryable<Pedido> PedidosDeTrabajo() => _context.Pedidos.DelAlcance(User).Where(p => !p.Partes.Any());
 
         private async Task<(int Pendientes, int EnProceso, int Completados, int Cancelados, int Reasignados)> ContarPorEstadoAsync()
         {
@@ -114,11 +114,12 @@ namespace PickingApp.Controllers
             var totales = await ContarPorEstadoAsync();
             var (totalGrafica, categorias) = await ConsultarGraficaAsync(agrupar, dias, bodegaId, prioridad, estados);
 
-            // Descripción de los filtros que se ven en el encabezado del PDF
+            // Descripción de los filtros que se ven en el encabezado del PDF (con bodega fija, siempre la suya)
             var filtros = new List<string>();
-            if (bodegaId.HasValue)
+            var bodegaFiltro = User.BodegaVisible() ?? bodegaId;
+            if (bodegaFiltro.HasValue)
             {
-                var bodega = await _context.Bodegas.FindAsync(bodegaId.Value);
+                var bodega = await _context.Bodegas.DelAlcance(User).FirstOrDefaultAsync(b => b.Id == bodegaFiltro.Value);
                 if (bodega != null) filtros.Add($"Bodega: {bodega.Nombre}");
             }
             if (!string.IsNullOrWhiteSpace(prioridad)) filtros.Add($"Prioridad: {prioridad}");
@@ -255,6 +256,12 @@ namespace PickingApp.Controllers
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
+
+        // Destino de UseStatusCodePagesWithReExecute (Program.cs): 404 de un registro inexistente o de otra bodega,
+        // y cualquier otro error sin contenido. Anónima para atender también direcciones que no existen sin sesión.
+        [AllowAnonymous]
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Estado(int id) => View(id);
 
         // Destino de ErrorBaseDatosMiddleware. Anónima porque la sesión puede no existir aún (p. ej. en el login)
         // y sin verbo HTTP para atender también los POST que fallaron.

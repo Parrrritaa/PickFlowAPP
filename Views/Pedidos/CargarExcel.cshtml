@@ -11,17 +11,23 @@
     <form asp-action="CargarExcel" method="post" enctype="multipart/form-data" id="formExcel">
         @Html.AntiForgeryToken()
 
-        <div class="pf-upload-box mb-4">
-            <h3 class="fw-bold text-dark mb-2">Seleccionar archivo Excel</h3>
-            <p class="text-secondary mb-4">Cargue el archivo previamente creado con los pedidos.</p>
-
-            <div class="d-flex justify-content-center align-items-center mb-4">
-                <input type="file" name="archivoExcel" id="archivoExcel" class="form-control" accept=".xlsx" style="max-width: 420px;" required />
+        @* Zona de carga: grande y centrada al entrar (se puede arrastrar el archivo encima); al validar se compacta
+           en una fila (.is-compacta, cargar-excel.js) para dejar a la vista el resultado y el botón de confirmar *@
+        <div class="pf-upload-box" id="cajaArchivo">
+            <span class="pf-upload-box__icono" aria-hidden="true"><i class="bi bi-file-earmark-spreadsheet"></i></span>
+            <div class="pf-upload-box__texto">
+                <h3 class="pf-upload-box__titulo" id="tituloArchivo">Arrastra aquí el archivo Excel</h3>
+                <p class="pf-upload-box__ayuda" id="ayudaArchivo" aria-live="polite">o elígelo desde tu equipo. Formato .xlsx con las columnas @PickingApp.Services.ExcelService.ColumnasEsperadas.</p>
             </div>
-
-            <button type="button" class="btn-pf-blue px-4 py-2" id="btnValidar">
-                Validar archivo
-            </button>
+            <div class="pf-upload-box__acciones">
+                <input type="file" name="archivoExcel" id="archivoExcel" class="pf-upload-box__input" accept=".xlsx" required aria-describedby="ayudaArchivo" />
+                <label for="archivoExcel" class="btn-pf-gray px-4 py-2 mb-0" id="btnElegirArchivo">
+                    <i class="bi bi-folder2-open me-1" aria-hidden="true"></i>Elegir archivo
+                </label>
+                <button type="button" class="btn-pf-blue px-4 py-2" id="btnValidar">
+                    Validar archivo
+                </button>
+            </div>
         </div>
 
         @if (errores != null && errores.Any())
@@ -40,27 +46,41 @@
         <!-- Resultado de validación (diapositiva 11): lo calcula el servidor con las mismas reglas de la carga -->
         <div id="sectionValidacion" hidden class="mt-4 pt-3 border-top" aria-live="polite">
             <h4 class="fw-bold text-dark mb-3">Resultado de validación</h4>
-            <ul class="list-unstyled d-flex flex-column gap-2 mb-3" id="listaVerificaciones"></ul>
-            <p class="fw-semibold mb-3" id="resumenValidacion"></p>
+            <ul class="list-unstyled pf-verificaciones mb-3" id="listaVerificaciones"></ul>
             <div class="pf-alert-warning mb-4" id="erroresValidacion" hidden>
                 <strong>Corrija estas filas y vuelva a validar:</strong>
                 <ul class="mb-0 mt-2" id="listaErroresValidacion"></ul>
             </div>
 
-            <!-- Productos no registrados o fuera de su ubicación: el usuario decide de dónde se recogen -->
+            <!-- Productos que la bodega del pedido no tiene: no bloquean la carga, quedan como novedad del pedido -->
+            <div class="pf-info-banner mb-4" id="avisosNoDisponibles" hidden>
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <div>
+                    <strong>Estos productos no se cargarán: su bodega no los tiene.</strong>
+                    <div class="small">Cada pedido queda con una novedad «No disponible» que indica dónde sí está el producto.</div>
+                    <ul class="mb-0 mt-2" id="listaNoDisponibles"></ul>
+                </div>
+            </div>
+
+            <!-- Nombres del archivo distintos al registrado para el código: el usuario confirma con qué nombre se cargan -->
             <div id="seccionIncidencias" class="mb-4" hidden>
-                <h5 class="fw-bold text-dark mb-1">Decida qué hacer con estas filas</h5>
-                <p class="text-secondary small mb-3">Los productos y ubicaciones nuevos se registran al confirmar la carga.</p>
+                <h5 class="fw-bold text-dark mb-1">Confirme el nombre de estos productos</h5>
+                <p class="text-secondary small mb-3">Se cargan con el nombre registrado en el sistema para su código.</p>
                 <div class="d-flex flex-column gap-3" id="listaIncidencias"></div>
             </div>
 
-            <button type="submit" class="btn-pf-blue px-4 py-2" id="btnConfirmarCarga" hidden>
-                Confirmar carga de pedidos
-            </button>
+            @* Resumen y confirmación en una barra pegada al borde de la pantalla (la de "Guardar cambios"):
+               se ve sin bajar, aunque haya muchas filas por decidir *@
+            <div class="pf-barra-guardar">
+                <span id="resumenValidacion"></span>
+                <button type="submit" class="btn-pf-blue px-4 py-2 text-nowrap" id="btnConfirmarCarga" hidden>
+                    Confirmar carga de pedidos
+                </button>
+            </div>
         </div>
     </form>
 </div>
 
 @section Scripts {
-    <script src="~/js/paginas/cargar-excel.js" asp-append-version="true" data-url-validar="@Url.Action("ValidarExcel")" data-max-unidades="@Producto.MaxUnidadesPorCaja"></script>
+    <script src="~/js/paginas/cargar-excel.js" asp-append-version="true" data-url-validar="@Url.Action("ValidarExcel")"></script>
 }

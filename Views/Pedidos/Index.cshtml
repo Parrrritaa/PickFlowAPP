@@ -46,11 +46,22 @@
         </span>
     }
 
-    // En la vista de divididos se filtra por el estado del pedido original
-    var estados = verDivididos
-        ? new[] { (PedidoEstados.Dividido, "En curso (dividido)"), (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") }
-        : new[] { (PedidoEstados.Pendiente, "Pendiente"), (PedidoEstados.Asignado, "Asignado"), (PedidoEstados.Reasignado, "Reasignado"),
-                  (PedidoEstados.Completado, "Completado"), (PedidoEstados.Cancelado, "Cancelado") };
+    // Pestañas de estado sobre la tabla (la primera, Todos, sin filtro). En divididos cuenta el estado del pedido original.
+    var pestanas = verDivididos
+        ? new (string? Estado, string Texto)[] { (null, "Todos"), (PedidoEstados.Dividido, "En curso"), (PedidoEstados.Completado, "Completados"), (PedidoEstados.Cancelado, "Cancelados") }
+        : new (string? Estado, string Texto)[] { (null, "Todos"), (PedidoEstados.Pendiente, "Pendientes"), (PedidoEstados.Asignado, "Asignados"),
+                  (PedidoEstados.Reasignado, "Reasignados"), (PedidoEstados.Completado, "Completados"), (PedidoEstados.Cancelado, "Cancelados") };
+    int ConteoPestana(string? estado) => estado == null ? Model.ConteoPorEstado.Values.Sum() : Model.ConteoPorEstado.GetValueOrDefault(estado);
+
+    // La URL actual con otro estado: conserva la búsqueda y los demás filtros, y vuelve a la página 1
+    string UrlPestana(string? estado)
+    {
+        var query = new Microsoft.AspNetCore.Http.Extensions.QueryBuilder(Context.Request.Query
+            .Where(q => q.Key is not ("estado" or "pagina") && !string.IsNullOrEmpty(q.Value))
+            .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string>(q.Key, v ?? ""))));
+        if (estado != null) query.Add("estado", estado);
+        return Context.Request.PathBase + Context.Request.Path + query.ToQueryString();
+    }
 
     // Punto de color de cada estado (el mismo de las cifras del Inicio) y color del texto de la prioridad
     string ClaseEstado(string estado) => estado switch
@@ -78,6 +89,13 @@
                 @($"{Model.Paginacion.TotalRegistros} pedido(s){(hayFiltros ? " con los filtros aplicados" : "")}")
             }
         </p>
+    </div>
+    @* Junto al título y no sobre la tabla: así no le quita una fila a la paginación. form= lo une a los filtros *@
+    <div class="pf-pedidos-buscar">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <label class="visually-hidden" for="buscarPedido">Buscar pedidos</label>
+        <input type="search" id="buscarPedido" name="busqueda" value="@busqueda" form="formFiltrosPedidos" class="pf-search-input"
+               placeholder="Pedido, producto o empleado" autocomplete="off" />
     </div>
 </div>
 
@@ -157,25 +175,30 @@
             @* El filtro de la franja de novedades se conserva al usar los filtros de las columnas *@
             <input type="hidden" name="novedad" value="@filtroNovedad" />
         }
+        @* La pestaña elegida viaja con los filtros de las columnas y con la búsqueda *@
+        <input type="hidden" name="estado" value="@filtroEstado" id="filtroEstado" />
+
+        <div class="pf-estado-barra">
+            <nav class="pf-estado-tabs" id="pfEstadoTabs" aria-label="Estado de los pedidos">
+                @foreach (var (estadoPestana, texto) in pestanas)
+                {
+                    var activa = (filtroEstado ?? "") == (estadoPestana ?? "");
+                    @* El punto lleva el color del estado, el mismo de la columna Estado (pf-estado-punto) *@
+                    <a href="@UrlPestana(estadoPestana)" data-estado="@estadoPestana"
+                       class="@(activa ? "activo" : "") @(estadoPestana == null ? "" : "pf-estado-punto " + ClaseEstado(estadoPestana))"
+                       aria-current="@(activa ? "page" : null)">
+                        @texto <span class="pf-estado-tabs__n">@ConteoPestana(estadoPestana)</span>
+                    </a>
+                }
+            </nav>
+        </div>
+
         <div class="table-responsive">
             <table class="pf-table" data-pf-filas-servidor="@(verDivididos ? "divididos" : "pedidos")" data-pf-tamano="@Model.Paginacion.TamanoPagina">
                 <thead>
                     <tr>
-                        <th>
-                            <div class="dropdown">
-                                <button type="button" class="th-filtro-btn @(activoPedido ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                                    Pedido <i class="bi @(activoPedido ? "bi-funnel-fill" : "bi-funnel")"></i>
-                                </button>
-                                <div class="dropdown-menu th-filtro-menu">
-                                    <label class="form-label small fw-semibold mb-1">Buscar pedido o producto</label>
-                                    <input type="text" name="busqueda" value="@busqueda" class="form-control form-control-sm" placeholder="Código de pedido, producto..." />
-                                    <div class="th-filtro-acciones">
-                                        <button type="button" class="btn btn-sm btn-link text-secondary" data-limpiar-filtro>Quitar</button>
-                                        <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </th>
+                        @* El pedido se busca en la barra de arriba y el estado se elige en las pestañas *@
+                        <th>Pedido</th>
                         <th>
                             <div class="dropdown">
                                 <button type="button" class="th-filtro-btn @(activoFecha ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
@@ -225,22 +248,7 @@
                                 </div>
                             </div>
                         </th>
-                        <th>
-                            <div class="dropdown">
-                                <button type="button" class="th-filtro-btn @(activoEstado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                                    Estado <i class="bi @(activoEstado ? "bi-funnel-fill" : "bi-funnel")"></i>
-                                </button>
-                                <div class="dropdown-menu th-filtro-menu">
-                                    <select name="estado" class="form-select form-select-sm filtro-auto">
-                                        <option value="">Todos</option>
-                                        @foreach (var (valor, texto) in estados)
-                                        {
-                                            <option value="@valor" selected="@(filtroEstado == valor)">@texto</option>
-                                        }
-                                    </select>
-                                </div>
-                            </div>
-                        </th>
+                        <th>Estado</th>
                         <th>
                             <div class="dropdown">
                                 <button type="button" class="th-filtro-btn @(activoEmpleado ? "activo" : "")" data-bs-toggle="dropdown" data-bs-auto-close="outside">
@@ -364,6 +372,14 @@
                                 {
                                     @("No quedan novedades sin atender.")
                                 }
+                                else if (activoPedido)
+                                {
+                                    @($"Ningún pedido coincide con «{busqueda!.Trim()}». Prueba con el código del pedido, un producto o el nombre de un empleado.")
+                                }
+                                else if (activoEstado && !(activoFecha || activoPrioridad || activoBodega || activoEmpleado || activoNovedad))
+                                {
+                                    @($"No hay pedidos {(pestanas.FirstOrDefault(t => t.Estado == filtroEstado).Texto ?? filtroEstado)!.ToLowerInvariant()}.")
+                                }
                                 else if (hayFiltros)
                                 {
                                     @("Ningún pedido coincide con los filtros aplicados.")
@@ -408,6 +424,73 @@
                     btn.closest('.th-filtro-menu').querySelectorAll('input').forEach(function (i) { i.value = ''; });
                     form.submit();
                 });
+            });
+
+            // Búsqueda mientras se escribe y pestañas de estado sin recargar: se pide la página 1 con los filtros del
+            // formulario y se cambian solo las pestañas (sus números), las filas y la paginación. Si algo falla, se navega.
+            var buscar = document.getElementById('buscarPedido');
+            var campoEstado = document.getElementById('filtroEstado');
+            var tabla = form.querySelector('table.pf-table');
+            var espera, pedido;
+
+            // La píldora de las pestañas la pone site.js (.pf-estado-tabs); aquí solo se cambian sus números
+            var pestanas = document.getElementById('pfEstadoTabs');
+
+            function actualizar() {
+                var url = new URL(form.getAttribute('action'), location.href);
+                new FormData(form).forEach(function (valor, clave) { if (valor !== '') url.searchParams.append(clave, valor); });
+                if (pedido) pedido.abort();
+                pedido = new AbortController();
+                tabla.classList.add('pf-paginando');
+                fetch(url, { credentials: 'same-origin', signal: pedido.signal })
+                    .then(function (r) {
+                        if (!r.ok || r.redirected) throw new Error();
+                        return r.text();
+                    })
+                    .then(function (html) {
+                        var doc = new DOMParser().parseFromString(html, 'text/html');
+                        var tablaNueva = doc.querySelector('#formFiltrosPedidos table.pf-table');
+                        if (!tablaNueva) throw new Error();
+                        // Las pestañas se actualizan en su lugar (enlace y número), así la píldora no salta
+                        var nuevas = doc.querySelectorAll('#pfEstadoTabs a');
+                        pestanas.querySelectorAll('a').forEach(function (a, i) {
+                            if (!nuevas[i]) return;
+                            a.setAttribute('href', nuevas[i].getAttribute('href'));
+                            a.querySelector('.pf-estado-tabs__n').textContent = nuevas[i].querySelector('.pf-estado-tabs__n').textContent;
+                        });
+                        pestanas.dispatchEvent(new CustomEvent('pf:pildora')); // los números cambian el ancho
+                        document.querySelector('.pf-page-sub').replaceWith(doc.querySelector('.pf-page-sub'));
+                        tabla.tBodies[0].replaceWith(tablaNueva.tBodies[0]);
+                        // La última columna del encabezado trae "Limpiar filtros" cuando hay alguno
+                        tabla.tHead.rows[0].lastElementChild.innerHTML = tablaNueva.tHead.rows[0].lastElementChild.innerHTML;
+                        var nav = form.parentElement.querySelector('nav.pf-paginacion');
+                        var navNueva = doc.querySelector('#formFiltrosPedidos').parentElement.querySelector('nav.pf-paginacion');
+                        if (nav) nav.remove();
+                        if (navNueva) form.after(navNueva);
+                        history.replaceState(null, '', url);
+                    })
+                    .catch(function (e) { if (e.name !== 'AbortError') location.href = url; })
+                    .finally(function () { tabla.classList.remove('pf-paginando'); });
+            }
+
+            buscar.addEventListener('input', function () {
+                clearTimeout(espera);
+                espera = setTimeout(actualizar, 300);
+            });
+            buscar.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                clearTimeout(espera);
+                actualizar();
+            });
+
+            // La pestaña se atiende aquí sin recargar (site.js ya mueve la píldora al instante); Ctrl+clic abre otra pestaña
+            pestanas.addEventListener('click', function (e) {
+                var enlace = e.target.closest('a');
+                if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                campoEstado.value = enlace.dataset.estado || '';
+                actualizar();
             });
         })();
     </script>

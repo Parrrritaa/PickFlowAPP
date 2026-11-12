@@ -26,15 +26,39 @@ namespace PickingApp.Controllers
         }
 
         // CU-16: Consultar empleados
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? bodegaId)
         {
-            var empleados = await _context.Empleados
+            var empleados = await _context.Empleados.DelAlcance(User)
+                .Include(e => e.Bodega)
                 .OrderBy(e => e.NombreCompleto)
                 .ToListAsync();
+
+            // Pestañas por bodega (solo el Administrador ve varias): cuántos empleados tiene cada una, antes de filtrar
+            var total = empleados.Count;
+            var porBodega = empleados.Where(e => e.BodegaId != null).GroupBy(e => e.BodegaId!.Value).ToDictionary(g => g.Key, g => g.Count());
+            var bodegas = User.IsInRole(Roles.Administrador)
+                ? await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync()
+                : new List<Bodega>();
+            if (bodegaId.HasValue && bodegas.Any(b => b.Id == bodegaId.Value))
+            {
+                empleados = empleados.Where(e => e.BodegaId == bodegaId.Value).ToList();
+            }
+            else
+            {
+                bodegaId = null;
+            }
 
             return View(new EmpleadosIndexViewModel
             {
                 Empleados = empleados,
+                // Quienes dejaron la bodega que se está viendo: siguen en la lista como trasladados
+                Trasladados = (User.BodegaVisible() ?? bodegaId) is int vista
+                    ? await Traslados.EmpleadosQueSalieronAsync(_context, vista)
+                    : new List<TrasladoPersonal>(),
+                Bodegas = bodegas,
+                EmpleadosPorBodega = porBodega,
+                FiltroBodegaId = bodegaId,
+                TotalEmpleados = total,
                 // Un empleado está "Ocupado" si tiene un pedido Asignado o Reasignado
                 EmpleadosOcupados = (await _context.Pedidos
                     .Where(p => p.EmpleadoId != null && PedidoEstados.EnCurso.Contains(p.Estado))
@@ -53,10 +77,11 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         public async Task<IActionResult> Historial(int id, int? pagina)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.ConPasoPorBodega(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
-            var completados = await _context.Pedidos
+            // Cada Supervisor ve lo que el empleado hizo en su bodega; el Administrador, todo
+            var completados = await _context.Pedidos.DelAlcance(User)
                 .Where(p => p.EmpleadoId == id && p.Estado == PedidoEstados.Completado && p.TiempoProcesamientoMinutos != null)
                 .OrderBy(p => p.FechaFinalizacion).ThenBy(p => p.Id)
                 .Select(p => new
@@ -91,10 +116,16 @@ namespace PickingApp.Controllers
             var cuentan = filas.Where(f => f.CuentaParaRendimiento).ToList();
             var conEstimado = filas.Where(f => f.Estimado > 0).ToList();
             var paginacion = new Paginacion(pagina, Paginacion.FilasPorPantalla(Request, "historial"), filas.Count);
+            var traslados = await Traslados.DeEmpleadoAsync(_context, id);
+            var bodegaVista = User.BodegaVisible();
 
             return View(new EmpleadoHistorialViewModel
             {
                 Empleado = empleado,
+                Periodos = Traslados.Periodos(traslados, empleado.FechaIngreso),
+                SalidaDeEstaBodega = bodegaVista != null && empleado.BodegaId != bodegaVista
+                    ? traslados.LastOrDefault(t => t.BodegaOrigenId == bodegaVista)
+                    : null,
                 Ocupado = await _context.Pedidos.AnyAsync(p => p.EmpleadoId == id && PedidoEstados.EnCurso.Contains(p.Estado)),
                 Rendimiento = (await _pickingEngine.CalcularRendimientosAsync(new[] { id }))[id],
                 Tendencia = TendenciaRendimiento.Calcular(cuentan.Select(f => (f.Real, f.Estandar)).ToList()),
@@ -123,8 +154,18 @@ namespace PickingApp.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Crear([Bind(nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto), nameof(Empleado.Correo),
-            nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso))] Empleado model)
+            nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso), nameof(Empleado.BodegaId))] Empleado model)
         {
+            // Solo el Administrador elige la bodega; lo que registra (o solicita) un Supervisor o Auxiliar queda en la suya
+            if (!User.IsInRole(Roles.Administrador))
+            {
+                model.BodegaId = User.IdBodega();
+            }
+            else if (!await BodegaActivaAsync(model.BodegaId))
+            {
+                ModelState.AddModelError(nameof(Empleado.BodegaId), "Elige una bodega activa.");
+            }
+
             if (!ModelState.IsValid)
             {
                 return View(model);
@@ -182,7 +223,7 @@ namespace PickingApp.Controllers
         [HttpGet]
         public async Task<IActionResult> Editar(int id)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
             return View(empleado);
@@ -191,7 +232,8 @@ namespace PickingApp.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Editar([Bind(nameof(Empleado.Id), nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto),
-            nameof(Empleado.Correo), nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso))] Empleado model,
+            nameof(Empleado.Correo), nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso),
+            nameof(Empleado.BodegaId))] Empleado model,
             string? motivo)
         {
             motivo = (motivo ?? string.Empty).Trim();
@@ -201,7 +243,7 @@ namespace PickingApp.Controllers
                 return View(model);
             }
 
-            var empleadoExistente = await _context.Empleados.FindAsync(model.Id);
+            var empleadoExistente = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == model.Id);
             if (empleadoExistente == null) return NotFound();
 
             model.Correo = ReglasEmpleado.NormalizarCorreo(model.Correo);
@@ -214,9 +256,24 @@ namespace PickingApp.Controllers
             }
 
 
-            // Administrador: Edición directa (CU-09)
+            // Administrador: Edición directa (CU-09), incluido el traslado de bodega
             if (User.IsInRole(Roles.Administrador))
             {
+                var trasladado = model.BodegaId != empleadoExistente.BodegaId;
+                if (trasladado)
+                {
+                    var errorTraslado = !await BodegaActivaAsync(model.BodegaId) ? "Elige una bodega activa."
+                        : await ObtenerPedidoEnCursoAsync(empleadoExistente.Id) is string enCurso
+                            ? $"No se puede trasladar a '{empleadoExistente.NombreCompleto}' porque tiene el pedido {enCurso} en curso. Reasigne, complete o cancele el pedido primero."
+                        : null;
+                    if (errorTraslado != null)
+                    {
+                        ModelState.AddModelError(nameof(Empleado.BodegaId), errorTraslado);
+                        return View(model);
+                    }
+                }
+
+                await Traslados.CambiarBodegaAsync(_context, empleadoExistente, model.BodegaId);
                 empleadoExistente.NombreCompleto = model.NombreCompleto;
                 empleadoExistente.Correo = model.Correo;
                 empleadoExistente.HorarioEntrada = model.HorarioEntrada;
@@ -227,7 +284,8 @@ namespace PickingApp.Controllers
                 TempData["EmpleadoDestacadoId"] = empleadoExistente.Id;
 
                 await _auditService.RegistrarAsync("Editar Empleado", "Empleados", 
-                    $"Datos actualizados de empleado: {empleadoExistente.Identificacion}");
+                    $"Datos actualizados de empleado: {empleadoExistente.Identificacion}" +
+                    (trasladado ? $". Trasladado a la bodega {(await _context.Bodegas.FindAsync(model.BodegaId))!.Nombre}" : ""));
 
                 TempData["SuccessMessage"] = $"Datos de '{empleadoExistente.NombreCompleto}' actualizados exitosamente.";
             }
@@ -280,7 +338,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Inactivar(int id, string? motivo)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
             // No se puede inactivar (ni solicitar inactivar) a un empleado con un pedido en curso
@@ -348,7 +406,7 @@ namespace PickingApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReiniciarPromedio(int id)
         {
-            var empleado = await _context.Empleados.FindAsync(id);
+            var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
             empleado.FechaReinicioPromedio = DateTime.Now;
@@ -369,6 +427,8 @@ namespace PickingApp.Controllers
                 .Select(p => p.CodigoPedido)
                 .FirstOrDefaultAsync();
         }
+
+        private Task<bool> BodegaActivaAsync(int? bodegaId) => _context.Bodegas.AnyAsync(b => b.Id == bodegaId && b.Activa);
 
         private static string FormatHora(TimeSpan t) => t.ToString(@"hh\:mm");
     }

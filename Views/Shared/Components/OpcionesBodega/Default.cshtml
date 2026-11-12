@@ -1,0 +1,7 @@
+@model (List<PickingApp.Models.Bodega> Bodegas, int? Seleccionada)
+
+<option value="">Elige una bodega</option>
+@foreach (var b in Model.Bodegas)
+{
+    <option value="@b.Id" selected="@(Model.Seleccionada == b.Id)">@b.Nombre@(b.Activa ? "" : " (inactiva)")</option>
+}

@@ -34,6 +34,14 @@ namespace PickingApp.Models
 
         public bool Activo { get; set; } = true;
 
+        public virtual ICollection<TrasladoPersonal> Traslados { get; set; } = new List<TrasladoPersonal>();
+
+        // shortcut: admite null mientras el administrador asigna bodega a los empleados existentes; pasa a obligatorio después.
+        public int? BodegaId { get; set; }
+
+        [ForeignKey("BodegaId")]
+        public virtual Bodega? Bodega { get; set; }
+
         // La ocupación no se guarda: un empleado está ocupado mientras tenga un pedido en curso.
         public static string DescribirEstado(bool activo, bool conPedidoEnCurso)
         {

@@ -16,6 +16,9 @@
     var puedeDividir = pedido.MotivoNoDivisible() == null;
     var puedeDeshacerDivision = pedido.PuedeDeshacerDivision;
     var esGestor = userRole == Roles.Administrador || userRole == Roles.Supervisor;
+    // Recién asignado o reasignado: la orden se imprime sola una vez. Se lee aquí arriba: TempData se guarda cuando la
+    // respuesta empieza a enviarse, y en una página tan larga eso ocurre antes de llegar al botón (no se borraría)
+    var imprimirAhora = TempData["ImprimirPedido"] is true;
     if (totalUbicaciones == 0) totalUbicaciones = pedido.Detalles.Count;
     var pasillosPedido = pedido.Detalles
         .Where(d => d.Ubicacion != null)
@@ -23,6 +26,43 @@
         .Distinct()
         .OrderBy(x => int.TryParse(x, out var n) ? n : int.MaxValue)
         .ToList();
+
+    var unidades = pedido.Detalles.Sum(d => d.Cantidad);
+
+    // Barra de tiempo: el real si ya terminó, el estimado si está en curso; sin ninguno (pendiente) solo se muestra el texto.
+    // La escala deja un 15 % de aire sobre el mayor valor para que la marca del estándar no quede pegada al borde.
+    double? valorTiempo = pedido.Estado == PedidoEstados.Completado && pedido.TiempoProcesamientoMinutos.HasValue
+        ? pedido.TiempoProcesamientoMinutos
+        : pedido.EstaEnCurso ? pedido.TiempoEstimadoMinutos : null;
+    var etiquetaTiempo = pedido.Estado == PedidoEstados.Completado ? "Real" : "Estimado";
+    var escalaTiempo = Math.Max(tiempoEstandar, valorTiempo ?? 0) * 1.15;
+    string PorcentajeEscala(double minutos) => escalaTiempo <= 0 ? "0" : (100 * minutos / escalaTiempo).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Punto de color del estado y color de la prioridad: los mismos de la lista de pedidos
+    string ClaseEstado(string estado) => estado switch
+    {
+        PedidoEstados.Pendiente => "is-pendiente",
+        PedidoEstados.Asignado => "is-asignado",
+        PedidoEstados.Reasignado => "is-reasignado",
+        PedidoEstados.Completado => "is-completado",
+        PedidoEstados.Cancelado => "is-cancelado",
+        _ => "is-dividido"
+    };
+    string ClasePrioridad(string prioridad) => prioridad switch { "Alta" => "is-alta", "Baja" => "is-baja", _ => "is-media" };
+
+    // Qué toca hacer ahora, en una frase, encima de las acciones del panel
+    string SiguientePaso() => pedido.Estado switch
+    {
+        PedidoEstados.Pendiente => superaJornada && puedeDividir
+            ? "Supera una jornada: divídelo o asígnalo a un empleado."
+            : "Asígnalo a un empleado disponible.",
+        PedidoEstados.Dividido => puedeDeshacerDivision
+            ? "Ninguna parte está asignada: aún se puede deshacer la división."
+            : "Cada parte se asigna y completa por separado.",
+        PedidoEstados.Completado => "Pedido entregado. Si algo no cuadró, registra una novedad.",
+        PedidoEstados.Cancelado => "Pedido cancelado.",
+        _ => "Cuando el empleado termine, márcalo como completado."
+    };
 }
 
 <h1 class="pf-page-title">Pedido @pedido.CodigoPedido</h1>
@@ -38,327 +78,373 @@
     </div>
 }
 
-<div class="pf-card">
-    <!-- 4 tarjetas blancas de datos (diapositiva 7) -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
-                <div class="text-secondary fw-semibold small mb-1">Estado</div>
-                <div class="fw-bold fs-3" style="color: var(--pf-blue);">@pedido.Estado</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
-                <div class="text-secondary fw-semibold small mb-1">Prioridad</div>
-                <div class="fw-bold fs-3 text-dark">@pedido.Prioridad</div>
-                @if (userRole == Roles.Administrador)
-                {
-                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-bs-toggle="modal" data-bs-target="#modalPrioridad">
-                        Cambiar
-                    </button>
-                }
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
-                <div class="text-secondary fw-semibold small mb-1">Ubicaciones</div>
-                <div class="fw-bold fs-3 text-dark">@totalUbicaciones</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="bg-white rounded-4 p-3 text-center shadow-sm h-100">
-                <div class="text-secondary fw-semibold small mb-1">Empleado</div>
-                <div class="fw-bold fs-3 text-dark">@(esDividido ? "Por partes" : pedido.Empleado?.NombreCompleto ?? "Sin asignar")</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sección de información -->
-    <div class="mb-4">
-        <h5 class="fw-bold mb-2 text-dark">Información</h5>
-        <div class="fs-6">
-            <strong>Bodega:</strong>
-            @if (pedido.Bodega != null)
-            {
-                @pedido.Bodega.Nombre <span class="text-secondary">(@pedido.Bodega.Codigo)</span>
-            }
-            else
-            {
-                <span class="fst-italic" style="color: var(--pf-ink2);">Sin bodega</span>
-            }
-        </div>
-        @if (pedido.Detalles.Any())
-        {
-            <div class="fs-6 mt-1">
-                <strong>Tiempo estándar:</strong> @PickingApp.Services.Formato.Duracion(tiempoEstandar)
-                <span class="text-secondary small">(según la categoría de cada producto)</span>
-            </div>
-            @if (pedido.Empleado != null && pedido.TiempoEstimadoMinutos.HasValue)
-            {
-                <div class="fs-6 mt-1">
-                    <strong>Tiempo estimado:</strong> @PickingApp.Services.Formato.Duracion(pedido.TiempoEstimadoMinutos.Value)
-                    <span class="text-secondary small">(según el rendimiento de @pedido.Empleado.NombreCompleto al asignarlo)</span>
-                </div>
-            }
-            @if (!string.IsNullOrEmpty(pedido.MotivoReasignacion))
-            {
-                <div class="fs-6 mt-1">
-                    <strong>Motivo de reasignación:</strong> @pedido.MotivoReasignacion
-                </div>
-            }
-            @if (pedido.Estado == PickingApp.Models.PedidoEstados.Completado && pedido.TiempoProcesamientoMinutos.HasValue)
-            {
-                <div class="fs-6 mt-1">
-                    <strong>Tiempo real:</strong> @PickingApp.Services.Formato.Duracion(pedido.TiempoProcesamientoMinutos.Value)
-                </div>
-            }
-            @if (superaJornada && pedido.Estado == PickingApp.Models.PedidoEstados.Pendiente)
-            {
-                <div class="pf-aviso-jornada mt-2" role="note">
-                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
-                    A ritmo estándar, este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h).
-                    @if (esGestor && puedeDividir)
+@* Ficha a la izquierda (qué es el pedido y qué lleva) y panel fijo a la derecha (quién, prioridad y qué se puede hacer
+   ahora), igual que Revisar solicitud: las acciones quedan a la vista sin bajar hasta el final de la página. *@
+<div class="pf-sol pf-sol--con-panel">
+    <article class="pf-card pf-sol-principal mb-0" aria-label="Pedido @pedido.CodigoPedido">
+        <header class="pf-ped-cabecera">
+            <span class="pf-estado-punto @ClaseEstado(pedido.Estado)">@(esDividido ? "En curso (dividido)" : pedido.Estado)</span>
+            <ul class="pf-ped-meta">
+                <li>
+                    <i class="bi bi-building" aria-hidden="true"></i>
+                    @if (pedido.Bodega != null)
                     {
-                        <a asp-action="Dividir" asp-route-id="@pedido.Id" class="fw-semibold">Dividirlo en @partesSugeridas partes</a>
-                    }
-                </div>
-            }
-        }
-    </div>
-
-    @if (partes.Any())
-    {
-        <!-- Partes del pedido dividido -->
-        <div class="mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                <h5 class="fw-bold mb-0 text-dark">Partes</h5>
-                <span class="text-muted fw-semibold small">@partesTerminadas de @partes.Count partes finalizadas</span>
-            </div>
-            <div class="pf-progreso-partes mb-3" role="img" aria-label="@partesTerminadas de @partes.Count partes finalizadas">
-                <span style="width: @((partes.Count == 0 ? 0 : partesTerminadas * 100 / partes.Count))%"></span>
-            </div>
-            <div class="table-responsive">
-                <table class="pf-table">
-                    <thead>
-                        <tr>
-                            <th>Parte</th>
-                            <th>Estado</th>
-                            <th>Empleado</th>
-                            <th class="text-end">Unidades</th>
-                            <th class="text-end">Tiempo estándar</th>
-                            <th class="text-center">Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var pa in partes)
-                        {
-                            <tr>
-                                <td class="fw-semibold">@pa.CodigoPedido</td>
-                                <td>@pa.Estado</td>
-                                <td>@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
-                                <td class="text-end">@pa.Detalles.Sum(d => d.Cantidad)</td>
-                                <td class="text-end">@PickingApp.Services.Formato.Duracion(pa.TiempoEstandarMinutos ?? tiemposPartes.GetValueOrDefault(pa.Id))</td>
-                                <td class="text-center">
-                                    <a asp-action="Detalle" asp-route-id="@pa.Id" class="btn-pf-blue" data-fila-abre style="padding: 4px 20px; font-size: 14px;">Ver</a>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    }
-
-    <!-- Sección de productos -->
-    <div class="mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <h5 class="fw-bold mb-0 text-dark">@(esDividido || partes.Any() ? "Productos del pedido original" : "Productos")</h5>
-            @if (pedido.Detalles.Count > 1)
-            {
-                <div class="d-flex gap-2 flex-wrap align-items-center">
-                    <input type="text" id="filtroProductoTexto" class="pf-search-input" placeholder="Buscar producto, código o ubicación..." />
-                    @if (pasillosPedido.Count > 1)
-                    {
-                        <select id="filtroProductoPasillo" class="form-select form-select-sm" style="width: auto;">
-                            <option value="">Todos los pasillos</option>
-                            @foreach (var pas in pasillosPedido)
-                            {
-                                <option value="@pas">Pasillo @pas</option>
-                            }
-                        </select>
-                    }
-                </div>
-            }
-        </div>
-        <div class="table-responsive">
-            <table class="pf-table" id="tablaProductosPedido" data-pf-paginar>
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Categoría</th>
-                        <th>Cantidad</th>
-                        <th>Ubicación</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (pedido.Detalles.Any())
-                    {
-                        @foreach (var d in pedido.Detalles)
-                        {
-                            <tr class="fila-producto"
-                                data-buscar="@($"{d.NombreProducto} {d.CodigoProducto} {d.Ubicacion?.CodigoUbicacion}".ToLowerInvariant())"
-                                data-pasillo="@(d.Ubicacion?.Pasillo)">
-                                <td class="fw-semibold">@d.NombreProducto</td>
-                                <td>
-                                    @if (d.Ubicacion?.Producto?.Categoria != null)
-                                    {
-                                        @d.Ubicacion.Producto.Categoria.Nombre
-                                    }
-                                    else
-                                    {
-                                        <span style="color: var(--pf-ink2);">@categoriaPredeterminada <span class="small">(por defecto)</span></span>
-                                    }
-                                </td>
-                                <td>@d.Cantidad</td>
-                                <td>
-                                    @if (d.Ubicacion != null)
-                                    {
-                                        @d.Ubicacion.CodigoUbicacion
-                                    }
-                                    else
-                                    {
-                                        @* Nunca se inventa una ubicación: se indica que falta *@
-                                        <span class="fst-italic" style="color: var(--pf-ink2);">Sin ubicación</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
+                        @pedido.Bodega.Nombre <span class="pf-ped-tenue">@pedido.Bodega.Codigo</span>
                     }
                     else
                     {
-                        <tr>
-                            <td colspan="4" class="text-center text-muted py-3">No hay productos registrados en este pedido</td>
-                        </tr>
+                        <span class="pf-ped-tenue">Sin bodega</span>
                     }
-                    <tr id="filaSinCoincidencias" class="d-none">
-                        <td colspan="4" class="text-center text-muted py-3">Ningún producto coincide con el filtro</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+                </li>
+                <li><i class="bi bi-geo-alt" aria-hidden="true"></i>@totalUbicaciones @(totalUbicaciones == 1 ? "ubicación" : "ubicaciones")</li>
+                <li><i class="bi bi-box-seam" aria-hidden="true"></i>@unidades @(unidades == 1 ? "unidad" : "unidades")</li>
+                <li><i class="bi bi-clock" aria-hidden="true"></i>Cargado <time datetime="@pedido.FechaCarga.ToString("s")">@pedido.FechaCarga.ToString("dd/MM/yyyy HH:mm")</time></li>
+                <li><i class="bi bi-play-circle" aria-hidden="true"></i>Inicio @if (pedido.FechaInicioProceso.HasValue) { <time datetime="@pedido.FechaInicioProceso.Value.ToString("s")">@pedido.FechaInicioProceso.Value.ToString("dd/MM/yyyy HH:mm")</time> } else { <span class="pf-ped-tenue">Sin iniciar</span> }</li>
+                <li><i class="bi bi-check2-circle" aria-hidden="true"></i>Fin @if (pedido.FechaFinalizacion.HasValue) { <time datetime="@pedido.FechaFinalizacion.Value.ToString("s")">@pedido.FechaFinalizacion.Value.ToString("dd/MM/yyyy HH:mm")</time> } else { <span class="pf-ped-tenue">Sin finalizar</span> }</li>
+            </ul>
+        </header>
 
-    <!-- Novedades registradas (CU-29 / CU-30) -->
-    @if (pedido.Novedades != null && pedido.Novedades.Any())
-    {
-        <div class="mb-4">
-            <h5 class="fw-bold mb-3 text-dark">Novedades registradas</h5>
+        @if (pedido.Detalles.Any())
+        {
+            <section class="pf-sol-seccion" aria-labelledby="tituloTiempo">
+                <h3 class="pf-sol-subtitulo" id="tituloTiempo">Tiempo</h3>
+                @if (valorTiempo.HasValue)
+                {
+                    @* La barra es el tiempo real (o el estimado si aún no termina); la marca vertical es el estándar *@
+                    <div class="pf-tiempo" role="img" aria-label="@etiquetaTiempo @PickingApp.Services.Formato.Duracion(valorTiempo.Value) de @PickingApp.Services.Formato.Duracion(tiempoEstandar) estándar">
+                        <span class="pf-tiempo__valor @(valorTiempo <= tiempoEstandar ? "is-dentro" : "is-fuera")" style="width: @(PorcentajeEscala(valorTiempo.Value))%"></span>
+                        <span class="pf-tiempo__estandar" style="left: @(PorcentajeEscala(tiempoEstandar))%"></span>
+                    </div>
+                }
+                <p class="pf-tiempo__leyenda">
+                    @if (pedido.Estado == PedidoEstados.Completado && pedido.TiempoProcesamientoMinutos.HasValue)
+                    {
+                        <span><b>Real @PickingApp.Services.Formato.Duracion(pedido.TiempoProcesamientoMinutos.Value)</b></span>
+                    }
+                    <span>Estándar @PickingApp.Services.Formato.Duracion(tiempoEstandar)</span>
+                    @if (pedido.Empleado != null && pedido.TiempoEstimadoMinutos.HasValue)
+                    {
+                        var estimado = $"Estimado {PickingApp.Services.Formato.Duracion(pedido.TiempoEstimadoMinutos.Value)}";
+                        <span title="Según el rendimiento de @pedido.Empleado.NombreCompleto al asignarlo">
+                            @if (pedido.EstaEnCurso)
+                            {
+                                <b>@estimado</b>
+                            }
+                            else
+                            {
+                                @estimado
+                            }
+                        </span>
+                    }
+                </p>
+                @if (!string.IsNullOrEmpty(pedido.MotivoReasignacion))
+                {
+                    <p class="pf-ped-nota"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Reasignado: @pedido.MotivoReasignacion</p>
+                }
+                @if (!string.IsNullOrEmpty(pedido.MotivoCancelacion))
+                {
+                    <p class="pf-ped-nota"><i class="bi bi-x-circle" aria-hidden="true"></i>Cancelado: @pedido.MotivoCancelacion</p>
+                }
+                @if (superaJornada && pedido.Estado == PedidoEstados.Pendiente)
+                {
+                    <div class="pf-aviso-jornada mt-2" role="note">
+                        <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                        A ritmo estándar, este pedido supera una jornada completa (@maxHorasJornada.ToString("0.#") h).
+                        @if (esGestor && puedeDividir)
+                        {
+                            <a asp-action="Dividir" asp-route-id="@pedido.Id" class="fw-semibold">Dividirlo en @partesSugeridas partes</a>
+                        }
+                    </div>
+                }
+            </section>
+        }
+
+        @if (partes.Any())
+        {
+            <section class="pf-sol-seccion" aria-labelledby="tituloPartes">
+                <div class="pf-ped-seccion-cabecera">
+                    <h3 class="pf-sol-subtitulo" id="tituloPartes">Partes</h3>
+                    <span class="pf-ped-tenue small">@partesTerminadas de @partes.Count finalizadas</span>
+                </div>
+                <div class="pf-progreso-partes mb-2" role="img" aria-label="@partesTerminadas de @partes.Count partes finalizadas">
+                    <span style="width: @((partes.Count == 0 ? 0 : partesTerminadas * 100 / partes.Count))%"></span>
+                </div>
+                <div class="table-responsive">
+                    <table class="pf-table">
+                        <thead>
+                            <tr>
+                                <th>Parte</th>
+                                <th>Estado</th>
+                                <th>Empleado</th>
+                                <th class="text-end">Unidades</th>
+                                <th class="text-end">Tiempo estándar</th>
+                                <th class="text-end"><span class="visually-hidden">Abrir</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pa in partes)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@pa.CodigoPedido</td>
+                                    <td><span class="pf-estado-punto @ClaseEstado(pa.Estado)">@pa.Estado</span></td>
+                                    <td>@(pa.Empleado?.NombreCompleto ?? "Sin asignar")</td>
+                                    <td class="text-end">@pa.Detalles.Sum(d => d.Cantidad)</td>
+                                    <td class="text-end">@PickingApp.Services.Formato.Duracion(pa.TiempoEstandarMinutos ?? tiemposPartes.GetValueOrDefault(pa.Id))</td>
+                                    <td class="text-end">
+                                        <a asp-action="Detalle" asp-route-id="@pa.Id" class="pf-btn-abrir" data-fila-abre aria-label="Abrir @pa.CodigoPedido" title="Abrir">
+                                            <partial name="_Icono" model='"derecha"' />
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+
+        <section class="pf-sol-seccion" aria-labelledby="tituloProductos">
+            <div class="pf-ped-seccion-cabecera">
+                <h3 class="pf-sol-subtitulo" id="tituloProductos">@(esDividido || partes.Any() ? "Productos del pedido original" : "Productos")</h3>
+                @if (pedido.Detalles.Count > 1)
+                {
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        <label class="visually-hidden" for="filtroProductoTexto">Buscar producto</label>
+                        <input type="search" id="filtroProductoTexto" class="pf-search-input" placeholder="Buscar producto o ubicación" autocomplete="off" />
+                        @if (pasillosPedido.Count > 1)
+                        {
+                            <label class="visually-hidden" for="filtroProductoPasillo">Pasillo</label>
+                            <select id="filtroProductoPasillo" class="form-select form-select-sm" style="width: auto;">
+                                <option value="">Todos los pasillos</option>
+                                @foreach (var pas in pasillosPedido)
+                                {
+                                    <option value="@pas">Pasillo @pas</option>
+                                }
+                            </select>
+                        }
+                    </div>
+                }
+            </div>
             <div class="table-responsive">
-                <table class="pf-table">
+                <table class="pf-table" id="tablaProductosPedido" data-pf-paginar>
                     <thead>
                         <tr>
-                            <th>Fecha</th>
-                            <th>Tipo</th>
-                            <th>Descripción</th>
-                            <th>Registrado por</th>
-                            <th>Estado</th>
-                            @if (userRole == Roles.Administrador)
-                            {
-                                <th class="text-center">Acción</th>
-                            }
+                            <th>Producto</th>
+                            <th>Categoría</th>
+                            <th class="text-end">Cantidad</th>
+                            <th>Ubicación</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var nov in pedido.Novedades.OrderByDescending(n => n.FechaRegistro))
+                        @if (pedido.Detalles.Any())
                         {
-                            <tr>
-                                <td>@nov.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td>@nov.TipoNovedad</td>
-                                <td>@nov.Descripcion</td>
-                                <td>@nov.RegistradoPor</td>
-                                <td>
-                                    @if (nov.Atendida)
-                                    {
-                                        <span class="badge bg-success">Atendida</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-warning text-dark">Pendiente</span>
-                                    }
-                                </td>
-                                @if (userRole == Roles.Administrador)
-                                {
-                                    <td class="text-center">
-                                        @if (!nov.Atendida)
+                            @foreach (var d in pedido.Detalles)
+                            {
+                                <tr class="fila-producto"
+                                    data-buscar="@($"{d.NombreProducto} {d.CodigoProducto} {d.Ubicacion?.CodigoUbicacion}".ToLowerInvariant())"
+                                    data-pasillo="@(d.Ubicacion?.Pasillo)">
+                                    <td>
+                                        <div class="fw-semibold">@d.NombreProducto</div>
+                                        <div class="pf-ped-tenue small">@d.CodigoProducto</div>
+                                    </td>
+                                    <td>
+                                        @if (d.Ubicacion?.Producto?.Categoria != null)
                                         {
-                                            <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
-                                                    data-bs-toggle="modal" data-bs-target="#modalAtenderNovedad"
-                                                    onclick="document.getElementById('atenderNovedadId').value='@nov.Id';">
-                                                Atender
-                                            </button>
+                                            @d.Ubicacion.Producto.Categoria.Nombre
+                                        }
+                                        else
+                                        {
+                                            <span class="pf-ped-tenue">@categoriaPredeterminada <span class="small">(por defecto)</span></span>
                                         }
                                     </td>
-                                }
+                                    <td class="text-end pf-num">@d.Cantidad</td>
+                                    <td class="pf-num">
+                                        @if (d.Ubicacion != null)
+                                        {
+                                            @d.Ubicacion.CodigoUbicacion
+                                        }
+                                        else
+                                        {
+                                            @* Nunca se inventa una ubicación: se indica que falta *@
+                                            <span class="fst-italic pf-ped-tenue">Sin ubicación</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">Este pedido no tiene productos registrados.</td>
                             </tr>
                         }
+                        <tr id="filaSinCoincidencias" class="d-none">
+                            <td colspan="4" class="text-center text-muted py-3">Ningún producto coincide con el filtro.</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
-        </div>
-    }
+        </section>
 
-    <!-- Botones de acción (diapositiva 7) -->
-    <div class="d-flex flex-wrap gap-3 mt-4 pt-2 align-items-center">
-        @if (userRole == Roles.Administrador || userRole == Roles.Supervisor)
+        <!-- Novedades registradas (CU-29 / CU-30) -->
+        @if (pedido.Novedades != null && pedido.Novedades.Any())
         {
-            @if (pedido.Estado == PickingApp.Models.PedidoEstados.Pendiente)
-            {
-                <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-blue">
-                    Asignar Empleado
-                </a>
-                @if (puedeDividir)
+            <section class="pf-sol-seccion" id="novedades" aria-labelledby="tituloNovedades">
+                <h3 class="pf-sol-subtitulo" id="tituloNovedades">Novedades</h3>
+                <div class="table-responsive">
+                    <table class="pf-table">
+                        <thead>
+                            <tr>
+                                @* Tres columnas y no cinco: junto al panel de acciones la columna es angosta y la tabla se recortaba *@
+                                <th>Novedad</th>
+                                <th>Registro</th>
+                                <th>Estado</th>
+                                @if (userRole == Roles.Administrador)
+                                {
+                                    <th class="text-end"><span class="visually-hidden">Acción</span></th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var nov in pedido.Novedades.OrderByDescending(n => n.FechaRegistro))
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@nov.TipoNovedad</div>
+                                        @nov.Descripcion
+                                        @if (nov.Atendida)
+                                        {
+                                            @* La respuesta del Administrador: así quien la registró ve cómo se resolvió *@
+                                            <div class="text-secondary small mt-1">
+                                                Atendida@(string.IsNullOrWhiteSpace(nov.AtendidaPor) ? "" : $" por {nov.AtendidaPor}")@(nov.FechaAtencion is DateTime atencion ? $" el {atencion:dd/MM/yyyy HH:mm}" : "")@(string.IsNullOrWhiteSpace(nov.ObservacionesAtencion) ? "." : $": {nov.ObservacionesAtencion}")
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="pf-num text-nowrap">@nov.FechaRegistro.ToString("dd/MM/yyyy")</span>
+                                        <div class="text-secondary small">@nov.FechaRegistro.ToString("HH:mm") · <span class="text-nowrap">@nov.RegistradoPor</span></div>
+                                    </td>
+                                    <td>
+                                        <span class="pf-marca-novedad @(nov.Atendida ? "is-atendida" : "is-pendiente")">
+                                            <i class="bi @(nov.Atendida ? "bi-check2" : "bi-exclamation-triangle-fill")" aria-hidden="true"></i>@(nov.Atendida ? "Atendida" : "Sin atender")
+                                        </span>
+                                    </td>
+                                    @if (userRole == Roles.Administrador)
+                                    {
+                                        <td class="text-end">
+                                            @if (!nov.Atendida)
+                                            {
+                                                <button type="button" class="btn-pf-gray pf-btn-fila"
+                                                        data-bs-toggle="modal" data-bs-target="#modalAtenderNovedad"
+                                                        onclick="document.getElementById('atenderNovedadId').value='@nov.Id';">
+                                                    Atender
+                                                </button>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+    </article>
+
+    <aside class="pf-card pf-sol-panel pf-ped-panel mb-0" aria-label="Acciones del pedido">
+        <dl class="pf-datos pf-datos--una">
+            <div>
+                <dt>Prioridad</dt>
+                <dd class="pf-ped-prioridad">
+                    <span class="pf-prioridad @ClasePrioridad(pedido.Prioridad)">@pedido.Prioridad</span>
+                    @if (userRole == Roles.Administrador)
+                    {
+                        <button type="button" class="pf-link-btn" data-bs-toggle="modal" data-bs-target="#modalPrioridad">Cambiar</button>
+                    }
+                </dd>
+            </div>
+            <div>
+                <dt>Responsable</dt>
+                <dd>@(esDividido || partes.Any() ? "Por partes" : pedido.Empleado?.NombreCompleto ?? "Sin asignar")</dd>
+            </div>
+        </dl>
+
+        @if (esGestor)
+        {
+            @* Una sola acción principal según el estado; las demás debajo, y cancelar aparte para no pulsarla por error *@
+            <p class="pf-ped-siguiente">@SiguientePaso()</p>
+            <div class="d-grid gap-2">
+                @if (pedido.Estado == PedidoEstados.Pendiente)
                 {
-                    <a asp-action="Dividir" asp-route-id="@pedido.Id" class="btn-pf-gray">
-                        <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i> Dividir pedido
+                    <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-blue text-center">Asignar empleado</a>
+                    @if (puedeDividir)
+                    {
+                        <a asp-action="Dividir" asp-route-id="@pedido.Id" class="btn-pf-gray text-center">
+                            <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Dividir pedido
+                        </a>
+                    }
+                }
+                else if (puedeDeshacerDivision)
+                {
+                    <form asp-action="DeshacerDivision" method="post" class="d-grid">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="pedidoId" value="@pedido.Id" />
+                        <button type="submit" class="btn-pf-gray">
+                            <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Deshacer división
+                        </button>
+                    </form>
+                }
+                else if (pedido.EstaEnCurso)
+                {
+                    <button type="button" class="btn-pf-green" data-bs-toggle="modal" data-bs-target="#modalCompletar">Marcar completado</button>
+                    <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-gray text-center">Reasignar</a>
+                }
+
+                @if (pedido.EmpleadoId != null)
+                {
+                    @* Orden impresa para el empleado (site.js, data-pf-imprimir) *@
+                    <a asp-action="Imprimir" asp-route-id="@pedido.Id" target="_blank" rel="noopener" class="btn-pf-gray text-center" data-pf-imprimir>
+                        <i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir orden
+                    </a>
+                    @if (imprimirAhora)
+                    {
+                        @* Tras asignar o reasignar se abre sola una vez. Elemento aparte: en un enlace con asp-action un
+                           atributo con valor null no se omite (queda vacío) y la orden se imprimía en cada carga *@
+                        <span hidden data-pf-imprimir-auto="@Url.Action("Imprimir", new { id = pedido.Id })"></span>
+                    }
+                }
+                <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Registrar novedad
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="d-grid gap-2">
+                @if (pedido.EmpleadoId != null)
+                {
+                    <a asp-action="Imprimir" asp-route-id="@pedido.Id" target="_blank" rel="noopener" class="btn-pf-gray text-center" data-pf-imprimir>
+                        <i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir orden
                     </a>
                 }
-            }
-            else if (puedeDeshacerDivision)
-            {
-                <form asp-action="DeshacerDivision" method="post" class="d-inline">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="pedidoId" value="@pedido.Id" />
-                    <button type="submit" class="btn-pf-gray">
-                        <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Deshacer división
-                    </button>
-                </form>
-            }
-            else if (pedido.EstaEnCurso)
-            {
-                <button type="button" class="btn-pf-green" data-bs-toggle="modal" data-bs-target="#modalCompletar">
-                    Marcar Completado
+                <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Registrar novedad
                 </button>
-                <a asp-action="Asignar" asp-route-id="@pedido.Id" class="btn-pf-gray">
-                    Reasignar
-                </a>
-            }
-
-            @if (!pedido.EstaFinalizado)
-            {
-                <button type="button" class="btn-pf-blue" data-bs-toggle="modal" data-bs-target="#modalCancelar">
-                    Cancelar pedido
-                </button>
-            }
-
-            <button type="button" class="btn-pf-gray" data-bs-toggle="modal" data-bs-target="#modalNovedad">
-                Novedad
-            </button>
+            </div>
         }
 
-        <a asp-action="Index" class="btn-pf-gray">
-            Volver a pedidos
-        </a>
-    </div>
+        <div class="pf-ped-panel-pie">
+            <a asp-action="Index" class="btn-pf-gray pf-ped-pie-btn" data-pf-volver>
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>Volver
+            </a>
+            @if (esGestor && !pedido.EstaFinalizado)
+            {
+                <button type="button" class="btn-pf-gray pf-ped-pie-btn pf-ped-cancelar" data-bs-toggle="modal" data-bs-target="#modalCancelar">
+                    <i class="bi bi-x-circle" aria-hidden="true"></i>Cancelar pedido
+                </button>
+            }
+        </div>
+    </aside>
 </div>
 
 @if (userRole == Roles.Administrador)

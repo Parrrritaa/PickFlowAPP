@@ -27,6 +27,7 @@ namespace PickingApp.Data
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
         public DbSet<CategoriaProducto> CategoriasProducto { get; set; } = null!;
         public DbSet<ObservacionSolicitud> ObservacionesSolicitud { get; set; } = null!;
+        public DbSet<TrasladoPersonal> TrasladosPersonal { get; set; } = null!;
 
         // Columna ENUM de MySQL con los valores permitidos: la base rechaza cualquier otro texto
         private static string EnumMySql(IEnumerable<string> valores) =>
@@ -66,6 +67,11 @@ namespace PickingApp.Data
                 .HasIndex(u => u.Correo)
                 .IsUnique();
 
+            // Varios NULL sí se permiten (usuarios antiguos sin identificación); dos iguales no
+            modelBuilder.Entity<Usuario>()
+                .HasIndex(u => u.Identificacion)
+                .IsUnique();
+
             modelBuilder.Entity<Empleado>()
                 .HasIndex(e => e.Identificacion)
                 .IsUnique();
@@ -74,8 +80,9 @@ namespace PickingApp.Data
                 .HasIndex(b => b.Codigo)
                 .IsUnique();
 
+            // El código lo pone el cliente: dos bodegas pueden recibir el mismo código
             modelBuilder.Entity<Pedido>()
-                .HasIndex(p => p.CodigoPedido)
+                .HasIndex(p => new { p.BodegaId, p.CodigoPedido })
                 .IsUnique();
 
             modelBuilder.Entity<ConfiguracionSistema>()
@@ -112,6 +119,17 @@ namespace PickingApp.Data
                 .HasForeignKey(u => u.RolId)
                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<Usuario>().Navigation(u => u.Rol).AutoInclude();
+
+            modelBuilder.Entity<TrasladoPersonal>()
+                .HasOne(t => t.BodegaOrigen)
+                .WithMany()
+                .HasForeignKey(t => t.BodegaOrigenId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<TrasladoPersonal>()
+                .HasOne(t => t.BodegaDestino)
+                .WithMany()
+                .HasForeignKey(t => t.BodegaDestinoId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Solicitud>()
                 .HasOne(s => s.TipoSolicitud)
@@ -155,10 +173,36 @@ namespace PickingApp.Data
                 .HasForeignKey(p => p.BodegaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Una bodega con personal asignado no se puede borrar
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Bodega)
+                .WithMany()
+                .HasForeignKey(u => u.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Empleado>()
+                .HasOne(e => e.Bodega)
+                .WithMany()
+                .HasForeignKey(e => e.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Solicitud>()
+                .HasOne(s => s.Bodega)
+                .WithMany()
+                .HasForeignKey(s => s.BodegaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<Pedido>()
                 .HasOne(p => p.Empleado)
                 .WithMany(e => e.PedidosAsignados)
                 .HasForeignKey(p => p.EmpleadoId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // SetNull: borrar al usuario que asignó no borra el pedido ni su historial
+            modelBuilder.Entity<Pedido>()
+                .HasOne(p => p.AsignadoPor)
+                .WithMany()
+                .HasForeignKey(p => p.AsignadoPorId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Partes de un pedido dividido: no se puede borrar el pedido original mientras tenga partes
@@ -198,6 +242,13 @@ namespace PickingApp.Data
                 .HasForeignKey(s => s.UsuarioRespondeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // SetNull: la novedad es historial del pedido; si se borra quien la registró, queda su nombre en texto
+            modelBuilder.Entity<NovedadPedido>()
+                .HasOne<Usuario>()
+                .WithMany()
+                .HasForeignKey(n => n.RegistradoPorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Cascade: una notificación no tiene sentido sin su destinatario.
             modelBuilder.Entity<Notificacion>()
                 .HasOne(n => n.UsuarioDestino)
@@ -211,6 +262,10 @@ namespace PickingApp.Data
                 .WithMany()
                 .HasForeignKey(l => l.UsuarioId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Auditoría lista y exporta el LOG por fecha: sin índice, cada página recorre toda la tabla
+            modelBuilder.Entity<LogSistema>()
+                .HasIndex(l => l.FechaHora);
         }
     }
 }

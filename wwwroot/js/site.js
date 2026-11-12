@@ -32,7 +32,22 @@ document.addEventListener('click', function (e) {
 // respeta (required, pattern, minlength, type="email"); aquí solo lo que esos atributos no cubren:
 //  - [data-pf-igual="nombre"]: debe coincidir con el campo de ese name (confirmar contraseña).
 //  - [data-pf-correo-disponible="url"]: pregunta al servidor (POST, true/false) si el correo ya está en uso.
+//  - [data-pf-oculto-si="idSelect=valor"]: oculta el bloque y desactiva sus campos (no se validan ni se envían)
+//    mientras ese select tenga ese valor; p. ej. la bodega, que no aplica al rol Administrador.
 (function () {
+    document.querySelectorAll('[data-pf-oculto-si]').forEach(function (bloque) {
+        var partes = bloque.dataset.pfOcultoSi.split('=');
+        var select = document.getElementById(partes[0]);
+        if (!select) return;
+        function aplicar() {
+            var oculto = select.value === partes[1];
+            bloque.hidden = oculto;
+            bloque.querySelectorAll('input, select').forEach(function (c) { c.disabled = oculto; });
+        }
+        select.addEventListener('change', aplicar);
+        aplicar();
+    });
+
     document.querySelectorAll('[data-pf-igual]').forEach(function (campo) {
         var otro = campo.form.elements[campo.dataset.pfIgual];
         function comparar() {
@@ -181,6 +196,22 @@ document.addEventListener('click', function (e) {
         if (location.href.split('#')[0] !== urlMostrada) location.reload();
     });
 
+    // La página a la vista queda en la URL (?pagina=, ?pagina2= para la segunda tabla de la página): al volver a esta
+    // lista con "Volver", atrás o recargando, se abre en la misma página. Las que pagina el servidor ya la llevan.
+    function parametroPagina(contenedor) {
+        var i = paginados.indexOf(contenedor);
+        return i > 0 ? 'pagina' + (i + 1) : 'pagina';
+    }
+
+    function recordarPagina(contenedor, pagina) {
+        var url = new URL(location.href);
+        if (pagina > 1) url.searchParams.set(parametroPagina(contenedor), pagina);
+        else url.searchParams.delete(parametroPagina(contenedor));
+        if (url.href === location.href) return;
+        history.replaceState(history.state, '', url);
+        urlMostrada = location.href.split('#')[0]; // es la misma página: atrás/adelante no debe recargarla
+    }
+
     // paginaPedida: la que eligió el usuario (o la de una fila destacada); sin ella se conserva la que estaba a la vista
     function paginar(contenedor, paginaPedida) {
         var estado = contenedor._pfPaginacion;
@@ -196,6 +227,7 @@ document.addEventListener('click', function (e) {
         else if (estado.porPagina) estado.pagina = Math.floor((estado.pagina - 1) * estado.porPagina / porPagina) + 1;
         estado.pagina = Math.min(Math.max(1, estado.pagina), paginas);
         estado.porPagina = porPagina;
+        recordarPagina(contenedor, estado.pagina);
         var desde = (estado.pagina - 1) * porPagina;
         items.forEach(function (f, i) { f.hidden = i < desde || i >= desde + porPagina; });
         dibujarBarra(contenedor, estado, paginas, total, desde, porPagina);
@@ -270,7 +302,7 @@ document.addEventListener('click', function (e) {
     paginados.forEach(function (contenedor) {
         // Si la vista resalta una fila recién creada o editada, se abre en su página
         var destacada = filas(contenedor).findIndex(function (f) { return f.classList.contains('pf-row-flash'); });
-        contenedor._pfPaginacion = { pagina: 1 };
+        contenedor._pfPaginacion = { pagina: Number(new URLSearchParams(location.search).get(parametroPagina(contenedor))) || 1 };
         contenedor.addEventListener('pf:repaginar', function (e) {
             paginar(contenedor, e.detail && e.detail.inicio ? 1 : undefined);
         });
@@ -308,6 +340,86 @@ document.addEventListener('click', function (e) {
             });
         }, 150);
     });
+})();
+
+// "Volver" lleva a la página exacta donde estaba el usuario, con su página de la lista y sus filtros (van en la URL).
+// En sessionStorage (por pestaña) cada página guarda de dónde se llegó a ella y la última URL de cada página visitada:
+//  - [data-pf-volver]: vuelve a la página de origen (p. ej. del pedido a la lista, al Inicio o a las notificaciones).
+//  - [data-pf-volver="ultima"]: el destino es su href (p. ej. "Volver al pedido"), en la última URL que tuvo.
+// Sin datos guardados (pestaña nueva, enlace directo) el enlace conserva su href.
+(function () {
+    function leer(clave) { try { return sessionStorage.getItem(clave); } catch (e) { return null; } }
+    function guardar(clave, valor) { try { sessionStorage.setItem(clave, valor); } catch (e) { } }
+    function quitar(clave) { try { sessionStorage.removeItem(clave); } catch (e) { } }
+    function ruta(url) { return url.split(/[?#]/)[0]; }
+
+    var aqui = location.pathname;
+    var anterior = leer('pf-ultima');
+    var enviado = leer('pf-envio');
+    quitar('pf-envio');
+    if (anterior && ruta(anterior) !== aqui) {
+        var origenDeAnterior = leer('pf-origen:' + ruta(anterior));
+        if (origenDeAnterior && ruta(origenDeAnterior) === aqui) {
+            // Regreso desde una página que se abrió desde esta (p. ej. de Asignar al pedido): se conserva su origen
+        } else if (enviado === ruta(anterior)) {
+            // Se llegó guardando un formulario (p. ej. aprobar una solicitud y pasar a la siguiente): hereda el origen
+            if (origenDeAnterior) guardar('pf-origen:' + aqui, origenDeAnterior); else quitar('pf-origen:' + aqui);
+        } else {
+            guardar('pf-origen:' + aqui, anterior);
+        }
+    }
+
+    document.querySelectorAll('a[data-pf-volver]').forEach(function (a) {
+        var destino = a.dataset.pfVolver === 'ultima'
+            ? leer('pf-visita:' + ruta(a.getAttribute('href')))
+            : leer('pf-origen:' + aqui);
+        if (destino && destino.charAt(0) === '/' && destino.charAt(1) !== '/') a.setAttribute('href', destino);
+    });
+
+    document.addEventListener('submit', function (e) { if (!e.defaultPrevented) guardar('pf-envio', location.pathname); });
+    // Al salir se guarda la URL tal como quedó (página de la lista, filtros y búsqueda que cambian sin recargar)
+    window.addEventListener('pagehide', function () {
+        var url = location.pathname + location.search + location.hash;
+        guardar('pf-ultima', url);
+        guardar('pf-visita:' + location.pathname, url);
+    });
+})();
+
+// Orden impresa: a[data-pf-imprimir] carga su href en un marco invisible y abre el cuadro de imprimir sin salir de la
+// página ni abrir una ventana que el navegador bloquee. Un elemento [data-pf-imprimir-auto="url"] la imprime sola al
+// cargar (Detalle, después de asignar). Ctrl+clic, o sin JavaScript, la hoja se abre en otra pestaña.
+(function () {
+    function imprimir(url) {
+        var anterior = document.getElementById('pfMarcoImpresion');
+        if (anterior) anterior.remove();
+        var marco = document.createElement('iframe');
+        marco.id = 'pfMarcoImpresion';
+        marco.title = 'Orden para imprimir';
+        marco.tabIndex = -1;
+        marco.setAttribute('aria-hidden', 'true');
+        marco.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+        // 'load' llega con el logo ya cargado: la hoja sale completa
+        marco.addEventListener('load', function () {
+            try {
+                marco.contentWindow.focus();
+                marco.contentWindow.print();
+            } catch (e) {
+                window.open(url, '_blank', 'noopener');
+            }
+        });
+        marco.src = url;
+        document.body.appendChild(marco);
+    }
+
+    document.addEventListener('click', function (e) {
+        var enlace = e.target.closest('a[data-pf-imprimir]');
+        if (!enlace || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        imprimir(enlace.href);
+    });
+
+    var automatica = document.querySelector('[data-pf-imprimir-auto]');
+    if (automatica) window.addEventListener('load', function () { imprimir(automatica.dataset.pfImprimirAuto); });
 })();
 
 // Cuadro de búsqueda de una tabla: <input data-pf-buscar-en="idTabla">. Filtra las filas por todo su texto, sin
@@ -410,6 +522,76 @@ document.addEventListener('click', function (e) {
             navegando = false;
             marcar(inicial);
             colocar(inicial, false);
+        });
+    });
+})();
+
+// Pestañas de estado sobre una tabla (.pf-estado-tabs: Pedidos, Solicitudes): la píldora de la barra superior,
+// un solo fondo que se desliza hasta la pestaña activa con transform y ancho (transición: se puede cambiar de
+// pestaña a mitad del recorrido). Si la vista atiende el clic sin recargar (preventDefault), solo se mueve; si se
+// navega, la página siguiente la recibe donde quedó y termina el recorrido. La vista que cambie los números de
+// las pestañas lanza 'pf:pildora' sobre el nav para reacomodarla.
+(function () {
+    var CLAVE = 'pf-estado-pildora';
+    document.querySelectorAll('.pf-estado-tabs').forEach(function (nav) {
+        var pildora = document.createElement('span');
+        pildora.className = 'pf-estado-tabs__pildora';
+        pildora.setAttribute('aria-hidden', 'true');
+        nav.prepend(pildora);
+        nav.classList.add('pf-con-pildora');
+
+        function colocar(x, ancho, alto, y, animar) {
+            pildora.classList.toggle('pf-animando', animar && !pfReducirMovimiento());
+            pildora.style.width = ancho + 'px';
+            pildora.style.height = alto + 'px';
+            pildora.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+        }
+
+        function mover(animar) {
+            var activa = nav.querySelector('a.activo');
+            pildora.hidden = !activa;
+            if (!activa) return;
+            colocar(activa.offsetLeft, activa.offsetWidth, activa.offsetHeight, activa.offsetTop, animar);
+            // En el celular las pestañas se desplazan de lado: la elegida queda a la vista
+            if (animar) activa.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: pfReducirMovimiento() ? 'auto' : 'smooth' });
+        }
+
+        // Llegada desde otra pestaña de esta misma lista hace un momento: se parte de donde quedó la píldora
+        var guardada = null;
+        var llegando = false;
+        try { guardada = JSON.parse(sessionStorage.getItem(CLAVE) || 'null'); sessionStorage.removeItem(CLAVE); } catch (e) { }
+        if (guardada && guardada.ruta === location.pathname && Date.now() - guardada.t < 5000 && nav.querySelector('a.activo')) {
+            llegando = true;
+            colocar(guardada.x, guardada.ancho, guardada.alto, guardada.y, false);
+            requestAnimationFrame(function () { requestAnimationFrame(function () { mover(true); llegando = false; }); });
+        } else {
+            mover(false);
+        }
+
+        // La fuente llega después del primer pintado y cambia el ancho de las pestañas. Si la píldora va llegando
+        // (o ya se desliza), se reacomoda animada: colocarla de golpe se comería el recorrido.
+        if (document.fonts) document.fonts.ready.then(function () { mover(llegando || pildora.classList.contains('pf-animando')); });
+        window.addEventListener('resize', function () { mover(false); });
+        nav.addEventListener('pf:pildora', function () { mover(true); });
+
+        // Se escucha en el documento para que el clic de la vista (si lo atiende ella) ya haya ocurrido
+        document.addEventListener('click', function (e) {
+            var enlace = e.target.closest('a');
+            if (!enlace || enlace.parentElement !== nav || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            var anterior = nav.querySelector('a.activo');
+            nav.querySelectorAll('a').forEach(function (a) {
+                a.classList.toggle('activo', a === enlace);
+                if (a === enlace) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+            });
+            mover(true);
+            if (e.defaultPrevented || !anterior) return;
+            // Se navega: la página siguiente arranca la píldora desde la pestaña anterior
+            try {
+                sessionStorage.setItem(CLAVE, JSON.stringify({
+                    ruta: location.pathname, t: Date.now(),
+                    x: anterior.offsetLeft, y: anterior.offsetTop, ancho: anterior.offsetWidth, alto: anterior.offsetHeight
+                }));
+            } catch (err) { }
         });
     });
 })();

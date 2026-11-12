@@ -35,6 +35,12 @@ namespace PickingApp.Models
 
         public DateTime? FechaAsignacion { get; set; }
 
+        // Quien asignó o reasignó el pedido por última vez (sale en la orden impresa). Null en los anteriores a este campo.
+        public int? AsignadoPorId { get; set; }
+
+        [ForeignKey("AsignadoPorId")]
+        public virtual Usuario? AsignadoPor { get; set; }
+
         public DateTime? FechaInicioProceso { get; set; }
 
         public DateTime? FechaFinalizacion { get; set; }

@@ -11,14 +11,15 @@ namespace PickingApp.Tests
     // La cookie de sesión se compara con la base de datos en cada petición (SesionUsuario.ValidarAsync).
     public class SesionUsuarioTests
     {
-        private static Usuario Usuario(Escenario e)
+        private static Usuario Usuario(Escenario e, int rolId = Roles.IdSupervisor)
         {
             var usuario = new Usuario
             {
                 NombreCompleto = "Usuario de prueba",
                 Correo = $"{Guid.NewGuid():N}@prueba.com",
                 PasswordHash = "hash",
-                RolId = Roles.IdSupervisor
+                RolId = rolId,
+                Bodega = rolId == Roles.IdAdministrador ? null : new Bodega { Codigo = "BOD-90", Nombre = "Norte" }
             };
             e.Db.Usuarios.Add(usuario);
             e.Db.SaveChanges();
@@ -99,6 +100,64 @@ namespace PickingApp.Tests
 
             Assert.True(r.ShouldRenew);
             Assert.Equal(Roles.Auxiliar, r.Principal!.FindFirstValue(ClaimTypes.Role));
+        }
+
+        [Fact]
+        public async Task QuedarSinBodegaCierraLaSesion()
+        {
+            using var e = new Escenario();
+            var usuario = Usuario(e);
+            var cookie = SesionUsuario.CrearPrincipal(usuario);
+            usuario.Bodega = null;
+            usuario.BodegaId = null;
+            e.Db.SaveChanges();
+
+            var r = await ValidarAsync(e, cookie);
+
+            Assert.Null(r.Principal);
+        }
+
+        [Fact]
+        public async Task InactivarLaBodegaCierraLaSesionDeSuPersonal()
+        {
+            using var e = new Escenario();
+            var usuario = Usuario(e, Roles.IdAuxiliar);
+            var cookie = SesionUsuario.CrearPrincipal(usuario);
+            usuario.Bodega!.Activa = false;
+            e.Db.SaveChanges();
+
+            var r = await ValidarAsync(e, cookie);
+
+            Assert.Null(r.Principal);
+        }
+
+        [Fact]
+        public async Task ElAdministradorNoNecesitaBodega()
+        {
+            using var e = new Escenario();
+            var usuario = Usuario(e, Roles.IdAdministrador);
+            var cookie = SesionUsuario.CrearPrincipal(usuario);
+
+            var r = await ValidarAsync(e, cookie);
+
+            Assert.Same(cookie, r.Principal);
+            Assert.Null(r.Principal!.IdBodega());
+        }
+
+        [Fact]
+        public async Task UnTrasladoDeBodegaSeAplicaSinCerrarLaSesion()
+        {
+            using var e = new Escenario();
+            var usuario = Usuario(e);
+            var cookie = SesionUsuario.CrearPrincipal(usuario);
+            var destino = new Bodega { Codigo = "BOD-91", Nombre = "Sur" };
+            usuario.Bodega = destino;
+            e.Db.SaveChanges();
+
+            var r = await ValidarAsync(e, cookie);
+
+            Assert.True(r.ShouldRenew);
+            Assert.Equal(destino.Id, r.Principal!.IdBodega());
         }
     }
 }

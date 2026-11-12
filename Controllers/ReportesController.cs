@@ -35,8 +35,8 @@ namespace PickingApp.Controllers
             // Listas para los reportes individuales (incluye inactivos para consultar su historial)
             return View(new ReportesIndexViewModel
             {
-                Empleados = await _context.Empleados.OrderBy(e => e.NombreCompleto).ToListAsync(),
-                Bodegas = await _context.Bodegas.OrderBy(b => b.Codigo).ToListAsync()
+                Empleados = await _context.Empleados.ConPasoPorBodega(User).OrderBy(e => e.NombreCompleto).ToListAsync(),
+                Bodegas = await _context.Bodegas.DelAlcance(User).OrderBy(b => b.Codigo).ToListAsync()
             });
         }
 
@@ -50,7 +50,7 @@ namespace PickingApp.Controllers
 
             if (empleadoId.HasValue)
             {
-                var empleado = await _context.Empleados.FindAsync(empleadoId.Value);
+                var empleado = await _context.Empleados.ConPasoPorBodega(User).FirstOrDefaultAsync(e => e.Id == empleadoId.Value);
                 if (empleado == null) return FiltroInvalido("El empleado seleccionado no existe.");
 
                 var pedidosEmpleado = await query
@@ -89,11 +89,10 @@ namespace PickingApp.Controllers
 
             var query = PedidosCompletadosEnPeriodo(periodo);
 
-            if (bodegaId.HasValue)
+            var (bodega, error) = await BodegaDelFiltroAsync(bodegaId);
+            if (error != null) return error;
+            if (bodega != null)
             {
-                var bodega = await _context.Bodegas.FindAsync(bodegaId.Value);
-                if (bodega == null) return FiltroInvalido("La bodega seleccionada no existe.");
-
                 var pedidosBodega = await query
                     .Where(p => p.BodegaId == bodega.Id)
                     .Include(p => p.Empleado)
@@ -148,11 +147,11 @@ namespace PickingApp.Controllers
             if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
             if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaCarga < hasta);
 
+            var (bodega, error) = await BodegaDelFiltroAsync(bodegaId);
+            if (error != null) return error;
             string? filtro = null;
-            if (bodegaId.HasValue)
+            if (bodega != null)
             {
-                var bodega = await _context.Bodegas.FindAsync(bodegaId.Value);
-                if (bodega == null) return FiltroInvalido("La bodega seleccionada no existe.");
                 query = query.Where(p => p.BodegaId == bodega.Id);
                 filtro = $"Bodega: {bodega.Nombre} ({bodega.Codigo})";
             }
@@ -163,7 +162,7 @@ namespace PickingApp.Controllers
                 $"{pedidos.Count} pedidos, periodo: {periodo.Descripcion}. {filtro ?? "Todas las bodegas"}.");
 
             var pdfBytes = _reportService.GenerarReportePedidosPorPeriodoPdf(pedidos, periodo, filtro);
-            var sufijo = bodegaId.HasValue ? $"_{pedidos.FirstOrDefault()?.Bodega?.Codigo ?? $"Bodega{bodegaId}"}" : "";
+            var sufijo = bodega != null ? $"_{bodega.Codigo}" : "";
             return File(pdfBytes, "application/pdf", $"Reporte_Pedidos{sufijo}_{periodo.ParaArchivo}.pdf");
         }
 
@@ -180,7 +179,7 @@ namespace PickingApp.Controllers
 
             // "Reasignados" incluye los que se reasignaron y después se completaron o cancelaron:
             // el estado Reasignado solo dura mientras el pedido sigue en curso.
-            var query = _context.Pedidos
+            var query = _context.Pedidos.DelAlcance(User)
                 .Include(p => p.Empleado)
                 .Where(p => !p.Partes.Any());
             query = estado switch
@@ -288,7 +287,9 @@ namespace PickingApp.Controllers
             if (error != null) return error;
             if (bodega != null) query = query.Where(p => p.BodegaId == bodega.Id);
 
-            var datos = DatosCargaHoraria.De(await query.ToListAsync(), await _context.Empleados.Where(e => e.Activo).ToListAsync());
+            var enTurno = _context.Empleados.Where(e => e.Activo);
+            if (bodega != null) enTurno = enTurno.Where(e => e.BodegaId == bodega.Id);
+            var datos = DatosCargaHoraria.De(await query.ToListAsync(), await enTurno.ToListAsync());
             var filtro = bodega != null ? $"Bodega: {bodega.Nombre} ({bodega.Codigo})" : null;
 
             await _auditService.RegistrarAsync("Exportar PDF Carga Horaria", "Reportes",
@@ -297,11 +298,13 @@ namespace PickingApp.Controllers
                 $"Reporte_Carga_Horaria{(bodega != null ? "_" + bodega.Codigo : "")}_{periodo.ParaArchivo}.pdf");
         }
 
-        // Bodega elegida en el filtro (null = todas); si no existe, el error para volver a Reportes
+        // Bodega elegida en el filtro (null = todas); si no existe o es de otra, el error para volver a Reportes.
+        // Supervisor y Auxiliar no eligen: el reporte siempre es de su bodega, venga lo que venga en la URL.
         private async Task<(Bodega? Bodega, IActionResult? Error)> BodegaDelFiltroAsync(int? bodegaId)
         {
+            bodegaId = User.BodegaVisible() ?? bodegaId;
             if (!bodegaId.HasValue) return (null, null);
-            var bodega = await _context.Bodegas.FindAsync(bodegaId.Value);
+            var bodega = await _context.Bodegas.DelAlcance(User).FirstOrDefaultAsync(b => b.Id == bodegaId.Value);
             return bodega == null ? (null, FiltroInvalido("La bodega seleccionada no existe.")) : (bodega, null);
         }
 
@@ -309,7 +312,7 @@ namespace PickingApp.Controllers
         // completados). Los divididos cuentan por sus partes, igual que en el reporte de pedidos por periodo.
         private async Task<ResumenEstadosPedidos> ResumenEstadosAsync(PeriodoReporte periodo, int? empleadoId = null, int? bodegaId = null)
         {
-            var query = _context.Pedidos.Where(p => !p.Partes.Any());
+            var query = _context.Pedidos.DelAlcance(User).Where(p => !p.Partes.Any());
             if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaCarga >= desde);
             if (periodo.HastaExclusivo is DateTime hasta) query = query.Where(p => p.FechaCarga < hasta);
             if (empleadoId.HasValue) query = query.Where(p => p.EmpleadoId == empleadoId.Value);
@@ -323,7 +326,7 @@ namespace PickingApp.Controllers
         // Base de los reportes de tiempos: solo pedidos completados con tiempo real, filtrados por fecha de finalización
         private IQueryable<Pedido> PedidosCompletadosEnPeriodo(PeriodoReporte periodo)
         {
-            var query = _context.Pedidos
+            var query = _context.Pedidos.DelAlcance(User)
                 .Where(p => p.Estado == PedidoEstados.Completado && p.TiempoProcesamientoMinutos != null);
 
             if (periodo.Desde is DateTime desde) query = query.Where(p => p.FechaFinalizacion >= desde);

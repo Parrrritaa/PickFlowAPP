@@ -4,10 +4,12 @@
     var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? Roles.Auxiliar;
     var esAdmin = userRole == Roles.Administrador;
     var esAuxiliar = userRole == Roles.Auxiliar;
+    var esSupervisor = userRole == Roles.Supervisor;
     // Fila del empleado recién creado o modificado: se resalta un instante para ubicar el cambio
     var destacadoId = TempData["EmpleadoDestacadoId"] as int?;
     var ocupados = Model.EmpleadosOcupados;
     var rendimientos = Model.Rendimientos;
+    var bodegaElegida = Model.Bodegas.FirstOrDefault(b => b.Id == Model.FiltroBodegaId);
 }
 
 <h1 class="pf-page-title">Gestión de empleados</h1>
@@ -20,13 +22,33 @@
             {
                 @* Filtra la tabla al escribir (site.js, data-pf-buscar-en) *@
                 <label class="visually-hidden" for="buscarEmpleado">Buscar empleado</label>
-                <input type="search" id="buscarEmpleado" class="pf-search-input" placeholder="Buscar nombre, estado o turno..." data-pf-buscar-en="tablaEmpleados" autocomplete="off" />
+                <input type="search" id="buscarEmpleado" class="pf-search-input" placeholder="@(esAdmin ? "Buscar nombre, bodega, estado o turno..." : "Buscar nombre, estado o turno...")" data-pf-buscar-en="tablaEmpleados" autocomplete="off" />
             }
             <a asp-action="Crear" class="btn-pf-blue">
                 @(esAuxiliar ? "+ Generar solicitud de registro" : "+ Registrar Empleado")
             </a>
         </div>
     </div>
+
+    @if (Model.Bodegas.Count > 1)
+    {
+        @* Solo el Administrador ve varias bodegas: cada pestaña recarga con ?bodegaId (la píldora la pone site.js) *@
+        <div class="pf-estado-barra">
+            <nav class="pf-estado-tabs" aria-label="Bodega de los empleados">
+                <a asp-action="Index" class="@(bodegaElegida == null ? "activo" : "")" aria-current="@(bodegaElegida == null ? "page" : null)">
+                    Todas <span class="pf-estado-tabs__n">@Model.TotalEmpleados</span>
+                </a>
+                @foreach (var b in Model.Bodegas)
+                {
+                    var activa = b.Id == bodegaElegida?.Id;
+                    <a asp-action="Index" asp-route-bodegaId="@b.Id" class="@(activa ? "activo" : "")" aria-current="@(activa ? "page" : null)"
+                       title="@b.Codigo@(b.Activa ? "" : " · inactiva")">
+                        @b.Nombre <span class="pf-estado-tabs__n">@Model.EmpleadosPorBodega.GetValueOrDefault(b.Id)</span>
+                    </a>
+                }
+            </nav>
+        </div>
+    }
 
     <div class="table-responsive">
         <table class="pf-table" id="tablaEmpleados" data-pf-paginar>
@@ -44,7 +66,7 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model.Empleados.Any())
+                @if (Model.Empleados.Any() || Model.Trasladados.Any())
                 {
                     @foreach (var emp in Model.Empleados)
                     {
@@ -54,6 +76,11 @@
                                más por página, con la paginación a la vista *@
                             <td>
                                 <div class="fw-semibold">@emp.NombreCompleto</div>
+                                @if (esAdmin)
+                                {
+                                    @* El Administrador ve a todas las bodegas; los demás solo la suya *@
+                                    <div class="text-secondary small">@(emp.Bodega?.Nombre ?? "Sin bodega asignada")</div>
+                                }
                                 @if (!esAuxiliar)
                                 {
                                     <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
@@ -103,15 +130,48 @@
                                             Reiniciar rendimiento
                                         </button>
                                     }
+                                    @if (esSupervisor)
+                                    {
+                                        <button type="button" class="btn-pf-gray" style="padding: 4px 16px; font-size: 14px;"
+                                                data-bs-toggle="modal" data-bs-target="#modalTraslado"
+                                                data-pf-id="@emp.Id" data-pf-texto="@emp.NombreCompleto">
+                                            Solicitar traslado
+                                        </button>
+                                    }
                                 </div>
                             </td>
+                        </tr>
+                    }
+                    @* Ya no trabajan en esta bodega: solo se consulta lo que hicieron aquí *@
+                    @foreach (var salida in Model.Trasladados)
+                    {
+                        var emp = salida.Empleado!;
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@emp.NombreCompleto</div>
+                                @if (!esAuxiliar)
+                                {
+                                    <a asp-action="Historial" asp-route-id="@emp.Id" class="pf-link-historial">
+                                        Ver historial<span class="visually-hidden"> de @emp.NombreCompleto</span>
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                    </a>
+                                }
+                            </td>
+                            <td>Inactivo · Trasladado a @salida.BodegaDestino!.Nombre el @salida.Fecha.ToString("dd/MM/yyyy")</td>
+                            @if (!esAuxiliar)
+                            {
+                                <td>-</td>
+                                <td>-</td>
+                            }
+                            <td>-</td>
+                            <td class="text-center">-</td>
                         </tr>
                     }
                 }
                 else
                 {
                     <tr>
-                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">No hay empleados registrados.</td>
+                        <td colspan="@(esAuxiliar ? 4 : 6)" class="text-center text-muted py-4">@(bodegaElegida != null ? $"{bodegaElegida.Nombre} no tiene empleados todavía." : esAdmin ? "No hay empleados registrados." : "Aún no hay empleados en tu bodega.")</td>
                     </tr>
                 }
                 <tr class="d-none" data-pf-sin-resultados>
@@ -150,6 +210,11 @@
         </div>
     </div>
 </div>
+
+@if (esSupervisor)
+{
+    <partial name="_ModalTraslado" model="true" />
+}
 
 @if (esAdmin)
 {

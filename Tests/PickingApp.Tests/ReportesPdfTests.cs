@@ -10,8 +10,8 @@ namespace PickingApp.Tests
     // Cada reporte se genera sin errores, con datos y vacío (ReportService)
     public class ReportesPdfTests
     {
-        // Entorno sin wwwroot: los PDF salen sin logo
-        private sealed class Entorno : IWebHostEnvironment
+        // Entorno sin wwwroot: los PDF salen sin logo (también lo usa AlcanceBodegaTests)
+        internal sealed class Entorno : IWebHostEnvironment
         {
             public string WebRootPath { get; set; } = Path.GetTempPath();
             public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();

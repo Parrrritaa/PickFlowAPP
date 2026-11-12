@@ -82,7 +82,8 @@ namespace PickingApp.Tests
             var usuario = new Usuario
             {
                 NombreCompleto = "Usuario de prueba", Correo = $"{Guid.NewGuid():N}@prueba.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Correcta1", 4), RolId = rolId
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Correcta1", 4), RolId = rolId,
+                Bodega = rolId == Roles.IdAdministrador ? null : new Bodega { Codigo = "BOD-90", Nombre = "Norte" }
             };
             e.Db.Usuarios.Add(usuario);
             e.Db.SaveChanges();
@@ -98,6 +99,21 @@ namespace PickingApp.Tests
             };
             await controlador.Login(new LoginViewModel { Correo = correo, Password = password });
             return controlador.ModelState[string.Empty]?.Errors.Select(x => x.ErrorMessage).ToArray() ?? Array.Empty<string>();
+        }
+
+        [Fact]
+        public async Task SinUnaBodegaActivaNoEntraAunqueLaContrasenaSeaCorrecta()
+        {
+            using var e = new Escenario();
+            var sinBodega = Usuario(e, Roles.IdSupervisor);
+            sinBodega.Bodega = null;
+            sinBodega.BodegaId = null;
+            var bodegaInactiva = Usuario(e, Roles.IdAuxiliar);
+            bodegaInactiva.Bodega!.Activa = false;
+            e.Db.SaveChanges();
+
+            Assert.Contains(await FallarAsync(e, sinBodega.Correo, "Correcta1"), m => m.Contains("no tiene una bodega"));
+            Assert.Contains(await FallarAsync(e, bodegaInactiva.Correo, "Correcta1"), m => m.Contains("está inactiva"));
         }
 
         [Fact]

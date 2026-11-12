@@ -13,8 +13,8 @@ namespace PickingApp.Services
     // en curso, reasignados, completados, cancelados y divididos, novedades abiertas y atendidas, y solicitudes
     // pendientes, aprobadas y rechazadas. Las fechas van hacia atrás desde el momento en que se pulsa el botón.
     //
-    // No pasa por los controladores (sus acciones usan la hora actual), pero aplica sus mismas reglas: un pedido en
-    // curso por empleado, asignaciones dentro de la jornada y desde la fecha de ingreso, tiempo real desde el inicio
+    // No pasa por los controladores (sus acciones usan la hora actual), pero aplica sus mismas reglas: cada pedido lo
+    // recoge personal de su bodega, un pedido en curso por empleado, asignaciones dentro de la jornada y desde la fecha de ingreso, tiempo real desde el inicio
     // del picking (asignación + margen), partes que cierran el pedido original y el mismo texto en el LOG.
     // El paso a paso de cada día está en SimulacionDemostracion.
     public class DatosDemostracion
@@ -67,21 +67,23 @@ namespace PickingApp.Services
         {
             if (await _context.Pedidos.AnyAsync())
                 return "Ya hay pedidos registrados. Borre primero el historial de pedidos para cargar la demostración desde cero.";
-            if (await _context.Empleados.CountAsync(e => e.Activo) < MinimoEmpleados)
-                return $"Se necesitan al menos {MinimoEmpleados} empleados activos.";
+            if (await _context.Empleados.CountAsync(e => e.Activo && e.BodegaId != null) < MinimoEmpleados)
+                return $"Se necesitan al menos {MinimoEmpleados} empleados activos con bodega.";
             if ((await UbicacionesPorBodegaAsync()).Sum(b => b.Count) < MinimoUbicaciones)
-                return $"Se necesitan al menos {MinimoUbicaciones} ubicaciones activas con producto en bodegas activas.";
+                return $"Se necesitan al menos {MinimoUbicaciones} ubicaciones activas con producto en bodegas activas que tengan empleados activos.";
             return null;
         }
 
-        // Ubicaciones de donde pueden salir pedidos, agrupadas por bodega: toda bodega activa con al menos una
-        // ubicación activa que tenga producto recibe pedidos (las que tienen pocas, pedidos de pocas líneas)
+        // Ubicaciones de donde pueden salir pedidos, agrupadas por bodega: toda bodega activa con empleados activos y
+        // al menos una ubicación activa que tenga producto recibe pedidos (las que tienen pocas, pedidos de pocas líneas).
+        // Sin empleados en la bodega nadie podría tomarlos: solo el personal de la bodega del pedido lo recoge.
         private async Task<List<List<Ubicacion>>> UbicacionesPorBodegaAsync()
         {
+            var conPersonal = await _context.Empleados.Where(e => e.Activo && e.BodegaId != null).Select(e => e.BodegaId).Distinct().ToListAsync();
             var ubicaciones = await _context.Ubicaciones
                 .Include(u => u.Producto)
                 .Include(u => u.Bodega)
-                .Where(u => u.Activa && u.Producto != null && u.Bodega!.Activa)
+                .Where(u => u.Activa && u.Producto != null && u.Bodega!.Activa && conPersonal.Contains(u.BodegaId))
                 .ToListAsync();
             return ubicaciones.GroupBy(u => u.BodegaId)
                 .Select(g => g.ToList())
@@ -93,14 +95,15 @@ namespace PickingApp.Services
             var usuarios = await _context.Usuarios.Include(u => u.Rol)
                 .Where(u => u.Estado == EstadosUsuario.Activo || u.Id == administradorId).ToListAsync();
             var administrador = usuarios.First(u => u.Id == administradorId);
-            // El trabajo diario lo hace el Supervisor; sin Supervisor activo, el Administrador
-            var supervisor = usuarios.FirstOrDefault(u => u.RolId == Roles.IdSupervisor) ?? administrador;
-            var auxiliar = usuarios.FirstOrDefault(u => u.RolId == Roles.IdAuxiliar);
+            // El trabajo diario de cada bodega lo firma su Supervisor (SimulacionDemostracion.SupervisorDe). Las solicitudes
+            // las envía un Supervisor y un Auxiliar con bodega; sin bodega no podrían entrar al sistema.
+            var supervisor = usuarios.FirstOrDefault(u => u.RolId == Roles.IdSupervisor && u.BodegaId != null) ?? administrador;
+            var auxiliar = usuarios.FirstOrDefault(u => u.RolId == Roles.IdAuxiliar && u.BodegaId != null);
 
             var sim = new SimulacionDemostracion(DateTime.Now, _azar,
-                await _context.Empleados.Where(e => e.Activo).ToListAsync(),
+                await _context.Empleados.Where(e => e.Activo && e.BodegaId != null).ToListAsync(),
                 await ParametrosSistema.ObtenerAsync(_context, ParametrosSistema.MargenInicioMinutos),
-                supervisor, administrador, usuarios);
+                administrador, usuarios);
 
             // Todo o nada: si algo falla, no queda una demostración a medias
             await using var transaccion = await _context.Database.BeginTransactionAsync();
@@ -121,7 +124,7 @@ namespace PickingApp.Services
             foreach (var padre in divididos.Where(p => p.CerrarSiTerminaronLasPartes()))
             {
                 var completado = padre.Estado == PedidoEstados.Completado;
-                sim.Log(padre.FechaFinalizacion!.Value, supervisor, completado ? AccionesLog.CompletarPedido : AccionesLog.CancelarPedido,
+                sim.Log(padre.FechaFinalizacion!.Value, sim.SupervisorDe(padre.BodegaId), completado ? AccionesLog.CompletarPedido : AccionesLog.CancelarPedido,
                     $"Pedido {padre.CodigoPedido} {(completado ? "completado" : "cancelado")} automáticamente: finalizaron sus {padre.Partes.Count} partes.");
             }
 
@@ -254,7 +257,7 @@ namespace PickingApp.Services
 
             pedido.Estado = PedidoEstados.Dividido;
             partes.ForEach(pedido.Partes.Add);
-            sim.Log(pedido.FechaCarga.AddMinutes(12), sim.Supervisor, AccionesLog.DividirPedido,
+            sim.Log(pedido.FechaCarga.AddMinutes(12), sim.SupervisorDe(pedido.BodegaId), AccionesLog.DividirPedido,
                 $"Pedido {pedido.CodigoPedido} dividido en {totalPartes} partes: " +
                 string.Join(", ", partes.Select(p => $"{p.CodigoPedido} ({p.Detalles.Sum(d => d.Cantidad)} uds)")) + ".");
             return partes;
@@ -273,7 +276,7 @@ namespace PickingApp.Services
                 sim.Log(s.FechaSolicitud, Solicitante, LogAccion, LogDetalle, "Solicitudes");
                 sim.NotificarRol(s.FechaSolicitud, RolDestinoId, Titulo,
                     $"El {ClaimsPrincipalExtensions.DescribirUsuario(Solicitante.NombreCompleto, Solicitante.NombreRol)} solicitó {QueSolicito}.",
-                    TipoAviso, "/Solicitudes/Index", leida: respondida);
+                    TipoAviso, "/Solicitudes/Index", leida: respondida, bodegaId: s.BodegaId);
                 if (!respondida || Responde == null) return;
 
                 var fecha = s.FechaRespuesta!.Value;
@@ -306,6 +309,7 @@ namespace PickingApp.Services
             {
                 var s = Solicitud.Nueva(tipo, solicitante.Id, datos);
                 s.FechaSolicitud = fecha;
+                s.BodegaId = solicitante.BodegaId; // como FlujoSolicitudes.CrearAsync
                 if (responde != null)
                 {
                     s.Estado = motivoRechazo == null ? EstadosSolicitud.Aprobada : EstadosSolicitud.Rechazada;
@@ -319,8 +323,9 @@ namespace PickingApp.Services
                 return demo;
             }
 
+            // El Supervisor solo pide cambios sobre empleados de su bodega
             var libres = new List<Empleado>();
-            foreach (var e in (await _context.Empleados.Where(e => e.Activo).ToListAsync()).OrderBy(_ => _azar.Next()))
+            foreach (var e in (await _context.Empleados.Where(e => e.Activo && e.BodegaId == supervisor.BodegaId).ToListAsync()).OrderBy(_ => _azar.Next()))
                 if (await SolicitudesPendientes.DeEmpleadoAsync(_context, e.Id) == null) libres.Add(e);
 
             if (supervisor.Id != administrador.Id)
@@ -385,17 +390,19 @@ namespace PickingApp.Services
                     return new DatosEmpleadoSolicitud
                     {
                         Identificacion = identificacion, NombreCompleto = nombre, Correo = CorreoDe(nombre),
-                        HorarioEntrada = new TimeSpan(7, 0, 0), HorarioSalida = new TimeSpan(16, 0, 0), FechaIngreso = hoy
+                        HorarioEntrada = new TimeSpan(7, 0, 0), HorarioSalida = new TimeSpan(16, 0, 0), FechaIngreso = hoy,
+                        BodegaId = auxiliar.BodegaId
                     };
                 }
 
-                // Rechazada por el Supervisor (él gestiona los registros que envían los Auxiliares) y otra pendiente,
-                // salvo que ya haya un registro esperando (al cargar la demostración más de una vez)
+                // Rechazada por el Supervisor de su bodega (él gestiona los registros que envían sus Auxiliares) y otra
+                // pendiente, salvo que esa bodega ya tenga un registro esperando (al cargar la demostración más de una vez)
                 Agregar(TiposSolicitud.RegistroEmpleado, auxiliar, Aspirante(nombres[0]), hoy.AddDays(-2).AddHours(9).AddMinutes(_azar.Next(0, 50)),
                     Roles.IdSupervisor, "Solicitud de Nuevo Empleado", TiposNotificacion.Info, $"el registro del empleado {nombres[0]}",
-                    AccionesLog.SolicitudRegistroEmpleado, $"Auxiliar solicitó registro de empleado: {nombres[0]}", supervisor,
+                    AccionesLog.SolicitudRegistroEmpleado, $"Auxiliar solicitó registro de empleado: {nombres[0]}", sim.SupervisorDe(auxiliar.BodegaId),
                     "La identificación no coincide con el documento; envíala de nuevo con los datos del contrato.");
-                if (!await _context.Solicitudes.AnyAsync(s => s.TipoSolicitudId == TiposSolicitud.RegistroEmpleado && s.Estado == EstadosSolicitud.Pendiente))
+                if (!await _context.Solicitudes.AnyAsync(s => s.TipoSolicitudId == TiposSolicitud.RegistroEmpleado && s.Estado == EstadosSolicitud.Pendiente
+                        && s.BodegaId == auxiliar.BodegaId))
                     Agregar(TiposSolicitud.RegistroEmpleado, auxiliar, Aspirante(nombres[1]), sim.Ahora.AddMinutes(-_azar.Next(30, 90)),
                     Roles.IdSupervisor, "Solicitud de Nuevo Empleado", TiposNotificacion.Info, $"el registro del empleado {nombres[1]}",
                     AccionesLog.SolicitudRegistroEmpleado, $"Auxiliar solicitó registro de empleado: {nombres[1]}");

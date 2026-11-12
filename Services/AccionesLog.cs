@@ -20,5 +20,6 @@ namespace PickingApp.Services
         public const string SolicitudRegistroEmpleado = "Solicitud Registro Empleado";
         public const string SolicitudEdicionEmpleado = "Solicitud Edición Empleado";
         public const string SolicitudInactivarEmpleado = "Solicitud Inactivar Empleado";
+        public const string SolicitudTraslado = "Solicitud Traslado";
     }
 }

@@ -20,18 +20,29 @@ namespace PickingApp.Models.ViewModels
     public class EmpleadosIndexViewModel
     {
         public List<Empleado> Empleados { get; init; } = new();
+        public List<TrasladoPersonal> Trasladados { get; init; } = new();
 
         // Ids de los empleados con un pedido Asignado o Reasignado
         public HashSet<int> EmpleadosOcupados { get; init; } = new();
 
         // Factor de rendimiento de cada empleado, por Id
         public Dictionary<int, RendimientoEmpleado> Rendimientos { get; init; } = new();
+
+        // Pestañas por bodega (solo el Administrador; vacío para los demás): la elegida y los empleados de cada una
+        public List<Bodega> Bodegas { get; init; } = new();
+        public Dictionary<int, int> EmpleadosPorBodega { get; init; } = new();
+        public int? FiltroBodegaId { get; init; }
+        public int TotalEmpleados { get; init; }
     }
 
     // Views/Empleados/Historial.cshtml: tiempos reales contra estimados de los pedidos que completó un empleado
     public class EmpleadoHistorialViewModel
     {
         public Empleado Empleado { get; init; } = null!;
+        public List<PickingApp.Services.PeriodoBodega> Periodos { get; init; } = new();
+
+        // Si dejó la bodega de quien consulta: su salida. En esa bodega se muestra como trasladado.
+        public TrasladoPersonal? SalidaDeEstaBodega { get; init; }
         public bool Ocupado { get; init; }
         public RendimientoEmpleado Rendimiento { get; init; } = null!;
         public TendenciaRendimiento Tendencia { get; init; } = null!;

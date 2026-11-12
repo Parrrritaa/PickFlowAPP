@@ -325,6 +325,7 @@ namespace PickingApp.Controllers
                 await _context.Pedidos.ExecuteDeleteAsync();
                 await _context.Solicitudes.ExecuteDeleteAsync();
                 await _context.Notificaciones.ExecuteDeleteAsync();
+                await _context.TrasladosPersonal.ExecuteDeleteAsync();
 
                 // Opcional: vaciar el LOG. El registro de esta limpieza se escribe después, así queda como primer registro.
                 if (limpiarLog)
@@ -336,7 +337,7 @@ namespace PickingApp.Controllers
 
             // Fuera de la transacción: en MySQL, ALTER TABLE confirma cualquier transacción abierta
 
-            var tablasAReiniciar = new List<string> { "NovedadesPedido", "DetallesPedido", "Pedidos", "Solicitudes", "Notificaciones" };
+            var tablasAReiniciar = new List<string> { "NovedadesPedido", "DetallesPedido", "Pedidos", "Solicitudes", "Notificaciones", "TrasladosPersonal" };
             if (limpiarLog)
             {
                 tablasAReiniciar.Add("LogsSistema");

@@ -20,6 +20,9 @@ namespace PickingApp.Models.ViewModels
         public List<Solicitud> Solicitudes { get; set; } = new();
         public FiltrosSolicitudes Filtros { get; set; } = new();
 
+        // Solicitudes de cada estado con los demás filtros: el número de cada pestaña
+        public Dictionary<string, int> ConteoPorEstado { get; set; } = new();
+
         // true: solicitudes de otros para revisar; false: "Mis solicitudes"
         public bool EsBandeja { get; set; }
 
