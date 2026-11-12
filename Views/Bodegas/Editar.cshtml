@@ -28,16 +28,16 @@
 
         <div class="row mb-3">
             <div class="col-12 pf-form-group">
-                <label class="pf-label">Nombre de la bodega <span class="text-danger">*</span></label>
-                <input asp-for="Nombre" class="pf-input" required />
+                <label for="Nombre" class="pf-label">Nombre de la bodega <span class="text-danger">*</span></label>
+                <input id="Nombre" asp-for="Nombre" class="pf-input" required />
                 <span asp-validation-for="Nombre" class="text-danger small"></span>
             </div>
         </div>
 
         <div class="row mb-4">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Estado</label>
-                <select asp-for="Activa" class="pf-input">
+                <label for="Activa" class="pf-label">Estado</label>
+                <select id="Activa" asp-for="Activa" class="pf-input">
                     <option value="true">Activa</option>
                     <option value="false">Inactiva</option>
                 </select>
@@ -46,8 +46,8 @@
 
         <div class="row mb-4">
             <div class="col-12 pf-form-group">
-                <label class="pf-label">Descripción</label>
-                <textarea asp-for="Descripcion" class="pf-input" style="height: 110px;"></textarea>
+                <label for="Descripcion" class="pf-label">Descripción</label>
+                <textarea id="Descripcion" asp-for="Descripcion" class="pf-input" style="height: 110px;"></textarea>
             </div>
         </div>
 

@@ -32,32 +32,32 @@
 
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Nombres <span class="text-danger">*</span></label>
+                <label for="inputNombres" class="pf-label">Nombres <span class="text-danger">*</span></label>
                 <input type="text" id="inputNombres" name="nombres" class="pf-input" value="@nombres" placeholder="" required />
             </div>
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Apellidos <span class="text-danger">*</span></label>
+                <label for="inputApellidos" class="pf-label">Apellidos <span class="text-danger">*</span></label>
                 <input type="text" id="inputApellidos" name="apellidos" class="pf-input" value="@apellidos" placeholder="" required />
             </div>
         </div>
 
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Numero de documento <span class="text-danger">*</span></label>
-                <input asp-for="Identificacion" class="pf-input" placeholder="" inputmode="numeric" pattern="\d*" title="Solo números" required />
+                <label for="Identificacion" class="pf-label">Numero de documento <span class="text-danger">*</span></label>
+                <input id="Identificacion" asp-for="Identificacion" class="pf-input" placeholder="" inputmode="numeric" pattern="\d*" title="Solo números" required />
                 <span asp-validation-for="Identificacion" class="text-danger small"></span>
             </div>
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Correo electronico <span class="text-danger">*</span></label>
-                <input asp-for="Correo" type="email" class="pf-input" placeholder="" required />
+                <label for="Correo" class="pf-label">Correo electronico <span class="text-danger">*</span></label>
+                <input id="Correo" asp-for="Correo" type="email" class="pf-input" placeholder="" required />
                 <span asp-validation-for="Correo" class="text-danger small"></span>
             </div>
         </div>
 
         <div class="row mb-3">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Fecha de ingreso <span class="text-danger">*</span></label>
-                <input asp-for="FechaIngreso" type="date" class="pf-input" required />
+                <label for="FechaIngreso" class="pf-label">Fecha de ingreso <span class="text-danger">*</span></label>
+                <input id="FechaIngreso" asp-for="FechaIngreso" type="date" class="pf-input" required />
                 <span asp-validation-for="FechaIngreso" class="text-danger small"></span>
             </div>
             @if (userRole == Roles.Administrador)
@@ -74,13 +74,13 @@
 
         <div class="row mb-4">
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Hora de entrada <span class="text-danger">*</span></label>
-                <input asp-for="HorarioEntrada" type="time" class="pf-input" required />
+                <label for="HorarioEntrada" class="pf-label">Hora de entrada <span class="text-danger">*</span></label>
+                <input id="HorarioEntrada" asp-for="HorarioEntrada" type="time" class="pf-input" required />
                 <span asp-validation-for="HorarioEntrada" class="text-danger small"></span>
             </div>
             <div class="col-md-6 pf-form-group">
-                <label class="pf-label">Hora de salida <span class="text-danger">*</span></label>
-                <input asp-for="HorarioSalida" type="time" class="pf-input" required />
+                <label for="HorarioSalida" class="pf-label">Hora de salida <span class="text-danger">*</span></label>
+                <input id="HorarioSalida" asp-for="HorarioSalida" type="time" class="pf-input" required />
                 <span asp-validation-for="HorarioSalida" class="text-danger small"></span>
                 <div class="form-text small">La jornada no puede superar el máximo de horas configurado por el Administrador.</div>
             </div>

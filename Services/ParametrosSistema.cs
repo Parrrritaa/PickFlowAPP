@@ -69,7 +69,7 @@ namespace PickingApp.Services
         public static bool EsValido(Parametro parametro, string? texto, out double valor)
         {
             return Formato.TryParseDecimal(texto, out valor)
-                && (!parametro.Entero || valor == Math.Floor(valor))
+                && (!parametro.Entero || double.IsInteger(valor))
                 && valor >= parametro.Minimo && valor <= parametro.Maximo;
         }
     }

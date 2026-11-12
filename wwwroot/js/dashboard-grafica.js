@@ -65,7 +65,7 @@
             mostrar.textContent = 'Mostrar todos';
             mostrar.addEventListener('click', () => {
                 kpis.forEach(k => k.setAttribute('aria-pressed', 'true'));
-                cargar();
+                void cargar();
             });
             el('pfResumen').append(nota, mostrar);
         }
@@ -180,11 +180,11 @@
         el('pfLimpiar').disabled = n === 0;
         el('pfFiltrosBtn').setAttribute('aria-label', n ? 'Filtros, ' + n + ' activos' : 'Filtros');
     }
-    camposFiltro.forEach(c => c.addEventListener('change', () => { contarFiltros(); cargar(); }));
+    camposFiltro.forEach(c => c.addEventListener('change', () => { contarFiltros(); void cargar(); }));
     el('pfLimpiar').addEventListener('click', () => {
         camposFiltro.forEach(c => { c.selectedIndex = 0; });
         contarFiltros();
-        cargar();
+        void cargar();
     });
 
     // El título muestra la agrupación elegida en un botón con menú propio (el select oculto guarda el valor)
@@ -214,7 +214,7 @@
         if (el('pfAgrupar').value === 'dia' && esCircular(estado.tipo)) {
             elegirTipo(tipos.querySelector('[data-tipo="line"]'));
         }
-        cargar();
+        void cargar();
     });
 
     // Franja de estados: cada uno muestra u oculta su estado en la gráfica
@@ -222,7 +222,7 @@
         const k = e.target.closest('.pf-kpi');
         if (!k) return;
         k.setAttribute('aria-pressed', k.getAttribute('aria-pressed') !== 'true');
-        cargar();
+        void cargar();
     });
 
     el('pfVerTabla').addEventListener('click', () => { estado.tabla = !estado.tabla; dibujar(); });
@@ -251,8 +251,8 @@
     }
 
     ajustarAgrupar();
-    document.fonts?.ready.then(ajustarAgrupar);
+    void document.fonts?.ready.then(ajustarAgrupar);
     elegirTipo(tipos.querySelector('.pf-tipo.active'));
     contarFiltros();
-    cargar();
+    void cargar();
 })();

@@ -7,6 +7,7 @@
 <html lang="es">
 <head>
     <partial name="_Cabecera" />
+    <title>@ViewData["Title"] - PickFlow</title>
 </head>
 <body class="@(TempData["JustLoggedIn"] != null ? "pf-just-logged-in" : "")">
     @if (User.Identity != null && User.Identity.IsAuthenticated)

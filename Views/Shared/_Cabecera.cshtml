@@ -1,10 +1,9 @@
-@* Parte común del <head> de los dos layouts: íconos, hojas de estilo, tipografía y apariencia.
-   El script fija data-theme en <html> antes de pintar (lo guardado en este navegador o el tema del equipo),
+@* Parte común de la cabecera de los dos layouts: íconos, hojas de estilo, tipografía y apariencia.
+   El script fija data-theme en el elemento raíz antes de pintar (lo guardado en este navegador o el tema del equipo),
    así la página no parpadea en claro antes de pasar a oscuro. *@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="color-scheme" content="light dark" />
-<title>@ViewData["Title"] - PickFlow</title>
 <script>
     (function () {
         var tema = null;

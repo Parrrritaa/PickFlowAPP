@@ -357,24 +357,27 @@ namespace PickingApp.Controllers
 
         // Con las tablas ya vacías, se reinicia el autoincremento para que los próximos
         // registros vuelvan a empezar en 1 (evita IDs de pedidos con números muy altos).
+        // Un nombre de tabla no puede ir como parámetro (@p0) en SQL, así que cada sentencia se escribe completa:
+        // no se arma texto con el nombre recibido y una tabla que no esté aquí no se puede reiniciar.
+        private static readonly Dictionary<string, string> SqlReiniciarAutoincremento = new(StringComparer.Ordinal)
+        {
+            ["NovedadesPedido"] = "ALTER TABLE `NovedadesPedido` AUTO_INCREMENT = 1",
+            ["DetallesPedido"] = "ALTER TABLE `DetallesPedido` AUTO_INCREMENT = 1",
+            ["Pedidos"] = "ALTER TABLE `Pedidos` AUTO_INCREMENT = 1",
+            ["Solicitudes"] = "ALTER TABLE `Solicitudes` AUTO_INCREMENT = 1",
+            ["Notificaciones"] = "ALTER TABLE `Notificaciones` AUTO_INCREMENT = 1",
+            ["TrasladosPersonal"] = "ALTER TABLE `TrasladosPersonal` AUTO_INCREMENT = 1",
+            ["LogsSistema"] = "ALTER TABLE `LogsSistema` AUTO_INCREMENT = 1",
+        };
+
         private async Task ReiniciarAutoincrementoAsync(params string[] tablas)
         {
-            // Un nombre de tabla no puede ir como parámetro en SQL, así que se compara contra las tablas
-            // reales del modelo de EF antes de armar la sentencia: aunque mañana el nombre llegara de otro
-            // lado, nada que no sea una tabla de PickFlow puede terminar dentro del ALTER TABLE.
-            var tablasDelModelo = _context.Model.GetEntityTypes()
-                .Select(t => t.GetTableName())
-                .Where(n => n != null)
-                .ToHashSet(StringComparer.Ordinal);
-
             foreach (var tabla in tablas)
             {
-                if (!tablasDelModelo.Contains(tabla))
-                    throw new InvalidOperationException($"'{tabla}' no es una tabla del modelo de PickFlow.");
+                if (!SqlReiniciarAutoincremento.TryGetValue(tabla, out var sql))
+                    throw new InvalidOperationException($"La tabla '{tabla}' no tiene reinicio de autoincremento definido.");
 
-#pragma warning disable EF1002
-                await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE `{tabla}` AUTO_INCREMENT = 1");
-#pragma warning restore EF1002
+                await _context.Database.ExecuteSqlRawAsync(sql);
             }
         }
     }
