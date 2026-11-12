@@ -83,7 +83,7 @@ document.addEventListener('click', function (e) {
         form.addEventListener('submit', function (e) {
             if (revisado === campo.value.trim().toLowerCase()) return;
             e.preventDefault();
-            consultar().then(function () {
+            void consultar().then(function () {
                 if (campo.checkValidity()) form.requestSubmit(); else campo.reportValidity();
             });
         });
@@ -118,7 +118,7 @@ document.addEventListener('click', function (e) {
 
     function filasQueCaben(contenedor, items) {
         // data-pf-paginar="6": la vista fija cuántas filas van por página
-        var fijas = parseInt(contenedor.dataset.pfPaginar, 10);
+        var fijas = Number.parseInt(contenedor.dataset.pfPaginar, 10);
         if (fijas > 0) return fijas;
         var medibles = items.filter(function (f) { return f.offsetHeight > 4; });
         if (!medibles.length) return PREDETERMINADO;
@@ -128,7 +128,7 @@ document.addEventListener('click', function (e) {
         // Lo que va debajo de la tabla en la misma tarjeta (p. ej. la barra "Guardar cambios") también resta espacio
         var debajo = 0;
         for (var s = (contenedor.closest('.table-responsive') || contenedor).nextElementSibling; s; s = s.nextElementSibling) {
-            if (!s.hidden && !s.classList.contains('pf-paginacion')) debajo += s.offsetHeight + parseFloat(getComputedStyle(s).marginTop);
+            if (!s.hidden && !s.classList.contains('pf-paginacion')) debajo += s.offsetHeight + Number.parseFloat(getComputedStyle(s).marginTop);
         }
         var espacio = window.innerHeight - topEnDocumento(cuerpo) - RESERVA - debajo;
         // Si la tabla empieza en el primer pantallazo se muestran las filas que caben, aunque sean menos de MIN
@@ -315,7 +315,7 @@ document.addEventListener('click', function (e) {
     var delServidor = Array.prototype.slice.call(document.querySelectorAll('[data-pf-filas-servidor]'));
     // Tras cargar fuentes e imágenes las filas ya tienen su alto definitivo
     // Las fuentes web pueden llegar después de 'load' y cambiar el alto de las filas
-    if (document.fonts) document.fonts.ready.then(function () { paginados.forEach(function (c) { paginar(c); }); });
+    if (document.fonts) void document.fonts.ready.then(function () { paginados.forEach(function (c) { paginar(c); }); });
     window.addEventListener('load', function () {
         paginados.forEach(function (c) { paginar(c); });
         if (!delServidor.some(ajustarServidor)) {
@@ -570,7 +570,7 @@ document.addEventListener('click', function (e) {
 
         // La fuente llega después del primer pintado y cambia el ancho de las pestañas. Si la píldora va llegando
         // (o ya se desliza), se reacomoda animada: colocarla de golpe se comería el recorrido.
-        if (document.fonts) document.fonts.ready.then(function () { mover(llegando || pildora.classList.contains('pf-animando')); });
+        if (document.fonts) void document.fonts.ready.then(function () { mover(llegando || pildora.classList.contains('pf-animando')); });
         window.addEventListener('resize', function () { mover(false); });
         nav.addEventListener('pf:pildora', function () { mover(true); });
 
@@ -714,7 +714,7 @@ document.addEventListener('show.bs.modal', function (e) {
     }
 
     // La fuente Geist llega después del primer pintado y cambia el ancho de las opciones
-    if (document.fonts) document.fonts.ready.then(function () { irA(activa(), false); });
+    if (document.fonts) void document.fonts.ready.then(function () { irA(activa(), false); });
     window.addEventListener('resize', function () { irA(activa(), false); });
 
     // Clic normal en una opción directa o en una opción de un panel: la píldora sale ya hacia ella
@@ -1054,7 +1054,7 @@ window.addEventListener('pageshow', function (e) {
         var n = numero.value.trim();
         repetido = null;
         if (/^\d+$/.test(n)) {
-            var valor = String(parseInt(n, 10));
+            var valor = String(Number.parseInt(n, 10));
             var codigo = 'PROD-' + (valor.length < 3 ? ('000' + valor).slice(-3) : valor);
             codigoTexto.textContent = 'Código: ' + codigo;
             repetido = productos.filter(function (p) { return p.codigo.toUpperCase() === codigo; })[0] || null;

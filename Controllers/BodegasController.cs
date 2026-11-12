@@ -185,7 +185,7 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Editar(int id, Bodega model)
+        public async Task<IActionResult> Editar(int id, [Bind(nameof(Bodega.Id), nameof(Bodega.Nombre), nameof(Bodega.Descripcion), nameof(Bodega.Activa))] Bodega model)
         {
             if (id != model.Id) return NotFound();
 
@@ -315,7 +315,8 @@ namespace PickingApp.Controllers
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditarUbicacion(int id, [Bind(Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion, string? motivo)
+        public async Task<IActionResult> EditarUbicacion(int id, [Bind(nameof(Ubicacion.Pasillo), nameof(Ubicacion.Estante), nameof(Ubicacion.Nivel),
+            nameof(Ubicacion.Activa), Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion, string? motivo)
         {
             var ubicacionExistente = await _context.Ubicaciones.DelAlcance(User)
                 .Include(u => u.Bodega)

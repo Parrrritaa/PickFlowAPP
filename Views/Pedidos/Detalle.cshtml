@@ -461,8 +461,8 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <label class="form-label fw-bold">Nueva prioridad:</label>
-                        <select name="nuevaPrioridad" class="form-select">
+                        <label for="nuevaPrioridad" class="form-label fw-bold">Nueva prioridad:</label>
+                        <select id="nuevaPrioridad" name="nuevaPrioridad" class="form-select">
                             @foreach (var prioridad in Prioridades.Todas)
                             {
                                 <option value="@prioridad" selected="@(pedido.Prioridad == prioridad)">@prioridad</option>
@@ -490,8 +490,8 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <label class="form-label fw-bold">Observaciones de atención:</label>
-                        <textarea name="observacionesAtencion" class="form-control" rows="3" maxlength="500" placeholder="Describa cómo fue atendida la novedad"></textarea>
+                        <label for="observacionesAtencion" class="form-label fw-bold">Observaciones de atención:</label>
+                        <textarea id="observacionesAtencion" name="observacionesAtencion" class="form-control" rows="3" maxlength="500" placeholder="Describa cómo fue atendida la novedad"></textarea>
                     </div>
                     <div class="modal-footer border-0">
                         <button type="button" class="btn-pf-gray" data-bs-dismiss="modal">Cancelar</button>
@@ -523,8 +523,8 @@
                         }
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Motivo de Cancelación (Obligatorio):</label>
-                        <textarea name="motivoCancelacion" class="form-control" rows="3" maxlength="250" required placeholder="Especifique el motivo de cancelación"></textarea>
+                        <label for="motivoCancelacion" class="form-label fw-bold">Motivo de Cancelación (Obligatorio):</label>
+                        <textarea id="motivoCancelacion" name="motivoCancelacion" class="form-control" rows="3" maxlength="250" required placeholder="Especifique el motivo de cancelación"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -578,8 +578,8 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Tipo de Novedad:</label>
-                        <select name="tipoNovedad" class="form-select">
+                        <label for="tipoNovedad" class="form-label fw-bold">Tipo de Novedad:</label>
+                        <select id="tipoNovedad" name="tipoNovedad" class="form-select">
                             <option value="@TiposNovedad.Faltante">Faltante de Producto</option>
                             <option value="@TiposNovedad.Averia">Avería / Producto Dañado</option>
                             <option value="@TiposNovedad.UbicacionIncorrecta">Ubicación Física Incorrecta</option>
@@ -588,8 +588,8 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Descripción de la Novedad:</label>
-                        <textarea name="descripcion" class="form-control" rows="3" maxlength="500" required placeholder="Detalle la situación encontrada"></textarea>
+                        <label for="descripcion" class="form-label fw-bold">Descripción de la Novedad:</label>
+                        <textarea id="descripcion" name="descripcion" class="form-control" rows="3" maxlength="500" required placeholder="Detalle la situación encontrada"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0">

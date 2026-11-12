@@ -198,8 +198,8 @@
                     <p>Empleado: <strong id="inactivarEmpleadoNombre" data-pf-recibe="texto"></strong></p>
                     @if (!esAdmin)
                     {
-                        <label class="form-label fw-bold">Motivo (obligatorio):</label>
-                        <textarea name="motivo" class="form-control" rows="3" required placeholder="Especifique el motivo de la inactivación"></textarea>
+                        <label for="motivo" class="form-label fw-bold">Motivo (obligatorio):</label>
+                        <textarea id="motivo" name="motivo" class="form-control" rows="3" required placeholder="Especifique el motivo de la inactivación"></textarea>
                     }
                 </div>
                 <div class="modal-footer border-0">

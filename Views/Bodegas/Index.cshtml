@@ -25,7 +25,8 @@
             {
                 <input type="hidden" name="estado" value="@filtroEstado" />
             }
-            <input type="text" name="busquedaProducto" value="@busquedaProducto" class="form-control" style="width: 320px; max-width: 100%;" placeholder="Código o nombre del producto..." />
+            <label class="visually-hidden" for="filtroBusquedaProducto">Buscar producto</label>
+            <input id="filtroBusquedaProducto" type="text" name="busquedaProducto" value="@busquedaProducto" class="form-control" style="width: 320px; max-width: 100%;" placeholder="Código o nombre del producto..." />
             <button type="submit" class="btn-pf-blue">Buscar</button>
             @if (hayBusquedaProducto)
             {
@@ -114,7 +115,8 @@
                                     Estado <i class="bi @(activoEstado ? "bi-funnel-fill" : "bi-funnel")"></i>
                                 </button>
                                 <div class="dropdown-menu th-filtro-menu">
-                                    <select name="estado" class="form-select form-select-sm filtro-auto">
+                                    <label class="visually-hidden" for="filtroEstado">Filtrar por estado</label>
+                                    <select id="filtroEstado" name="estado" class="form-select form-select-sm filtro-auto">
                                         <option value="">Todas</option>
                                         <option value="Activa" selected="@(filtroEstado == "Activa")">Activa</option>
                                         <option value="Inactiva" selected="@(filtroEstado == "Inactiva")">Inactiva</option>

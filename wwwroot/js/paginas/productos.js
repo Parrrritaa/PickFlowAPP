@@ -20,7 +20,7 @@
     var modalProducto = document.getElementById('modalProducto');
     modalProducto.addEventListener('show.bs.modal', function (e) {
         var origen = e.relatedTarget;
-        var ubicaciones = parseInt(origen.dataset.ubicaciones, 10) || 0;
+        var ubicaciones = Number.parseInt(origen.dataset.ubicaciones, 10) || 0;
         document.getElementById('tituloModalProducto').textContent = 'Editar ' + origen.dataset.codigo;
         document.getElementById('textoModalProducto').textContent = ubicaciones > 1
             ? 'Los cambios se verán en sus ' + ubicaciones + ' ubicaciones.'
@@ -36,7 +36,7 @@
     var modalEliminar = document.getElementById('modalEliminarCategoria');
     modalEliminar.addEventListener('show.bs.modal', function (e) {
         var origen = e.relatedTarget;
-        var n = parseInt(origen.dataset.productos, 10) || 0;
+        var n = Number.parseInt(origen.dataset.productos, 10) || 0;
         document.getElementById('eliminarCategoriaId').value = origen.dataset.id;
         document.getElementById('tituloEliminarCategoria').textContent = '¿Eliminar «' + origen.dataset.nombre + '»?';
         document.getElementById('textoEliminarCategoria').textContent = n === 0
