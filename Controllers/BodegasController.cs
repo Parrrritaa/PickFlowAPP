@@ -242,37 +242,40 @@ namespace PickingApp.Controllers
             var bodega = await _context.Bodegas.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == bodegaId);
             if (bodega == null) return NotFound();
 
-            return await FormularioUbicacionAsync(new Ubicacion { BodegaId = bodegaId }, bodega, new SeleccionProductoViewModel());
+            return await FormularioUbicacionAsync(new UbicacionCampos { Activa = true }, bodega, new SeleccionProductoViewModel());
         }
 
-        // Los campos de la ubicación llegan como "Ubicacion.Pasillo", "Ubicacion.Estante"... (UbicacionFormViewModel)
-        // y los del producto en "seleccion" (campos seleccion.Modo, seleccion.ProductoId, ...)
+        // Los campos de la ubicación llegan como "Ubicacion.Pasillo", "Ubicacion.Estante"... (UbicacionFormViewModel),
+        // los del producto en "seleccion" (seleccion.Modo, seleccion.ProductoId, ...) y la bodega en la ruta
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CrearUbicacion([Bind(nameof(Ubicacion.BodegaId), nameof(Ubicacion.Pasillo), nameof(Ubicacion.Estante),
-            nameof(Ubicacion.Nivel), nameof(Ubicacion.Activa), Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion)
+        public async Task<IActionResult> CrearUbicacion(int bodegaId, [Bind(Prefix = PrefijoUbicacion)] UbicacionCampos campos, SeleccionProductoViewModel seleccion)
         {
-            var bodega = await _context.Bodegas.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == model.BodegaId);
+            var bodega = await _context.Bodegas.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == bodegaId);
             if (bodega == null) return NotFound();
-            ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.Producto)}");
 
             var producto = await ResolverProductoAsync(seleccion);
             if (!ModelState.IsValid || producto == null)
             {
-                return await FormularioUbicacionAsync(model, bodega, seleccion);
+                return await FormularioUbicacionAsync(campos, bodega, seleccion);
             }
 
             // El código de ubicación siempre se genera automáticamente: PASXX-ESTXX-NIVXX
-            model.Pasillo = model.Pasillo.Trim();
-            model.Estante = model.Estante.Trim();
-            model.Nivel = model.Nivel.Trim();
+            var model = new Ubicacion
+            {
+                BodegaId = bodegaId,
+                Pasillo = campos.Pasillo.Trim(),
+                Estante = campos.Estante.Trim(),
+                Nivel = campos.Nivel.Trim(),
+                Activa = campos.Activa!.Value,
+            };
             model.CodigoUbicacion = Ubicacion.GenerarCodigo(model.Pasillo, model.Estante, model.Nivel);
 
-            if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == model.BodegaId && u.CodigoUbicacion == model.CodigoUbicacion))
+            if (await _context.Ubicaciones.AnyAsync(u => u.BodegaId == bodegaId && u.CodigoUbicacion == model.CodigoUbicacion))
             {
-                ModelState.AddModelError($"{PrefijoUbicacion}.{nameof(Ubicacion.CodigoUbicacion)}", "Ya existe una ubicación con ese código en esta bodega.");
-                return await FormularioUbicacionAsync(model, bodega, seleccion);
+                ModelState.AddModelError(string.Empty, "Ya existe una ubicación con ese código en esta bodega.");
+                return await FormularioUbicacionAsync(campos, bodega, seleccion);
             }
 
             // Producto nuevo: se inserta junto con la ubicación en el mismo SaveChanges
@@ -304,14 +307,13 @@ namespace PickingApp.Controllers
 
             if (ubicacion == null) return NotFound();
 
-            return await FormularioUbicacionAsync(ubicacion, ubicacion.Bodega!, new SeleccionProductoViewModel { ProductoId = ubicacion.ProductoId });
+            return await FormularioUbicacionAsync(UbicacionCampos.De(ubicacion), ubicacion.Bodega!, new SeleccionProductoViewModel { ProductoId = ubicacion.ProductoId }, ubicacion);
         }
 
         [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditarUbicacion(int id, [Bind(nameof(Ubicacion.Pasillo), nameof(Ubicacion.Estante), nameof(Ubicacion.Nivel),
-            nameof(Ubicacion.Activa), Prefix = PrefijoUbicacion)] Ubicacion model, SeleccionProductoViewModel seleccion, string? motivo)
+        public async Task<IActionResult> EditarUbicacion(int id, [Bind(Prefix = PrefijoUbicacion)] UbicacionCampos campos, SeleccionProductoViewModel seleccion, string? motivo)
         {
             var ubicacionExistente = await _context.Ubicaciones.DelAlcance(User)
                 .Include(u => u.Bodega)
@@ -319,9 +321,6 @@ namespace PickingApp.Controllers
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (ubicacionExistente == null) return NotFound();
-
-            ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.Producto)}");
-            ModelState.Remove($"{PrefijoUbicacion}.{nameof(Ubicacion.CodigoUbicacion)}");
 
             motivo = (motivo ?? string.Empty).Trim();
 
@@ -332,14 +331,7 @@ namespace PickingApp.Controllers
 
             // Vuelve a mostrar el formulario con lo que escribió el usuario (no se guarda nada).
             // El motivo lo repone la vista desde ModelState, como cualquier campo enviado.
-            Task<IActionResult> Reintentar()
-            {
-                ubicacionExistente.Pasillo = model.Pasillo;
-                ubicacionExistente.Estante = model.Estante;
-                ubicacionExistente.Nivel = model.Nivel;
-                ubicacionExistente.Activa = model.Activa;
-                return FormularioUbicacionAsync(ubicacionExistente, ubicacionExistente.Bodega!, seleccion);
-            }
+            Task<IActionResult> Reintentar() => FormularioUbicacionAsync(campos, ubicacionExistente.Bodega!, seleccion, ubicacionExistente);
 
             var producto = await ResolverProductoAsync(seleccion);
             if (!ModelState.IsValid || producto == null)
@@ -347,9 +339,10 @@ namespace PickingApp.Controllers
                 return await Reintentar();
             }
 
-            var pasillo = model.Pasillo.Trim();
-            var estante = model.Estante.Trim();
-            var nivel = model.Nivel.Trim();
+            var pasillo = campos.Pasillo.Trim();
+            var estante = campos.Estante.Trim();
+            var nivel = campos.Nivel.Trim();
+            var activa = campos.Activa!.Value;
             var codigoUbicacionNuevo = Ubicacion.GenerarCodigo(pasillo, estante, nivel);
 
             if (codigoUbicacionNuevo != ubicacionExistente.CodigoUbicacion &&
@@ -362,7 +355,7 @@ namespace PickingApp.Controllers
             var productoNuevo = producto.Id == 0;
 
             var impedimento = await ReglasUbicacion.ValidarCambioAsync(_context, ubicacionExistente,
-                cambiaProducto: productoNuevo || producto.Id != ubicacionExistente.ProductoId, quedaActiva: model.Activa);
+                cambiaProducto: productoNuevo || producto.Id != ubicacionExistente.ProductoId, quedaActiva: activa);
             if (impedimento != null)
             {
                 ModelState.AddModelError(string.Empty, impedimento);
@@ -377,7 +370,7 @@ namespace PickingApp.Controllers
                 ubicacionExistente.Estante = estante;
                 ubicacionExistente.Nivel = nivel;
                 ubicacionExistente.CodigoUbicacion = codigoUbicacionNuevo;
-                ubicacionExistente.Activa = model.Activa;
+                ubicacionExistente.Activa = activa;
                 ubicacionExistente.Producto = producto;
 
                 await _context.SaveChangesAsync();
@@ -396,7 +389,7 @@ namespace PickingApp.Controllers
                 var productoAnterior = ubicacionExistente.Producto;
                 var textoProductoAnterior = productoAnterior != null ? $"{productoAnterior.Codigo} · {productoAnterior.Nombre}" : "-";
                 cambios.Agregar(CamposUbicacion.Codigo, ubicacionExistente.CodigoUbicacion, codigoUbicacionNuevo);
-                cambios.Agregar(CamposUbicacion.Estado, ubicacionExistente.Activa ? "Activa" : "Inactiva", model.Activa ? "Activa" : "Inactiva");
+                cambios.Agregar(CamposUbicacion.Estado, ubicacionExistente.Activa ? "Activa" : "Inactiva", activa ? "Activa" : "Inactiva");
                 cambios.Agregar(CamposUbicacion.Producto, textoProductoAnterior,
                     $"{producto.Codigo} · {producto.Nombre}{(productoNuevo ? " (nuevo)" : "")}");
                 if (productoNuevo)
@@ -434,7 +427,7 @@ namespace PickingApp.Controllers
                         Estante = estante,
                         Nivel = nivel,
                         CodigoUbicacion = codigoUbicacionNuevo,
-                        Activa = model.Activa,
+                        Activa = activa,
                         ProductoId = productoNuevo ? null : producto.Id,
                         ProductoNuevo = productoNuevo,
                         CodigoProducto = producto.Codigo,
@@ -522,10 +515,14 @@ namespace PickingApp.Controllers
         private const string PrefijoUbicacion = nameof(UbicacionFormViewModel.Ubicacion);
 
         // Formulario de Crear/Editar ubicación (la vista sale del nombre de la acción que lo llama)
-        private async Task<IActionResult> FormularioUbicacionAsync(Ubicacion ubicacion, Bodega bodega, SeleccionProductoViewModel seleccion)
+        private async Task<IActionResult> FormularioUbicacionAsync(UbicacionCampos campos, Bodega bodega, SeleccionProductoViewModel seleccion, Ubicacion? existente = null)
         {
             await PrepararSeleccionProductoAsync(seleccion);
-            return View(new UbicacionFormViewModel { Ubicacion = ubicacion, Bodega = bodega, Seleccion = seleccion });
+            return View(new UbicacionFormViewModel
+            {
+                Ubicacion = campos, Bodega = bodega, Seleccion = seleccion,
+                Id = existente?.Id ?? 0, CodigoUbicacion = existente?.CodigoUbicacion ?? string.Empty,
+            });
         }
 
         // Productos y categorías para el bloque "Producto" del formulario de ubicación

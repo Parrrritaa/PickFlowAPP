@@ -60,10 +60,41 @@ namespace PickingApp.Models.ViewModels
 
     // Views/Bodegas/CrearUbicacion.cshtml y EditarUbicacion.cshtml.
     // Los campos de la ubicación viajan como "Ubicacion.Pasillo", "Ubicacion.Estante"...; los del producto como "seleccion.*".
+    // Id y CodigoUbicacion solo se muestran al editar (0 y vacío al crear); el POST recibe UbicacionCampos.
     public class UbicacionFormViewModel
     {
-        public Ubicacion Ubicacion { get; init; } = null!;
+        public UbicacionCampos Ubicacion { get; init; } = null!;
         public Bodega Bodega { get; init; } = null!;
         public SeleccionProductoViewModel Seleccion { get; init; } = new();
+        public int Id { get; init; }
+        public string CodigoUbicacion { get; init; } = string.Empty;
+    }
+
+    // Lo que envía el formulario de ubicación. La bodega y el Id llegan por la ruta, y Activa es anulable
+    // para que un formulario sin estado dé error en vez de guardar la ubicación como inactiva.
+    public class UbicacionCampos
+    {
+        [Required(ErrorMessage = "El pasillo es obligatorio")]
+        [StringLength(20)]
+        [RegularExpression(@"^\d{1,9}$", ErrorMessage = "El pasillo solo debe contener números (hasta 9 dígitos)")]
+        public string Pasillo { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El estante es obligatorio")]
+        [StringLength(20)]
+        [RegularExpression(@"^\d{1,9}$", ErrorMessage = "El estante solo debe contener números (hasta 9 dígitos)")]
+        public string Estante { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El nivel es obligatorio")]
+        [StringLength(20)]
+        [RegularExpression(@"^\d{1,9}$", ErrorMessage = "El nivel solo debe contener números (hasta 9 dígitos)")]
+        public string Nivel { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Elija el estado de la ubicación")]
+        public bool? Activa { get; set; }
+
+        public static UbicacionCampos De(Ubicacion ubicacion) => new()
+        {
+            Pasillo = ubicacion.Pasillo, Estante = ubicacion.Estante, Nivel = ubicacion.Nivel, Activa = ubicacion.Activa,
+        };
     }
 }

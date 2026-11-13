@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using PickingApp.Services;
 
 namespace PickingApp.Models.ViewModels
@@ -14,6 +15,81 @@ namespace PickingApp.Models.ViewModels
         // Opciones del filtro de bodega del gráfico
         public List<Bodega> Bodegas { get; init; } = new();
         public List<Pedido> UltimosPedidos { get; init; } = new();
+    }
+
+    // Views/Empleados/Crear.cshtml y Editar.cshtml: solo lo que envía el formulario. El Id llega por la ruta, y fechas y
+    // horarios son anulables para que un campo que no llega dé error en vez de guardarse como 00:00 o 01/01/0001.
+    public class EmpleadoCampos
+    {
+        [Required(ErrorMessage = "La identificación es obligatoria")]
+        [StringLength(30)]
+        [RegularExpression(@"^\d+$", ErrorMessage = "La identificación solo debe contener números")]
+        public string Identificacion { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El nombre completo es obligatorio")]
+        [StringLength(100)]
+        public string NombreCompleto { get; set; } = string.Empty;
+
+        [EmailAddress]
+        [StringLength(100)]
+        public string? Correo { get; set; }
+
+        [Required(ErrorMessage = "La hora de entrada es obligatoria")]
+        public TimeSpan? HorarioEntrada { get; set; }
+
+        [Required(ErrorMessage = "La hora de salida es obligatoria")]
+        public TimeSpan? HorarioSalida { get; set; }
+
+        [Required(ErrorMessage = "La fecha de ingreso es obligatoria")]
+        public DateTime? FechaIngreso { get; set; }
+
+        public int? BodegaId { get; set; }
+
+        public static EmpleadoCampos De(Empleado empleado) => new()
+        {
+            Identificacion = empleado.Identificacion, NombreCompleto = empleado.NombreCompleto, Correo = empleado.Correo,
+            HorarioEntrada = empleado.HorarioEntrada, HorarioSalida = empleado.HorarioSalida,
+            FechaIngreso = empleado.FechaIngreso, BodegaId = empleado.BodegaId,
+        };
+
+        // Solo después de validar: los campos obligatorios ya tienen valor
+        public Empleado ComoEmpleado() => new()
+        {
+            Identificacion = Identificacion, NombreCompleto = NombreCompleto, Correo = Correo,
+            HorarioEntrada = HorarioEntrada!.Value, HorarioSalida = HorarioSalida!.Value,
+            FechaIngreso = FechaIngreso!.Value, BodegaId = BodegaId,
+        };
+    }
+
+    // Views/Usuarios/Crear.cshtml: solo lo que envía el formulario (la contraseña llega aparte y se guarda como hash).
+    // RolId es anulable: el Supervisor no lo envía y el controlador lo fija; si falta en el del Administrador,
+    // la validación contra el catálogo de roles lo rechaza en vez de crear un auxiliar sin avisar.
+    public class UsuarioCampos
+    {
+        [Required(ErrorMessage = "El nombre completo es obligatorio")]
+        [StringLength(100)]
+        public string NombreCompleto { get; set; } = string.Empty;
+
+        [StringLength(30)]
+        [RegularExpression(@"^\d*$", ErrorMessage = "La identificación solo debe contener números")]
+        public string? Identificacion { get; set; }
+
+        [Required(ErrorMessage = "El correo es obligatorio")]
+        [EmailAddress(ErrorMessage = "Formato de correo electrónico inválido")]
+        [StringLength(100)]
+        public string Correo { get; set; } = string.Empty;
+
+        public int? RolId { get; set; }
+
+        public string Estado { get; set; } = string.Empty;
+
+        public int? BodegaId { get; set; }
+
+        public Usuario ComoUsuario() => new()
+        {
+            NombreCompleto = NombreCompleto, Identificacion = Identificacion, Correo = Correo,
+            RolId = RolId ?? 0, Estado = Estado, BodegaId = BodegaId,
+        };
     }
 
     // Views/Empleados/Index.cshtml

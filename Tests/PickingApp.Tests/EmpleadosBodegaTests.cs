@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PickingApp.Controllers;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Tests
@@ -45,12 +46,27 @@ namespace PickingApp.Tests
             };
         }
 
-        private static Empleado Formulario(int? bodegaId, string identificacion = "998877") => new()
+        private static EmpleadoCampos Formulario(int? bodegaId, string identificacion = "998877") => new()
         {
             Identificacion = identificacion, NombreCompleto = "Empleado nuevo",
             HorarioEntrada = new TimeSpan(8, 0, 0), HorarioSalida = new TimeSpan(16, 0, 0),
             FechaIngreso = new DateTime(2026, 1, 15), BodegaId = bodegaId
         };
+
+        [Fact]
+        public void UnEmpleadoSinFechaNiHorarioNoEsValido()
+        {
+            // Como lo deja el model binder si el formulario no envía fecha ni horario
+            var campos = new EmpleadoCampos { Identificacion = "123", NombreCompleto = "Ana Ruiz" };
+            var errores = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+
+            Assert.False(System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+                campos, new System.ComponentModel.DataAnnotations.ValidationContext(campos), errores, true));
+            var conError = errores.SelectMany(r => r.MemberNames).ToList();
+            Assert.Contains(nameof(EmpleadoCampos.FechaIngreso), conError);
+            Assert.Contains(nameof(EmpleadoCampos.HorarioEntrada), conError);
+            Assert.Contains(nameof(EmpleadoCampos.HorarioSalida), conError);
+        }
 
         [Fact]
         public async Task LoQueRegistraElSupervisorQuedaEnSuBodega()
@@ -96,16 +112,15 @@ namespace PickingApp.Tests
             e.Db.SaveChanges();
 
             var formulario = Formulario(sur.Id, empleado.Identificacion);
-            formulario.Id = empleado.Id;
             var controlador = Como(e, admin);
-            await controlador.Editar(formulario, motivo: null);
+            await controlador.Editar(empleado.Id, formulario, motivo: null);
 
             Assert.Contains(controlador.ModelState["BodegaId"]!.Errors, x => x.ErrorMessage.Contains("en curso"));
             Assert.Equal(norte.Id, empleado.BodegaId);
 
             pedido.Estado = PedidoEstados.Completado;
             e.Db.SaveChanges();
-            await Como(e, admin).Editar(formulario, motivo: null);
+            await Como(e, admin).Editar(empleado.Id, formulario, motivo: null);
             Assert.Equal(sur.Id, empleado.BodegaId);
         }
 

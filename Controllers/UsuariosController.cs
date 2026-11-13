@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickingApp.Data;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Controllers
@@ -87,13 +88,13 @@ namespace PickingApp.Controllers
             return View();
         }
 
-        // [Bind] limita qué campos del formulario se copian al modelo: aunque alguien envíe
-        // PasswordHash o IntentosFallidos manipulando el formulario, se ignoran
+        // UsuarioCampos solo tiene los campos del formulario: aunque alguien envíe PasswordHash
+        // o IntentosFallidos manipulando el formulario, no hay dónde copiarlos
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Crear([Bind(nameof(Usuario.NombreCompleto), nameof(Usuario.Identificacion), nameof(Usuario.Correo),
-            nameof(Usuario.RolId), nameof(Usuario.Estado), nameof(Usuario.BodegaId))] Usuario model, string password, string confirmPassword)
+        public async Task<IActionResult> Crear(UsuarioCampos campos, string password, string confirmPassword)
         {
+            var model = campos.ComoUsuario();
             if (!EsAdministrador)
             {
                 // El Supervisor solo crea auxiliares de su bodega: rol y bodega se fijan aquí, no vienen del formulario
@@ -104,10 +105,6 @@ namespace PickingApp.Controllers
             {
                 model.BodegaId = null;
             }
-
-            // El formulario envía la contraseña en "password", no en "PasswordHash": el binding automático
-            // la deja vacía y dispara el [Required] del modelo antes de llegar aquí. Se valida a mano abajo.
-            ModelState.Remove("PasswordHash");
 
             if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
             {
@@ -161,7 +158,7 @@ namespace PickingApp.Controllers
 
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return View(campos);
             }
 
             // La contraseña se guarda como hash BCrypt, nunca en texto plano
