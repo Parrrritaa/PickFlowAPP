@@ -44,14 +44,20 @@ namespace PickingApp.Controllers
                 Atendida = false
             };
 
-            // Se agregan la novedad y la notificación al Administrador; ambas se guardan en el mismo SaveChangesAsync
+            // Se agregan la novedad y los avisos a quienes pueden atenderla; todo se guarda en el mismo SaveChangesAsync
             _context.NovedadesPedido.Add(novedad);
 
-            await Avisos.AlRolAsync(_context, Roles.IdAdministrador,
-                "Novedad en Pedido",
-                $"Se registró una novedad de tipo '{tipoNovedad}' en el pedido {pedido.CodigoPedido}.",
-                TiposNotificacion.Warning,
-                $"/Pedidos/Detalle/{pedidoId}");
+            var titulo = "Novedad en Pedido";
+            var mensaje = $"Se registró una novedad de tipo '{tipoNovedad}' en el pedido {pedido.CodigoPedido}.";
+            var enlace = $"/Pedidos/Detalle/{pedidoId}";
+            await Avisos.AlRolAsync(_context, Roles.IdAdministrador, titulo, mensaje, TiposNotificacion.Warning, enlace);
+
+            // Supervisores de la bodega del pedido, salvo quien la registró
+            var supervisores = await _context.Usuarios
+                .Where(u => u.RolId == Roles.IdSupervisor && u.BodegaId == pedido.BodegaId && u.Id != novedad.RegistradoPorId)
+                .Select(u => u.Id).ToListAsync();
+            foreach (var id in supervisores)
+                Avisos.AlUsuario(_context, id, titulo, mensaje, TiposNotificacion.Warning, enlace);
 
             await _context.SaveChangesAsync();
 
@@ -62,8 +68,8 @@ namespace PickingApp.Controllers
             return RedirectToAction(nameof(Detalle), new { id = pedidoId });
         }
 
-        // CU-30: Atender novedad (Solo Administrador)
-        [Authorize(Roles = Roles.Administrador)]
+        // CU-30: Atender novedad (Administrador, o Supervisor en su bodega: DelAlcance filtra la novedad)
+        [Authorize(Roles = Roles.AdministradorOSupervisor)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AtenderNovedad(int novedadId,
