@@ -1,4 +1,4 @@
-@model PickingApp.Models.Bodega
+@model PickingApp.Models.ViewModels.BodegaCampos
 @{
     ViewData["Title"] = "Editar bodega";
 }
@@ -16,11 +16,8 @@
         </div>
     }
 
-    <form asp-action="Editar" asp-route-id="@Model.Id" method="post">
+    <form asp-action="Editar" asp-route-id="@ViewContext.RouteData.Values["id"]" method="post">
         @Html.AntiForgeryToken()
-        <input type="hidden" asp-for="Id" />
-        <input type="hidden" asp-for="Codigo" />
-        <input type="hidden" asp-for="FechaCreacion" />
 
         <div class="pf-info-banner mb-3" style="font-size: 13px;">
             Código de bodega: <strong>@Model.Codigo</strong> (no editable).

@@ -61,16 +61,22 @@
     }
 
     // Campos que cambiaron (valor anterior → nuevo) para que quien revisa la solicitud los compare
-    public class ListaCambios : List<CambioSolicitud>
+    public class ListaCambios
     {
+        private readonly List<CambioSolicitud> _cambios = new();
+
+        public int Count => _cambios.Count;
+
         // Un campo que queda igual no se agrega
         public void Agregar(string campo, string anterior, string nuevo)
         {
             if (!string.Equals(anterior, nuevo, StringComparison.Ordinal))
             {
-                Add(new CambioSolicitud { Campo = campo, Anterior = anterior, Nuevo = nuevo });
+                _cambios.Add(new CambioSolicitud { Campo = campo, Anterior = anterior, Nuevo = nuevo });
             }
         }
+
+        public List<CambioSolicitud> ToList() => new(_cambios);
     }
 
     // RegistroEmpleado guarda estos datos en la raíz; EdicionEmpleado los guarda en NuevosDatos
