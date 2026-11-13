@@ -227,6 +227,28 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public async Task ElSupervisorDeLaBodegaSeEnteraYAtiendeLaNovedad()
+        {
+            using var e = new Escenario();
+            var pedido = e.Pedido(PedidoEstados.Pendiente, (e.Ubicacion(Escenario.Mediano), 1));
+            var auxiliar = Usuario(e, Roles.IdAuxiliar, Principal(e));
+            var supervisor = Usuario(e, Roles.IdSupervisor, Principal(e));
+            var delSur = Usuario(e, Roles.IdSupervisor, new Bodega { Codigo = "BOD-91", Nombre = "Sur" });
+
+            await Pedidos(e, auxiliar).RegistrarNovedad(pedido.Id, TiposNovedad.Faltante, "Faltan 2 unidades");
+            Assert.Single(e.Db.Notificaciones, n => n.UsuarioDestinoId == supervisor.Id && n.Titulo == "Novedad en Pedido");
+            Assert.DoesNotContain(e.Db.Notificaciones, n => n.UsuarioDestinoId == delSur.Id);
+
+            var novedad = e.Db.NovedadesPedido.Single();
+            Assert.IsType<NotFoundResult>(await Pedidos(e, delSur).AtenderNovedad(novedad.Id, "No es mía"));
+            Assert.False(novedad.Atendida);
+
+            await Pedidos(e, supervisor).AtenderNovedad(novedad.Id, "Se repuso desde reserva");
+            Assert.True(novedad.Atendida);
+            Assert.Single(e.Db.Notificaciones, n => n.UsuarioDestinoId == auxiliar.Id && n.Titulo == "Novedad Atendida");
+        }
+
+        [Fact]
         public async Task ElDashboardYLosReportesSoloCuentanLaBodegaPropia()
         {
             using var e = new Escenario();

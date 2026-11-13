@@ -299,7 +299,7 @@
                                 <th>Novedad</th>
                                 <th>Registro</th>
                                 <th>Estado</th>
-                                @if (userRole == Roles.Administrador)
+                                @if (esGestor)
                                 {
                                     <th class="text-end"><span class="visually-hidden">Acción</span></th>
                                 }
@@ -329,7 +329,7 @@
                                             <i class="bi @(nov.Atendida ? "bi-check2" : "bi-exclamation-triangle-fill")" aria-hidden="true"></i>@(nov.Atendida ? "Atendida" : "Sin atender")
                                         </span>
                                     </td>
-                                    @if (userRole == Roles.Administrador)
+                                    @if (esGestor)
                                     {
                                         <td class="text-end">
                                             @if (!nov.Atendida)
@@ -477,7 +477,10 @@
             </div>
         </div>
     </div>
+}
 
+@if (esGestor)
+{
     <!-- Modal Atender Novedad (CU-30) -->
     <div class="modal fade" id="modalAtenderNovedad" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
