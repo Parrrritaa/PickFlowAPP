@@ -53,6 +53,38 @@ namespace PickingApp.Tests
                 e.Motor(), new SinAuditoria()), quien);
 
         [Fact]
+        public void UnaBodegaSinEstadoNoEsValida()
+        {
+            // Sin asignar Activa, como lo deja el model binder si el formulario no la envía
+            var campos = new BodegaCampos { Nombre = "Norte" };
+            var errores = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+
+            Assert.False(System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+                campos, new System.ComponentModel.DataAnnotations.ValidationContext(campos), errores, true));
+            Assert.Contains(errores, r => r.MemberNames.Contains(nameof(BodegaCampos.Activa)));
+        }
+
+        [Fact]
+        public async Task EditarBodegaSoloGuardaSiElFormularioEsValido()
+        {
+            using var e = new Escenario();
+            var bodega = Principal(e);
+            var admin = Usuario(e, Roles.IdAdministrador, null);
+
+            var conError = Como(new BodegasController(e.Db, new SinAuditoria()), admin);
+            conError.ModelState.AddModelError(nameof(BodegaCampos.Activa), "Elija el estado de la bodega");
+            var vista = Assert.IsType<ViewResult>(await conError.Editar(bodega.Id, new BodegaCampos { Nombre = "Otro nombre", Activa = null }));
+            Assert.Equal(bodega.Codigo, Assert.IsType<BodegaCampos>(vista.Model).Codigo);
+            Assert.NotEqual("Otro nombre", e.Db.Bodegas.Single(b => b.Id == bodega.Id).Nombre);
+
+            await Como(new BodegasController(e.Db, new SinAuditoria()), admin)
+                .Editar(bodega.Id, new BodegaCampos { Nombre = "  Bodega Norte  ", Activa = false });
+            var guardada = e.Db.Bodegas.Single(b => b.Id == bodega.Id);
+            Assert.Equal("Bodega Norte", guardada.Nombre);
+            Assert.False(guardada.Activa);
+        }
+
+        [Fact]
         public async Task ElSupervisorSoloVeLoDeSuBodegaYElAdministradorTodo()
         {
             using var e = new Escenario();

@@ -320,7 +320,7 @@ namespace PickingApp.Controllers
                 await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.EdicionEmpleado, new SolicitudEdicionEmpleado
                 {
                     Motivo = motivo,
-                    Cambios = cambios,
+                    Cambios = cambios.ToList(),
                     NuevosDatos = DatosEmpleadoSolicitud.Desde(model)
                 }, "Solicitud de Edición de Empleado", $"modificar los datos del empleado {model.NombreCompleto}", TiposNotificacion.Info);
 

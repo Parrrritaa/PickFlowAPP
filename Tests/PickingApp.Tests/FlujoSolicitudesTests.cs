@@ -83,7 +83,7 @@ namespace PickingApp.Tests
             var solicitud = Solicitud.Nueva(TiposSolicitud.EdicionUbicacion, 1, new SolicitudEdicionUbicacion
             {
                 UbicacionId = ubicacion.Id,
-                Cambios = cambios,
+                Cambios = cambios.ToList(),
                 NuevosDatos = new DatosUbicacionSolicitud { ProductoId = otra.ProductoId, CodigoProducto = otra.Producto.Codigo, Activa = true }
             });
 
