@@ -432,7 +432,7 @@ namespace PickingApp.Controllers
                     CodigoUbicacion = ubicacionExistente.CodigoUbicacion,
                     Producto = productoAnterior != null ? textoProductoAnterior : "Sin producto",
                     Motivo = motivo,
-                    Cambios = cambios,
+                    Cambios = cambios.ToList(),
                     NuevosDatos = new DatosUbicacionSolicitud
                     {
                         Pasillo = pasillo,

@@ -118,6 +118,7 @@
 
         el('pfCentro').innerHTML = estado.tipo === 'doughnut' && !vacio && !estado.tabla
             ? '<strong>' + datos.total + '</strong><span>' + (datos.total === 1 ? 'pedido' : 'pedidos') + '</span>' : '';
+        el('pfCentro').parentElement.setAttribute('aria-label', vacio ? 'Gráfica de pedidos' : 'Gráfica de pedidos: ' + datos.total + (datos.total === 1 ? ' pedido' : ' pedidos'));
 
         if (vacio || estado.tabla) {
             if (grafica) { grafica.destroy(); grafica = null; dibujada = null; }

@@ -55,6 +55,7 @@
         form.querySelector('.pf-rg-lienzo').hidden = vacio;
         el('rgCentro').innerHTML = tipo === 'doughnut' && !vacio
             ? '<strong>' + datos.total + '</strong><span>' + (datos.total === 1 ? 'pedido' : 'pedidos') + '</span>' : '';
+        el('rgCentro').parentElement.setAttribute('aria-label', vacio ? 'Vista previa de la gráfica del reporte' : 'Vista previa de la gráfica del reporte: ' + datos.total + (datos.total === 1 ? ' pedido' : ' pedidos'));
 
         if (grafica) { grafica.destroy(); grafica = null; }
         if (!vacio) grafica = new Chart(el('rgGrafica'), configGrafica(tipo, datos, agrupar, false));
