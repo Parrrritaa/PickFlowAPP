@@ -123,20 +123,21 @@ namespace PickingApp.Controllers
         [HttpGet]
         public IActionResult Crear()
         {
-            return View();
+            return View(new BodegaCampos { Activa = true });
         }
 
         [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Crear([Bind(nameof(Bodega.Nombre), nameof(Bodega.Descripcion), nameof(Bodega.Activa))] Bodega model)
+        public async Task<IActionResult> Crear(BodegaCampos campos)
         {
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return View(campos);
             }
 
-            model.FechaCreacion = DateTime.Now;
+            var model = new Bodega { FechaCreacion = DateTime.Now };
+            campos.AplicarA(model);
             _context.Bodegas.Add(model);
 
             // El código de bodega siempre se genera automáticamente con autoincremento: BOD-01, BOD-02, ...
@@ -179,30 +180,24 @@ namespace PickingApp.Controllers
             var bodega = await _context.Bodegas.FindAsync(id);
             if (bodega == null) return NotFound();
 
-            return View(bodega);
+            return View(BodegaCampos.De(bodega));
         }
 
         [Authorize(Roles = Roles.Administrador)]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Editar(int id, [Bind(nameof(Bodega.Id), nameof(Bodega.Nombre), nameof(Bodega.Descripcion), nameof(Bodega.Activa))] Bodega model)
+        public async Task<IActionResult> Editar(int id, BodegaCampos campos)
         {
-            if (id != model.Id) return NotFound();
-
             var bodega = await _context.Bodegas.FindAsync(id);
             if (bodega == null) return NotFound();
 
-            ModelState.Remove("Codigo");
             if (!ModelState.IsValid)
             {
-                model.Codigo = bodega.Codigo;
-                model.FechaCreacion = bodega.FechaCreacion;
-                return View(model);
+                campos.Codigo = bodega.Codigo;
+                return View(campos);
             }
 
-            bodega.Nombre = model.Nombre.Trim();
-            bodega.Descripcion = model.Descripcion?.Trim();
-            bodega.Activa = model.Activa;
+            campos.AplicarA(bodega);
             await _context.SaveChangesAsync();
 
             await _auditService.RegistrarAsync("Editar Bodega", "Bodegas",
