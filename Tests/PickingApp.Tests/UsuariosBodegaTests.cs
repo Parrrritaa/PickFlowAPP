@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using PickingApp.Controllers;
 using PickingApp.Models;
+using PickingApp.Models.ViewModels;
 using PickingApp.Services;
 
 namespace PickingApp.Tests
@@ -45,11 +46,27 @@ namespace PickingApp.Tests
             };
         }
 
-        private static Usuario Nuevo(int rolId, int? bodegaId) => new()
+        private static UsuarioCampos Nuevo(int rolId, int? bodegaId) => new()
         {
             NombreCompleto = "Nuevo", Identificacion = "123", Correo = $"{Guid.NewGuid():N}@prueba.com",
             RolId = rolId, BodegaId = bodegaId, Estado = EstadosUsuario.Activo
         };
+
+        [Fact]
+        public async Task ElAdministradorDebeElegirElRolAlCrear()
+        {
+            using var e = new Escenario();
+            var admin = Usuario(e, Roles.IdAdministrador, null);
+
+            // Formulario sin rol: antes se guardaba como Auxiliar sin avisar
+            var sinRol = Nuevo(Roles.IdAuxiliar, null);
+            sinRol.RolId = null;
+            var controlador = Como(e, admin);
+            Assert.IsType<ViewResult>(await controlador.Crear(sinRol, "Clave123", "Clave123"));
+
+            Assert.True(controlador.ModelState.ContainsKey("RolId"));
+            Assert.False(e.Db.Usuarios.Any(u => u.Correo == sinRol.Correo));
+        }
 
         [Fact]
         public async Task ElSupervisorSoloCreaAuxiliaresDeSuBodega()

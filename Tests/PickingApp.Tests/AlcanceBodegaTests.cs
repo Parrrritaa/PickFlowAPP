@@ -65,6 +65,18 @@ namespace PickingApp.Tests
         }
 
         [Fact]
+        public void UnaUbicacionSinEstadoNoEsValida()
+        {
+            // Sin asignar Activa, como lo deja el model binder si el formulario no la envía
+            var campos = new UbicacionCampos { Pasillo = "1", Estante = "2", Nivel = "3" };
+            var errores = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+
+            Assert.False(System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+                campos, new System.ComponentModel.DataAnnotations.ValidationContext(campos), errores, true));
+            Assert.Contains(errores, r => r.MemberNames.Contains(nameof(UbicacionCampos.Activa)));
+        }
+
+        [Fact]
         public async Task EditarBodegaSoloGuardaSiElFormularioEsValido()
         {
             using var e = new Escenario();

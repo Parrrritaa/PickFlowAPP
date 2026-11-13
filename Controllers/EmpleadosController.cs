@@ -142,36 +142,35 @@ namespace PickingApp.Controllers
         [HttpGet]
         public IActionResult Crear()
         {
-            var model = new Empleado
+            return View(new EmpleadoCampos
             {
                 FechaIngreso = DateTime.Today,
                 HorarioEntrada = new TimeSpan(8, 0, 0),
                 HorarioSalida = new TimeSpan(17, 0, 0)
-            };
-            return View(model);
+            });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Crear([Bind(nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto), nameof(Empleado.Correo),
-            nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso), nameof(Empleado.BodegaId))] Empleado model)
+        public async Task<IActionResult> Crear(EmpleadoCampos campos)
         {
             // Solo el Administrador elige la bodega; lo que registra (o solicita) un Supervisor o Auxiliar queda en la suya
             if (!User.IsInRole(Roles.Administrador))
             {
-                model.BodegaId = User.IdBodega();
+                campos.BodegaId = User.IdBodega();
             }
-            else if (!await BodegaActivaAsync(model.BodegaId))
+            else if (!await BodegaActivaAsync(campos.BodegaId))
             {
-                ModelState.AddModelError(nameof(Empleado.BodegaId), "Elige una bodega activa.");
+                ModelState.AddModelError(nameof(EmpleadoCampos.BodegaId), "Elige una bodega activa.");
             }
 
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return View(campos);
             }
 
             // Reglas que necesitan consultar la BD: identificación y correo únicos, duración máxima de jornada
+            var model = campos.ComoEmpleado();
             model.Identificacion = model.Identificacion.Trim();
             model.Correo = ReglasEmpleado.NormalizarCorreo(model.Correo);
             var error = await ReglasEmpleado.ValidarAsync(_context, model.Identificacion, model.Correo,
@@ -179,7 +178,7 @@ namespace PickingApp.Controllers
             if (error != null)
             {
                 ModelState.AddModelError(error.Campo, error.Mensaje);
-                return View(model);
+                return View(campos);
             }
 
 
@@ -202,7 +201,7 @@ namespace PickingApp.Controllers
                 if (pendiente != null)
                 {
                     ModelState.AddModelError(nameof(Empleado.Identificacion), SolicitudesPendientes.Mensaje(pendiente, "un empleado con esta identificación"));
-                    return View(model);
+                    return View(campos);
                 }
 
                 // El empleado aún no se crea: sus datos se guardan como JSON en la solicitud
@@ -226,25 +225,27 @@ namespace PickingApp.Controllers
             var empleado = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleado == null) return NotFound();
 
-            return View(empleado);
+            return View(EmpleadoCampos.De(empleado));
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Editar([Bind(nameof(Empleado.Id), nameof(Empleado.Identificacion), nameof(Empleado.NombreCompleto),
-            nameof(Empleado.Correo), nameof(Empleado.HorarioEntrada), nameof(Empleado.HorarioSalida), nameof(Empleado.FechaIngreso),
-            nameof(Empleado.BodegaId))] Empleado model,
-            string? motivo)
+        public async Task<IActionResult> Editar(int id, EmpleadoCampos campos, string? motivo)
         {
             motivo = (motivo ?? string.Empty).Trim();
 
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return View(campos);
             }
 
-            var empleadoExistente = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == model.Id);
+            var empleadoExistente = await _context.Empleados.DelAlcance(User).FirstOrDefaultAsync(x => x.Id == id);
             if (empleadoExistente == null) return NotFound();
+
+            // La identificación no se edita: se toma la guardada, no la que llegue en el formulario
+            var model = campos.ComoEmpleado();
+            model.Id = empleadoExistente.Id;
+            model.Identificacion = empleadoExistente.Identificacion;
 
             model.Correo = ReglasEmpleado.NormalizarCorreo(model.Correo);
             var error = await ReglasEmpleado.ValidarAsync(_context, empleadoExistente.Identificacion, model.Correo,
@@ -252,7 +253,7 @@ namespace PickingApp.Controllers
             if (error != null)
             {
                 ModelState.AddModelError(error.Campo, error.Mensaje);
-                return View(model);
+                return View(campos);
             }
 
 
@@ -269,7 +270,7 @@ namespace PickingApp.Controllers
                     if (errorTraslado != null)
                     {
                         ModelState.AddModelError(nameof(Empleado.BodegaId), errorTraslado);
-                        return View(model);
+                        return View(campos);
                     }
                 }
 
@@ -295,7 +296,7 @@ namespace PickingApp.Controllers
                 if (string.IsNullOrWhiteSpace(motivo))
                 {
                     ModelState.AddModelError(string.Empty, "Debe indicar el motivo de la edición.");
-                    return View(model);
+                    return View(campos);
                 }
 
                 var cambios = new ListaCambios();
@@ -314,7 +315,7 @@ namespace PickingApp.Controllers
                 if (errorSolicitud != null)
                 {
                     ModelState.AddModelError(string.Empty, errorSolicitud);
-                    return View(model);
+                    return View(campos);
                 }
 
                 await FlujoSolicitudes.CrearAsync(_context, User, TiposSolicitud.EdicionEmpleado, new SolicitudEdicionEmpleado

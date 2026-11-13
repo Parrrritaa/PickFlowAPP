@@ -27,7 +27,7 @@
         </div>
     }
 
-    <form asp-action="EditarUbicacion" asp-route-id="@Model.Ubicacion.Id" method="post">
+    <form asp-action="EditarUbicacion" asp-route-id="@Model.Id" method="post">
         @Html.AntiForgeryToken()
         <partial name="_CamposUbicacion" model="Model" />
 
@@ -42,7 +42,7 @@
         }
 
         <div class="d-flex justify-content-end gap-3 pt-2">
-            <a asp-action="Detalle" asp-route-id="@Model.Ubicacion.BodegaId" class="btn-pf-gray" data-pf-volver="ultima">
+            <a asp-action="Detalle" asp-route-id="@Model.Bodega.Id" class="btn-pf-gray" data-pf-volver="ultima">
                 Cancelar
             </a>
             <button type="submit" class="btn-pf-blue">

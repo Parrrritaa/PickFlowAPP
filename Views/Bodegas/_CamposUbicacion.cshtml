@@ -1,8 +1,6 @@
 ﻿@model PickingApp.Models.ViewModels.UbicacionFormViewModel
 @* Campos comunes de Crear y Editar ubicación. Recibe el mismo modelo que la vista, así los asp-for
    generan los mismos nombres (Ubicacion.Pasillo...) que espera el [Bind] del controlador. *@
-<input type="hidden" asp-for="Ubicacion.BodegaId" />
-
 <div class="row mb-3">
     <div class="col-md-12 pf-form-group">
         <label for="bodegaNombre" class="pf-label">Bodega</label>
@@ -30,9 +28,9 @@
 
 <div class="pf-info-banner mb-3" style="font-size: 13px;">
     El código de la ubicación se genera automáticamente a partir de estos datos (ej: <strong>PAS01-EST02-NIV03</strong>).
-    @if (Model.Ubicacion.Id > 0)
+    @if (Model.Id > 0)
     {
-        <text>Código actual: <strong>@Model.Ubicacion.CodigoUbicacion</strong>.</text>
+        <text>Código actual: <strong>@Model.CodigoUbicacion</strong>.</text>
     }
 </div>
 

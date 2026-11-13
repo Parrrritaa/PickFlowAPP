@@ -1,4 +1,4 @@
-@model PickingApp.Models.Empleado
+@model PickingApp.Models.ViewModels.EmpleadoCampos
 @{
     ViewData["Title"] = "Editar empleado";
     var nombres = "";
@@ -38,9 +38,8 @@
         </div>
     }
 
-    <form asp-action="Editar" method="post" id="formEmpleado">
+    <form asp-action="Editar" asp-route-id="@ViewContext.RouteData.Values["id"]" method="post" id="formEmpleado">
         @Html.AntiForgeryToken()
-        <input type="hidden" asp-for="Id" />
         <input type="hidden" asp-for="Identificacion" />
         <input type="hidden" asp-for="NombreCompleto" id="hiddenNombreCompleto" />
 
