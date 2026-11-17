@@ -66,3 +66,6 @@ anti-slop/
 CLAUDE.md
 skills-lock.json
 .gitattributes
+
+# Reporte de cobertura
+cobertura/
